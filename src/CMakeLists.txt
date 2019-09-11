@@ -215,6 +215,7 @@ add_library (artscore STATIC
   lineshapemodel.cc
   linefunctions.cc
   m_abs.cc
+  m_absorptionlines.cc
   m_abs_lookup.cc
   m_agenda.cc
   m_atmosphere.cc
