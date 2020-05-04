@@ -537,3 +537,32 @@ arts_test_cmdline("version" -v)
 arts_test_cmdline("workspacevariables" -w all)
 arts_test_cmdline("check-docs" -C)
 
+############# GUI ###############
+if (ARTS_GUI)
+  cmake_minimum_required(VERSION 3.6)
+
+  # glfw
+  find_package(glfw3 REQUIRED)
+  include_directories(${GLFW_INCLUDE_DIRS})
+  link_libraries(${GLFW_LIBRARY_DIRS})
+
+  # opengl
+  set(OpenGL_GL_PREFERENCE GLVND)
+  find_package(OpenGL REQUIRED)
+  include_directories(${OPENGL_INCLUDE_DIRS})
+
+  # glew
+  find_package(GLEW REQUIRED)
+  include_directories(${GLEW_INCLUDE_DIRS})
+
+  # Link to ARTS
+  target_link_libraries(artscore
+          imgui
+          implot
+          imfilebrowser
+          glfw
+          ${OPENGL_LIBRARIES}
+          ${GLEW_LIBRARIES}
+          ${EXTRA_LIBS}
+  )
+endif()
