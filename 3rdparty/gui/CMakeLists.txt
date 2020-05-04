@@ -5,7 +5,6 @@ if (ARTS_GUI)
   
   add_subdirectory(imgui)
   add_subdirectory(implot)
-  add_subdirectory(filebrowser)
   
   include_directories(${PROJECT_SOURCE_DIR})
   add_executable(imgui_example imgui_example.cpp)
@@ -39,4 +38,3 @@ if (ARTS_GUI)
 else()
   message(STATUS "Added no GUI libraries (-DARTS_GUI=1 to activate)")
 endif()
-

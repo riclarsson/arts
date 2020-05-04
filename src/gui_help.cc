@@ -1,4 +1,4 @@
-#include "help.h"
+#include "gui_help.h"
 
 static int mini(int x, int y)
 {

@@ -559,10 +559,12 @@ if (ARTS_GUI)
   target_link_libraries(artscore
           imgui
           implot
-          imfilebrowser
           glfw
           ${OPENGL_LIBRARIES}
           ${GLEW_LIBRARIES}
           ${EXTRA_LIBS}
   )
+  
+  add_executable(test_plot gui_plot.cc gui_help.cc)
+  target_link_libraries(test_plot artscore ${ALL_ARTS_LIBRARIES})
 endif()

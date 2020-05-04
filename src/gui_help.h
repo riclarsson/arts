@@ -1,8 +1,8 @@
-#ifndef HELP_H
-#define HELP_H
+#ifndef GUI_HELP_H
+#define GUI_HELP_H
 
-#include <GLFW/glfw3.h>
+#include "gui_inc.h"
 
 GLFWmonitor* get_current_monitor(GLFWwindow *window);
 
-#endif  // HELP_H
+#endif  // GUI_HELP_H

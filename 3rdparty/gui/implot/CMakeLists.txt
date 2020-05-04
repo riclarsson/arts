@@ -8,3 +8,4 @@ target_include_directories(implot PUBLIC
     ../imgui
     ./
 )
+target_compile_definitions(implot PUBLIC ImDrawIdx=unsigned\ int)

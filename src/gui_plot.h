@@ -1,10 +1,15 @@
-#ifndef PLOT_H
-#define PLOT_H
+#ifndef GUI_PLOT_H
+#define GUI_PLOT_H
 
+#include "gui_inc.h"
+
+// Extra includes
 #include <algorithm>
+#include <iostream>
 #include <type_traits>
 #include <vector>
 
-#include "plotdata.h"
+#include "gui_help.h"
+#include "gui_plotdata.h"
 
-#endif  // PLOT_H
+#endif  // GUI_PLOT_H

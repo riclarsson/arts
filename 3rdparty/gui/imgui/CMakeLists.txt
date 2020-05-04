@@ -16,6 +16,5 @@ add_library(
             imstb_textedit.h
             imstb_truetype.h
         )
-target_include_directories(imgui PUBLIC
-    .
-)
+target_include_directories(imgui PUBLIC .)
+target_compile_definitions(imgui PUBLIC ImDrawIdx=unsigned\ int)

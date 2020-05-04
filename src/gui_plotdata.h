@@ -1,63 +1,76 @@
-#ifndef PLOTDATA_H
-#define PLOTDATA_H
+#ifndef GUI_PLOTDATA_H
+#define GUI_PLOTDATA_H
 
-#include "../3rdparty/gui/imgui/imgui.h"
+#include "gui_inc.h"
+
 #include <cmath>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
-template<class T>
+#include "matpackI.h"
+#include "mystring.h"
+
 class PlotData {
-  std::string mname;
-  T one;
-  T two;
+  String mname;
+  Vector one;
+  Vector two;
   bool cur;
 public:
-  PlotData(const std::string& name, std::size_t n) : mname(name), one(n), two(n), cur(true) {}
-  const T& get() const {if(cur) return one; else return two;}
-  bool set(const T& x) {if (x.nelem() not_eq size()) return false; if(cur) two = x; else one = x; cur = not cur; return true;}
-  const std::string& name() const {return mname;}
-  std::size_t size() const {return std::size_t(one.nelem());}
+  PlotData(const String& name, std::size_t n) : mname(name), one(n), two(n), cur(true) {}
+  const Vector& get() const {if(cur) return one; else return two;}
+  bool set(const Vector& x) {if (x.nelem() not_eq nelem()) return false; if(cur) two = x; else one = x; cur = not cur; return true;}
+  const String& name() const {return mname;}
+  Index nelem() const {return one.nelem();}
 };
 
 enum class LineType {
   Average,
+  RunningAverage
 };
 
 typedef ImVec2 (* LineGetter)(void *, int);
 
 // Change in C++20 to use the atmopic locks
-template <class T>
 class Line {
-  std::string mname;
-  PlotData<T>* mx;
-  PlotData<T>* my;
+  String mname;
+  PlotData* mx;
+  PlotData* my;
   bool xy;
   LineType mtype;
-  size_t typemodifier;
+  std::size_t typemodifier;
   
-  float x(int i) {if (xy) return mx -> get()[i]; else return i;}
-  float y(int i) {return my -> get()[i];}
+  float x(int i) {if (xy) return float(mx -> get()[i]); else return float(i);}
+  float y(int i) {return float(my -> get()[i]);}
   
-  float avg_x(int i0) {float sum_x=0.0f; for(size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) sum_x += x(i); return sum_x / typemodifier;}
-  float avg_y(int i0) {float sum_y=0.0f; for(size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) sum_y += y(i); return sum_y / typemodifier;}
+  float avg_x(int i0) {float sum_x=0.0f; for(std::size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) sum_x += x(int(i)); return sum_x / float(typemodifier);}
+  float avg_y(int i0) {float sum_y=0.0f; for(std::size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) sum_y += y(int(i)); return sum_y / float(typemodifier);}
   LineGetter avg() const
   {
     return [](void * data, int i) {
-      return ImVec2(static_cast<Line<T> *>(data) -> avg_x(i),
-                    static_cast<Line<T> *>(data) -> avg_y(i));
+      return ImVec2(static_cast<Line *>(data) -> avg_x(i),
+                    static_cast<Line *>(data) -> avg_y(i));
+    };
+  }
+  
+  float runavg_x(int i0) {float sum_x=0.0f; for(std::size_t i=i0; i<i0+typemodifier; i++) sum_x += x(int(i)); return sum_x / float(typemodifier);}
+  float runavg_y(int i0) {float sum_y=0.0f; for(std::size_t i=i0; i<i0+typemodifier; i++) sum_y += y(int(i)); return sum_y / float(typemodifier);}
+  LineGetter runavg() const
+  {
+    return [](void * data, int i) {
+      return ImVec2(static_cast<Line *>(data) -> runavg_x(i),
+                    static_cast<Line *>(data) -> runavg_y(i));
     };
   }
   
 public:
-  Line(const std::string& name, PlotData<T>* x, PlotData<T>* y) : mname(name), mx(x), my(y), xy(true), mtype(LineType::Average), typemodifier(1) {}
-  Line(const std::string& name, PlotData<T>* y) : mname(name), my(y), xy(false), mtype(LineType::Average), typemodifier(1) {}
+  Line(const String& name, PlotData* x, PlotData* y) : mname(name), mx(x), my(y), xy(true), mtype(LineType::Average), typemodifier(1) {}
+  Line(const String& name, PlotData* y) : mname(name), my(y), xy(false), mtype(LineType::Average), typemodifier(1) {}
   const char * name() const {return mname.c_str();}
   
-  void changeX(PlotData<T>* x) {mx = x; xy=true;}
-  void changeY(PlotData<T>* y) {my = y;}
+  void changeX(PlotData* x) {mx = x; xy=true;}
+  void changeY(PlotData* y) {my = y;}
   void swapaxis() {std::swap(mx, my);}
   
   // LineType data
@@ -65,7 +78,9 @@ public:
   {
     switch (mtype) {
       case LineType::Average:
-        return int(my -> size()) / typemodifier;
+        return int(my -> nelem() / typemodifier);
+      case LineType::RunningAverage:
+        return int(my -> nelem() - typemodifier) + 1;
     }
     return 0;
   }
@@ -74,14 +89,25 @@ public:
   {
     switch (mtype) {
       case LineType::Average: return avg();
+      case LineType::RunningAverage: return runavg();
     }
     return [](void*, int){return ImVec2();};
   }
   
-  // LineType setter
-  size_t maxsize() const {return my -> size();}
-  size_t TypeModifier() const {return typemodifier;}
-  void Linear(size_t n) {mtype = LineType::Average; if(n) typemodifier=n; else typemodifier=1;}
+  std::size_t maxsize() const
+  {
+    switch (mtype) {
+      case LineType::Average:
+        return my -> nelem() / 2;
+      case LineType::RunningAverage:
+        return my -> nelem() / 2;
+    }
+    return 0;
+  }
+  
+  Index TypeModifier() const {return typemodifier;}
+  void Linear(std::size_t n) {mtype = LineType::Average; if(n) typemodifier=n; else if(n > maxsize()) typemodifier = maxsize(); else typemodifier=1;}
+  void RunningLinear(std::size_t n) {mtype = LineType::RunningAverage; if(n) typemodifier=n; else if(n > maxsize()) typemodifier = maxsize(); else typemodifier=1;}
 };
 
-#endif  // PLOTDATA_H
+#endif  // GUI_PLOTDATA_H
