@@ -565,6 +565,6 @@ if (ARTS_GUI)
           ${EXTRA_LIBS}
   )
   
-  add_executable(test_plot gui_plot.cc gui_help.cc)
-  target_link_libraries(test_plot artscore ${ALL_ARTS_LIBRARIES})
+  add_executable(test_gui test_gui.cc gui_help.cc gui_plot.cc gui_menubar.cc)
+  target_link_libraries(test_gui artscore ${ALL_ARTS_LIBRARIES})
 endif()
