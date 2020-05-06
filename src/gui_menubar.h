@@ -22,8 +22,7 @@ struct Config {
 void fullscreen(Config& cfg, GLFWwindow* window);
 void quitscreen(Config& cfg, GLFWwindow* window);
 void imgui_help(Config& cfg);
-void background(ImVec4& colors);
-
+void arts_help();
 
 };  // MainMenu
 };  // ARTSGUI

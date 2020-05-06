@@ -1,27 +1,42 @@
-#include "gui_plot.h"
 #include "gui_menubar.h"
+#include "gui_plot.h"
 
 int main(int, char**)
 {
   InitializeARTSGUI;
   
   // Our states
-  ImPlotRange copy_range;
   ARTSGUI::MainMenu::Config config;
   
   // Test data
-  auto x = PlotData("X-axis", 50000);
-  auto y = PlotData("Y-axis", 50000);
-  Vector tmp(50000);
-  for (int i=0; i<50000; i++)
-    tmp[i] = (6.28*5*i)/100000;
+  constexpr int n=3000;
+  auto x = ARTSGUI::Plotting::Data(n);
+  auto y1 = ARTSGUI::Plotting::Data(n);
+  auto y2 = ARTSGUI::Plotting::Data(n);
+  Vector tmp(n);
+  for (int i=0; i<n; i++)
+    tmp[i] = (6.28*5*i)/n;
   x.set(tmp);
   
-  for (int i=0; i<50000; i++)
+  for (int i=0; i<n; i++)
     tmp[i] = std::sin(tmp[i]);
-  y.set(tmp);            
+  y1.set(tmp);
   
-  Line line("XY-plot", &x, &y);
+  for (int i=0; i<n; i++)
+    tmp[i] = (6.28*5*i)/n;
+  for (int i=0; i<n; i++)
+    tmp[i] = std::cos(tmp[i]);
+  y2.set(tmp);
+  
+  ARTSGUI::Plotting::Line line1("Sine-curve", &x, &y1);
+  ARTSGUI::Plotting::Line line2("Cosine-curve", &x, &y2);
+  
+  ARTSGUI::Plotting::Frame frame("Test plot", "X", "Y");
+  frame.push_back(line1);
+  frame.push_back(line2);
+  
+  // Style
+  ARTSGUI::LayoutAndStyleSettings();
   
   // Main loop
   BeginWhileLoopARTSGUI;
@@ -29,8 +44,6 @@ int main(int, char**)
   // Main menu bar
   ARTSGUI::MainMenu::fullscreen(config, window);
   ARTSGUI::MainMenu::quitscreen(config, window);
-  ARTSGUI::MainMenu::background(clear_color);
-  ARTSGUI::MainMenu::imgui_help(config);
   
   // Plotting defaults:
   ImGui::GetPlotStyle().LineWeight = 4;
@@ -45,16 +58,21 @@ int main(int, char**)
   ImGui::SetNextWindowPos(pos);
   ImGui::SetNextWindowSize(size);
   if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar)) {
-    if (ImGui::BeginPlot("XY-plot", "X-values", "Y-values", {-1, -1}, ImPlotFlags_MousePos | ImPlotFlags_Legend | ImPlotFlags_Highlight | ImPlotFlags_Selection | ImPlotFlags_ContextMenu)) {
-      ImGui::Plot(line.name(), line.getter(), (void*)&line, line.size());
+    if (ImGui::BeginPlot(frame.title().c_str(), frame.xlabel().c_str(), frame.ylabel().c_str(), {-1, -1}, ImPlotFlags_MousePos | ImPlotFlags_Legend | ImPlotFlags_Highlight | ImPlotFlags_Selection | ImPlotFlags_ContextMenu)) {
+      for (auto& line: frame)
+        ImGui::Plot(line.name().c_str(), line.getter(), (void*)&line, line.size());
       ImGui::EndPlot();
     }
     
-    // Menu bar
-    ARTSGUI::PlotMenu::range(copy_range);
-    ARTSGUI::PlotMenu::scale(line);
+    // Menu bar for plot
+    ARTSGUI::PlotMenu::range(frame);
+    ARTSGUI::PlotMenu::scale(frame);
   }
   ImGui::End();
+  
+  // Add help menu at end
+  ARTSGUI::MainMenu::arts_help();
+  ARTSGUI::MainMenu::imgui_help(config);
 
   EndWhileLoopARTSGUI;
   CleanupARTSGUI;

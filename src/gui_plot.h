@@ -20,15 +20,19 @@ namespace PlotMenu {
 
 /** Plot range modifier 
  *
- * @param[in] copy A copy of a range, if anyone is nan, the paste option is disabled
+ * Modifies the frame range copy as required.
+ * 
+ * @param[in,out] frame A plotting frame
  */
-void range(ImPlotRange& copy);
+void range(ARTSGUI::Plotting::Frame& frame);
 
 /** Plot scale modifier
  * 
- * @param[in] line A description of a line whose scales can be modified
+ * Modifies the lines X-Y calculations as required
+ * 
+ * @param[in] frame A plotting frame
  */
-void scale(Line& line);
+void scale(ARTSGUI::Plotting::Frame& frame);
 };  // PlotMenuGUI
 };  // ARTSGUI
   

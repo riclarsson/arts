@@ -19,6 +19,8 @@ extern "C" {
   }
 }
 
-namespace ARTSGUI {};
+namespace ARTSGUI {
+  void LayoutAndStyleSettings();
+};
 
 #endif  // GUI_INC_H

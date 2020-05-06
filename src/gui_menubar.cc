@@ -1,5 +1,6 @@
 #include "gui_menubar.h"
 #include "gui_help.h"
+#include "auto_version.h"
 
 void ARTSGUI::MainMenu::fullscreen(Config& cfg, GLFWwindow* window)
 {
@@ -77,18 +78,51 @@ void ARTSGUI::MainMenu::imgui_help(Config& cfg)
   }
 }
 
-void ARTSGUI::MainMenu::background(ImVec4& colors)
+void ARTSGUI::MainMenu::arts_help()
 {
+  bool arts_help_popup=false;
+  bool arts_license_popup=false;
   
   if (ImGui::BeginMainMenuBar()) {
-    if (ImGui::BeginMenu("View")) {
-      ImGui::SliderFloat("Red", &colors.x, 0.0f, 1.0f);
-      ImGui::SliderFloat("Green", &colors.y, 0.0f, 1.0f);
-      ImGui::SliderFloat("Blue", &colors.z, 0.0f, 1.0f);
-      ImGui::SliderFloat("Alpha", &colors.w, 0.0f, 1.0f);
+    if (ImGui::BeginMenu("Help")) {
+      if (ImGui::MenuItem("About ARTS")) arts_help_popup = true;
+      if (ImGui::MenuItem("License ARTS")) arts_license_popup = true;
       ImGui::Separator();
       ImGui::EndMenu();
     }
-  ImGui::EndMainMenuBar();
+    ImGui::EndMainMenuBar();
+  }
+  
+  if (arts_help_popup) {
+    ImGui::OpenPopup("ARTS Help");
+  }
+  
+  if (arts_license_popup) {
+    ImGui::OpenPopup("ARTS License");
+  }
+  
+  if (ImGui::BeginPopup("ARTS Help")) {
+    ImGui::Text("You are using " ARTS_FULL_VERSION);
+    ImGui::EndPopup();
+  }
+  
+  if (ImGui::BeginPopup("ARTS License")) {
+    ImGui::Text("The ARTS program is free software; you can redistribute it\n"
+                "and/or modify it under the terms of the GNU General Public\n"
+                "License as published by the Free Software Foundation; either\n"
+                "version 2, or (at your option) any later version.\n"
+                "\n"
+                "This program is distributed in the hope that it will be\n"
+                "useful, but WITHOUT ANY WARRANTY; without even the implied\n"
+                "warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR\n"
+                "PURPOSE. See the GNU General Public License for more\n"
+                "details. \n"
+                "\n"
+                "You should have received a copy of the GNU General Public\n"
+                "License along with the program; if not, write to the Free\n"
+                "Software Foundation, Inc., 59 Temple Place - Suite 330,\n"
+                "Boston, MA 02111-1307, USA.\n");
+    ImGui::EndPopup();
   }
 }
+
