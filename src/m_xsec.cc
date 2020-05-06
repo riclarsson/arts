@@ -346,7 +346,7 @@ void PlotSpeciesLinesXsec(
   // Select band
   if (ImGui::BeginMainMenuBar()) {
     for (Index i=0; i<species_list.nelem(); i++) {
-      if (ImGui::BeginMenu("Select Band")) {
+      if (ImGui::BeginMenu("Select Species")) {
         if (ImGui::MenuItem(species_list[i].c_str())) {
           species = i;
           new_plot = true;
