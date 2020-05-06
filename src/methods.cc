@@ -20951,4 +20951,58 @@ void define_md_data_raw() {
       GIN_TYPE(),
       GIN_DEFAULT(),
       GIN_DESC()));
+  
+    md_data_raw.push_back(create_mdrecord(
+      NAME("PlotBandXsec"),
+      DESCRIPTION(
+          "Plots XSEC line absorption of a band.\n"),
+      AUTHORS("Richard Larsson"),
+      OUT(),
+      GOUT(),
+      GOUT_TYPE(),
+      GOUT_DESC(),
+      IN("abs_species",
+         "jacobian_quantities",
+         "f_grid",
+         "rtp_pressure",
+         "rtp_temperature",
+         "rtp_nlte",
+         "rtp_vmr",
+         "abs_lines_per_species",
+         "isotopologue_ratios",
+         "partition_functions",
+         "abs_xsec_agenda_checked",
+         "lbl_checked",
+         "nlte_do"),
+      GIN(),
+      GIN_TYPE(),
+      GIN_DEFAULT(),
+      GIN_DESC()));
+  
+    md_data_raw.push_back(create_mdrecord(
+      NAME("PlotSpeciesLinesXsec"),
+      DESCRIPTION(
+          "Plots XSEC line absorption of species.\n"),
+      AUTHORS("Richard Larsson"),
+      OUT(),
+      GOUT(),
+      GOUT_TYPE(),
+      GOUT_DESC(),
+      IN("abs_species",
+         "jacobian_quantities",
+         "f_grid",
+         "rtp_pressure",
+         "rtp_temperature",
+         "rtp_nlte",
+         "rtp_vmr",
+         "abs_lines_per_species",
+         "isotopologue_ratios",
+         "partition_functions",
+         "abs_xsec_agenda_checked",
+         "lbl_checked",
+         "nlte_do"),
+      GIN(),
+      GIN_TYPE(),
+      GIN_DEFAULT(),
+      GIN_DESC()));
 }

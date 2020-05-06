@@ -32,6 +32,7 @@
 #include <iomanip>
 #include <iostream>
 #include <vector>
+#include <set>
 #include "matpack.h"
 
 // Declare the existance of class Array:
@@ -362,6 +363,13 @@ Index FlattenedIndex(const Array<Array<base> >& aa,
   }
 
   return N + inner;
+}
+
+//! Determine if the array contains only unique values
+template <class base>
+bool is_unique(const Array<base>& a) {
+  std::set<base> s(a.begin(), a.end());
+  return Index(s.size()) == a.nelem();
 }
 
 // It is not a good idea to put all the predefined array types in one

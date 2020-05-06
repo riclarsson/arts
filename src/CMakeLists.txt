@@ -257,6 +257,7 @@ add_library (artscore STATIC
   m_transmitter.cc
   m_wigner.cc
   m_xml.cc
+  m_xsec.cc
   m_zeeman.cc
   math_funcs.cc
   mc_antenna.cc
@@ -557,14 +558,19 @@ if (ARTS_GUI)
 
   # Link to ARTS
   target_link_libraries(artscore
+  )
+  
+  add_library(artsgui STATIC gui_inc.cc gui_help.cc gui_plot.cc gui_menubar.cc)
+  target_link_libraries(artsgui
           imgui
           implot
           glfw
           ${OPENGL_LIBRARIES}
           ${GLEW_LIBRARIES}
-          ${EXTRA_LIBS}
-  )
+          ${EXTRA_LIBS})
+  target_link_libraries(artscore artsgui)
   
-  add_executable(test_gui test_gui.cc gui_inc.cc gui_help.cc gui_plot.cc gui_menubar.cc)
+  ############## GUI TEST ###################
+  add_executable(test_gui test_gui.cc)
   target_link_libraries(test_gui artscore ${ALL_ARTS_LIBRARIES})
 endif()
