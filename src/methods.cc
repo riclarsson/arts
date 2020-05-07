@@ -20979,7 +20979,7 @@ void define_md_data_raw() {
       GIN_DESC("Minimum frequency", "Maximum frequency", "Frequency grid points")));
   
     md_data_raw.push_back(create_mdrecord(
-      NAME("PlotSpeciesLinesXsec"),
+      NAME("PlotXsecAgenda"),
       DESCRIPTION(
           "Plots XSEC line absorption of species.\n"),
       AUTHORS("Richard Larsson"),
@@ -20993,12 +20993,7 @@ void define_md_data_raw() {
          "rtp_temperature",
          "rtp_nlte",
          "rtp_vmr",
-         "abs_lines_per_species",
-         "isotopologue_ratios",
-         "partition_functions",
-         "abs_xsec_agenda_checked",
-         "lbl_checked",
-         "nlte_do"),
+         "abs_xsec_agenda"),
       GIN("fmin", "fmax", "fnum"),
       GIN_TYPE("Numeric", "Numeric", "Index"),
       GIN_DEFAULT("1", "2", "500"),

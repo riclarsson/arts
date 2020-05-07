@@ -188,19 +188,15 @@ void PlotBandXsec(
   CleanupARTSGUI;
 }
 
-void PlotSpeciesLinesXsec(
+void PlotXsecAgenda(
+  Workspace& ws,
   const ArrayOfArrayOfSpeciesTag& abs_species,
   const ArrayOfRetrievalQuantity& jacobian_quantities,
   const Numeric& rtp_pressure,
   const Numeric& rtp_temperature,
   const EnergyLevelMap& rtp_nlte,
   const Vector& rtp_vmr,
-  const ArrayOfArrayOfAbsorptionLines& abs_lines_per_species,
-  const SpeciesAuxData& isotopologue_ratios,
-  const SpeciesAuxData& partition_functions,
-  const Index& abs_xsec_agenda_checked,
-  const Index& lbl_checked,
-  const Index& nlte_do,
+  const Agenda& abs_xsec_agenda,
   const Numeric& fmin,
   const Numeric& fmax,
   const Index& fnum,
@@ -222,31 +218,11 @@ void PlotSpeciesLinesXsec(
   AbsInputFromRteScalars(abs_p, abs_t, abs_vmrs, rtp_pressure, rtp_temperature, rtp_vmr, verbosity);
   nlinspace(f_grid, fmin, fmax, fnum);
   
-  // Run once to have some output and to check the individual data
-  abs_xsec_per_speciesInit(abs_xsec_per_species, src_xsec_per_species, dabs_xsec_per_species_dx, dsrc_xsec_per_species_dx,
-                           abs_species, jacobian_quantities, asa, f_grid, abs_p, abs_xsec_agenda_checked,
-                           nlte_do, verbosity);
-  abs_xsec_per_speciesAddLines(abs_xsec_per_species, src_xsec_per_species, dabs_xsec_per_species_dx, dsrc_xsec_per_species_dx,
-                               abs_species, jacobian_quantities, asa, f_grid, abs_p, abs_t, rtp_nlte, abs_vmrs,
-                               abs_lines_per_species, isotopologue_ratios, partition_functions, lbl_checked, verbosity);
+  abs_xsec_agendaExecute(ws, abs_xsec_per_species, src_xsec_per_species, dabs_xsec_per_species_dx, dsrc_xsec_per_species_dx,
+                         abs_species, jacobian_quantities, asa, f_grid, abs_p, abs_t, rtp_nlte, abs_vmrs, abs_xsec_agenda);
   
   if (abs_xsec_per_species.nelem() == 0)
     throw std::runtime_error("Cannot draw anything since xsec is zeroed");
-  
-  // Setup constant variables for the drawing loop
-  const bool do_jac = supports_propmat_clearsky(jacobian_quantities);
-  const bool do_lte = rtp_nlte.Data().empty();
-  const ArrayOfIndex jac_pos = equivalent_propmattype_indexes(jacobian_quantities);
-  
-  // Uninteresting data
-  static Matrix dummy1(0, 0);
-  static ArrayOfMatrix dummy2(0);
-  
-  // Setup dynamic variables for the drawing loop
-  Matrix xsec(abs_xsec_per_species[0]);
-  Matrix src = do_lte ? dummy1 : src_xsec_per_species[0];
-  ArrayOfMatrix dxsec = do_jac ? dabs_xsec_per_species_dx[0] : ArrayOfMatrix(0);
-  ArrayOfMatrix dsrc = (do_jac and not do_lte) ? dsrc_xsec_per_species_dx[0] : ArrayOfMatrix(0);
   
   // Menu data
   ArrayOfString species_list;
@@ -321,6 +297,9 @@ void PlotSpeciesLinesXsec(
   ARTSGUI::MainMenu::arts_help();
   
   if (new_plot) {
+    abs_xsec_agendaExecute(ws, abs_xsec_per_species, src_xsec_per_species, dabs_xsec_per_species_dx, dsrc_xsec_per_species_dx,
+                           abs_species, jacobian_quantities, asa, f_grid, abs_p, abs_t, rtp_nlte, abs_vmrs, abs_xsec_agenda);
+    
     Index numlines=0;
     for (Index species=0; species<species_list.nelem(); species++) {
       if (check_species[species]) {
@@ -333,21 +312,7 @@ void PlotSpeciesLinesXsec(
     
     for (Index species=0; species<species_list.nelem(); species++) {
       if (check_species[species]) {
-        xsec = 0;
-        src = 0;
-        for (auto& dx: dxsec) dx = 0;
-        for (auto& ds: dsrc) ds = 0;
-        
-        for (auto& lines: abs_lines_per_species[species]) {
-          xsec_species(xsec, src, dummy1, dxsec, dsrc, dummy2,
-            jacobian_quantities, jac_pos, f_grid, abs_p, abs_t,
-            rtp_nlte, abs_vmrs, abs_species, lines,
-            isotopologue_ratios.getIsotopologueRatio(lines.QuantumIdentity()),
-                      partition_functions.getParamType(lines.QuantumIdentity()),
-                      partition_functions.getParam(lines.QuantumIdentity()));
-        }
-        
-        xsec_data[iline].overwrite(xsec(joker, 0));
+        xsec_data[iline].overwrite(abs_xsec_per_species[species](joker, 0));
         xsec_lines[iline] = ARTSGUI::Plotting::Line(species_list[species], &f, &xsec_data[iline]);
         iline += 1;
       }
