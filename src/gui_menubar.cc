@@ -126,3 +126,92 @@ void ARTSGUI::MainMenu::arts_help()
   }
 }
 
+
+bool ARTSGUI::MainMenu::SelectAtmosphere(VectorView abs_p, VectorView abs_t, MatrixView abs_vmrs, const ArrayOfString& spec_list, const Index level)
+{
+  bool new_plot=false;
+  
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Atmospheric properties")) {
+      float temperature = float(abs_t[level]);
+      if (ImGui::SliderFloat("Temperature [K]", &temperature, 150.0f, 600.0f)) {
+        if (temperature < 0.01)
+          abs_t[level] = 0.01; 
+        else
+          abs_t[level] = Numeric(temperature);
+        new_plot = true;
+      }
+      ImGui::Separator();
+      
+      float pressure = float(abs_p[level]);
+      if (ImGui::SliderFloat("Pressure [Pa]", &pressure, 0.01f, 1'000'000.0f, "%g", 10.0f)) {
+        if (pressure < 0.01)
+          abs_p[level] = 0.01; 
+        else
+          abs_p[level] = Numeric(pressure);
+        new_plot = true;
+      }
+      ImGui::Separator();
+      
+      for (Index i=0; i<spec_list.nelem(); i++) {
+        float vmr = float(abs_vmrs(i, level) * 1e6);
+        if (ImGui::SliderFloat(spec_list[i].c_str(), &vmr, 0.00f, 1'000'000.0f, "%g", 10.0f)) {
+          if (vmr < 0)
+            abs_vmrs(i, level) = 0;
+          else
+            abs_vmrs(i, level) = Numeric(vmr) / 1e6;
+          new_plot = true;
+        }
+        ImGui::Separator();
+      }
+      
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+  
+  return new_plot;
+}
+
+
+bool ARTSGUI::MainMenu::Select(ArrayOfIndex& truths, const ArrayOfString& options, const String& menuname)
+{
+  bool pressed = false;
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu(menuname.c_str())) {
+      for (Index i=0; i<truths.nelem(); i++) {
+        bool val = truths[i];
+        pressed |= ImGui::Checkbox(options[i].c_str(), &val);
+        truths[i] = val;
+        ImGui::Separator();
+      }
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+  return pressed;
+}
+
+bool ARTSGUI::MainMenu::Select(ArrayOfArrayOfIndex& truths, const ArrayOfString& dropdowns, const ArrayOfArrayOfString& options, const String& menuname)
+{
+  bool pressed = false;
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu(menuname.c_str())) {
+      for (Index i=0; i<truths.nelem(); i++) {
+        if (ImGui::BeginMenu(dropdowns[i].c_str())) {
+          for (Index j=0; j<truths[i].nelem(); j++) {
+            bool val = truths[i].at(j);
+            pressed |= ImGui::Checkbox(options[i][j].c_str(), &val);
+            truths[i].at(j) = val;
+            ImGui::Separator();
+          }
+          ImGui::EndMenu();
+        }
+        ImGui::Separator();
+      }
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+  return pressed;
+}

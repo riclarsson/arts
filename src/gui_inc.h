@@ -20,6 +20,21 @@ extern "C" {
 }
 
 namespace ARTSGUI {
+  struct Config {
+    ImGuiIO& io;
+    bool show_about_help, show_metrics_help, show_style_help;
+    bool fullscreen;
+    bool autoscale_x;
+    int width, height, xpos, ypos;
+    Config(bool fullscreen_on=false) : io(ImGui::GetIO()),
+    show_about_help(false), show_metrics_help(false), show_style_help(false), 
+    fullscreen(fullscreen_on), autoscale_x(false), width(1280), height(720), xpos(50), ypos(50)
+    {
+      (void)io;
+      io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    }
+  };  // Config
+  
   void LayoutAndStyleSettings();
 };
 

@@ -11,6 +11,7 @@
 
 #include "gui_help.h"
 #include "gui_plotdata.h"
+#include "gui_menubar.h"
 
 /** All gui related things; should subnamespace things */
 namespace ARTSGUI {
@@ -33,6 +34,8 @@ void range(ARTSGUI::Plotting::Frame& frame);
  * @param[in] frame A plotting frame
  */
 void scale(ARTSGUI::Plotting::Frame& frame);
+
+bool SelectFrequency(ARTSGUI::Plotting::Data& f, VectorView f_grid, ARTSGUI::Plotting::Frame& frame, ARTSGUI::Config& cfg);
 };  // PlotMenuGUI
 };  // ARTSGUI
   

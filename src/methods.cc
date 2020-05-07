@@ -20963,7 +20963,6 @@ void define_md_data_raw() {
       GOUT_DESC(),
       IN("abs_species",
          "jacobian_quantities",
-         "f_grid",
          "rtp_pressure",
          "rtp_temperature",
          "rtp_nlte",
@@ -20974,10 +20973,10 @@ void define_md_data_raw() {
          "abs_xsec_agenda_checked",
          "lbl_checked",
          "nlte_do"),
-      GIN(),
-      GIN_TYPE(),
-      GIN_DEFAULT(),
-      GIN_DESC()));
+      GIN("fmin", "fmax", "fnum"),
+      GIN_TYPE("Numeric", "Numeric", "Index"),
+      GIN_DEFAULT("1", "2", "500"),
+      GIN_DESC("Minimum frequency", "Maximum frequency", "Frequency grid points")));
   
     md_data_raw.push_back(create_mdrecord(
       NAME("PlotSpeciesLinesXsec"),
@@ -20990,7 +20989,6 @@ void define_md_data_raw() {
       GOUT_DESC(),
       IN("abs_species",
          "jacobian_quantities",
-         "f_grid",
          "rtp_pressure",
          "rtp_temperature",
          "rtp_nlte",
@@ -21001,8 +20999,8 @@ void define_md_data_raw() {
          "abs_xsec_agenda_checked",
          "lbl_checked",
          "nlte_do"),
-      GIN(),
-      GIN_TYPE(),
-      GIN_DEFAULT(),
-      GIN_DESC()));
+      GIN("fmin", "fmax", "fnum"),
+      GIN_TYPE("Numeric", "Numeric", "Index"),
+      GIN_DEFAULT("1", "2", "500"),
+      GIN_DESC("Minimum frequency", "Maximum frequency", "Frequency grid points")));
 }

@@ -6,7 +6,7 @@ int main(int, char**)
   InitializeARTSGUI;
   
   // Our states
-  ARTSGUI::MainMenu::Config config;
+  ARTSGUI::Config config;
   
   // Test data
   constexpr int n=3000;

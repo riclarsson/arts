@@ -19,14 +19,17 @@ namespace Plotting {
 class Data {
   Vector vec;
 public:
-  Data(std::size_t n) : vec(n) {}
+  Data(std::size_t n=0) : vec(n) {}
   Data(const Vector& v) : vec(v) {}
   Data(Vector&& v) : vec(std::move(v)) {}
   const Vector& get() const {return vec;}
   bool set(const Vector& x) {if (x.nelem() not_eq nelem()) return false; else vec = x; return true;}
   bool set(ConstVectorView x) {if (x.nelem() not_eq nelem()) return false; else vec = x; return true;}
+  void overwrite(Vector&& x) {vec = std::move(x);}
   Index nelem() const {return vec.nelem();}
 };  // Data
+
+using ArrayOfData = Array<Data>;
 
 enum class LineType {
   Average,
@@ -69,9 +72,9 @@ class Line {
   }
   
 public:
-  Line(const String& name, Data* x, Data* y) : mname(name), mx(x), my(y), mtype(LineType::Average), typemodifier(1) {}
-  Line(const String& name, Data* y) : mname(name), mx(nullptr), my(y), mtype(LineType::Average), typemodifier(1) {}
-  Line(const String& name="") : mname(name), mx(nullptr), my(nullptr), mtype(LineType::Average), typemodifier(1) {}
+  Line(const String& name, Data* x, Data* y) : mname(name), mx(x), my(y), mtype(LineType::Average), typemodifier(1), mmul(0, 0) {}
+  Line(const String& name, Data* y) : mname(name), mx(nullptr), my(y), mtype(LineType::Average), typemodifier(1), mmul(0, 0) {}
+  Line(const String& name="") : mname(name), mx(nullptr), my(nullptr), mtype(LineType::Average), typemodifier(1), mmul(0, 0) {}
   
   void changeX(Data* x) {mx = x;}
   void changeY(Data* y) {my = y;}
@@ -161,16 +164,22 @@ class Frame {
 public:
   Frame(const String& title, const String& x, const String& y) : mtitle(title), mxlabel(x), mylabel(y), mrange(), mlines(0) {}
   Frame(const String& title, const String& x, const String& y, const Line& line) : mtitle(title), mxlabel(x), mylabel(y), mrange(), mlines(1, line) {}
+  Frame(const String& title, const String& x, const String& y, const ArrayOfLine& lines) : mtitle(title), mxlabel(x), mylabel(y), mrange(), mlines(lines) {}
   
   // Names
   const String& title() const {return mtitle;}
   const String& xlabel() const {return mxlabel;}
   const String& ylabel() const {return mylabel;}
+  void title(const String& x) {mtitle=x;}
+  void xlabel(const String& x) {mxlabel=x;}
+  void ylabel(const String& x) {mylabel=x;}
   
   // Line manipulation
   void push_back(Line& line) {mlines.push_back(line);}
   void pop_back() {mlines.pop_back();}
+  void set_empty() {mlines.resize(0);}
   const Line& operator[](Index i) const {return mlines[i];}
+  void lines(const ArrayOfLine& x) {mlines=x;}
   Index nelem() const {return mlines.nelem();}
   decltype(mlines.begin()) begin() {return mlines.begin();}
   decltype(mlines.end()) end() {return mlines.end();}
@@ -182,6 +191,9 @@ public:
   void range(ImPlotRange x) {mrange=x;}
   bool invalid_range() const {using std::isnan; return isnan(mrange.XMax) or isnan(mrange.XMin) or isnan(mrange.YMax) or isnan(mrange.XMin);}
 };  // Frame
+
+/** Plots a frame  in the current window */
+void PlotFrame(Frame& frame);
 
 };  // Plotting
 };  // ARTSGUI
