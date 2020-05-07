@@ -117,7 +117,7 @@ void PlotBandXsec(
   bool new_plot = ARTSGUI::MainMenu::Select(check_species, species_list, band_list, "Select Band");
   
   // Set atmospheric variables
-  new_plot |= ARTSGUI::MainMenu::SelectAtmosphere(abs_p, abs_t, abs_vmrs, vmr_list);
+  new_plot |= ARTSGUI::MainMenu::SelectAtmosphere(abs_p[0], abs_t[0], abs_vmrs(joker, 0), vmr_list);
   
   // Plotting defaults:
   ImGui::GetPlotStyle().LineWeight = 4;
@@ -131,7 +131,7 @@ void PlotBandXsec(
   // Show a simple window
   ImGui::SetNextWindowPos(pos);
   ImGui::SetNextWindowSize(size);
-  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar)) {
+  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
     ARTSGUI::Plotting::PlotFrame(xsec_frame);
     
     // Menu bar for plot
@@ -269,7 +269,7 @@ void PlotXsecAgenda(
   bool new_plot = ARTSGUI::MainMenu::Select(check_species, species_list, "Select Species");
   
   // Set atmospheric variables
-  new_plot |= ARTSGUI::MainMenu::SelectAtmosphere(abs_p, abs_t, abs_vmrs, vmr_list);
+  new_plot |= ARTSGUI::MainMenu::SelectAtmosphere(abs_p[0], abs_t[0], abs_vmrs(joker, 0), vmr_list);
   
   // Plotting defaults:
   ImGui::GetPlotStyle().LineWeight = 4;
@@ -283,7 +283,7 @@ void PlotXsecAgenda(
   // Show a simple window
   ImGui::SetNextWindowPos(pos);
   ImGui::SetNextWindowSize(size);
-  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar)) {
+  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
     ARTSGUI::Plotting::PlotFrame(xsec_frame);
     
     // Menu bar for plot
@@ -323,4 +323,141 @@ void PlotXsecAgenda(
   
   EndWhileLoopARTSGUI;
   CleanupARTSGUI;
-}  
+}
+
+void PlotPropmatAgenda(
+  Workspace& ws,
+  const ArrayOfArrayOfSpeciesTag& abs_species,
+  const ArrayOfRetrievalQuantity& jacobian_quantities,
+  const Numeric& rtp_pressure_in,
+  const Numeric& rtp_temperature_in,
+  const EnergyLevelMap& rtp_nlte,
+  const Vector& rtp_vmr_in,
+  const Vector& rtp_mag_in,
+  const Vector& rtp_los_in,
+  const Agenda& propmat_clearsky_agenda,
+  const Numeric& fmin,
+  const Numeric& fmax,
+  const Index& fnum,
+  const Verbosity&)
+{
+  // Output of methods
+  ArrayOfPropagationMatrix propmat_clearsky, dpropmat_clearsky_dx;
+  ArrayOfStokesVector nlte_source, dnlte_dx_source, nlte_dx_dsource_dx;
+  Vector f_grid;
+  nlinspace(f_grid, fmin, fmax, fnum);
+  Numeric rtp_pressure = rtp_pressure_in;
+  Numeric rtp_temperature = rtp_temperature_in;
+  Vector rtp_vmr = rtp_vmr_in;
+  Vector rtp_mag = rtp_mag_in;
+  Vector rtp_los = rtp_los_in;
+
+  propmat_clearsky_agendaExecute(ws, propmat_clearsky, nlte_source, dpropmat_clearsky_dx, dnlte_dx_source, nlte_dx_dsource_dx,
+                                 jacobian_quantities, f_grid, rtp_mag, rtp_los, rtp_pressure, rtp_temperature, rtp_nlte,
+                                 rtp_vmr, propmat_clearsky_agenda);
+  
+  if (propmat_clearsky.nelem() == 0)
+    throw std::runtime_error("Cannot draw anything since propagation matrix is zeroed");
+  
+  // Menu data
+  ArrayOfString species_list;
+  for (auto& specs: abs_species) {
+    species_list.push_back(String(""));
+    for (Index ispec=0; ispec<specs.nelem(); ispec++) {
+      species_list.back() += specs[ispec].Name();
+      if (ispec+1 not_eq specs.nelem())
+        species_list.back() += ',';
+    }
+  }
+  ArrayOfString vmr_list;
+  for (Index i=0; i<species_list.nelem(); i++) {
+    vmr_list.push_back(species_list[i] + " VMR [ppmv]");
+  }
+  ArrayOfIndex check_species(species_list.nelem(), false);
+  check_species[0] = true;
+  
+  // Plotting data
+  ARTSGUI::Plotting::Data f(f_grid);
+  ARTSGUI::Plotting::ArrayOfData abs_data(1, ARTSGUI::Plotting::Data(propmat_clearsky[0].Kjj()));
+  ARTSGUI::Plotting::ArrayOfLine abs_lines(1, ARTSGUI::Plotting::Line(species_list[0].c_str(), &f, &abs_data[0]));
+  ARTSGUI::Plotting::Frame abs_frame("Absorption", "Frequency [Hz]", "Absorption [1/m]", abs_lines);
+  
+  if (not is_unique(species_list))
+    throw std::runtime_error("Requires a unique set of species to work");
+  
+  // Create the plotting window
+  InitializeARTSGUI;
+  
+  // Our states
+  ARTSGUI::Config config;
+  
+  // Our style
+  ARTSGUI::LayoutAndStyleSettings();
+  
+  // Main loop
+  BeginWhileLoopARTSGUI;
+  
+  // Main menu bar
+  ARTSGUI::MainMenu::fullscreen(config, window);
+  ARTSGUI::MainMenu::quitscreen(config, window);
+  
+  bool new_plot = ARTSGUI::MainMenu::Select(check_species, species_list, "Select Species");
+  
+  // Set atmospheric variables
+  new_plot |= ARTSGUI::MainMenu::SelectAtmosphere(rtp_pressure, rtp_temperature, rtp_vmr, vmr_list);
+  new_plot |= ARTSGUI::MainMenu::SelectLOS(rtp_los);
+  
+  // Plotting defaults:
+  ImGui::GetPlotStyle().LineWeight = 4;
+  
+  //Cursors and sizes
+  int width = 0, height = 0;
+  glfwGetWindowSize(window, &width, &height);
+  ImVec2 pos = ImGui::GetCursorPos();
+  ImVec2 size = {float(width)-2*pos.x, float(height)-pos.y};
+  
+  // Show a simple window
+  ImGui::SetNextWindowPos(pos);
+  ImGui::SetNextWindowSize(size);
+  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
+    ARTSGUI::Plotting::PlotFrame(abs_frame);
+    
+    // Menu bar for plot
+    ARTSGUI::PlotMenu::range(abs_frame);
+    ARTSGUI::PlotMenu::scale(abs_frame);
+    new_plot |= ARTSGUI::PlotMenu::SelectFrequency(f, f_grid, abs_frame, config);
+  }
+  ImGui::End();
+  
+  // Add help menu at end
+  ARTSGUI::MainMenu::arts_help();
+  
+  if (new_plot) {
+    propmat_clearsky_agendaExecute(ws, propmat_clearsky, nlte_source, dpropmat_clearsky_dx, dnlte_dx_source, nlte_dx_dsource_dx,
+                                   jacobian_quantities, f_grid, rtp_mag, rtp_los, rtp_pressure, rtp_temperature, rtp_nlte,
+                                   rtp_vmr, propmat_clearsky_agenda);;
+    
+    Index numlines=0;
+    for (Index species=0; species<species_list.nelem(); species++) {
+      if (check_species[species]) {
+        numlines += 1;
+      }
+    }
+    abs_data.resize(numlines);
+    abs_lines.resize(numlines);
+    Index iline=0;
+    
+    for (Index species=0; species<species_list.nelem(); species++) {
+      if (check_species[species]) {
+        abs_data[iline].overwrite(propmat_clearsky[species].Kjj());
+        abs_lines[iline] = ARTSGUI::Plotting::Line(species_list[species], &f, &abs_data[iline]);
+        iline += 1;
+      }
+    }
+    
+    abs_frame.lines(abs_lines);
+  }
+  
+  EndWhileLoopARTSGUI;
+  CleanupARTSGUI;
+}

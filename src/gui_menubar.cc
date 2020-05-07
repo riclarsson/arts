@@ -127,39 +127,39 @@ void ARTSGUI::MainMenu::arts_help()
 }
 
 
-bool ARTSGUI::MainMenu::SelectAtmosphere(VectorView abs_p, VectorView abs_t, MatrixView abs_vmrs, const ArrayOfString& spec_list, const Index level)
+bool ARTSGUI::MainMenu::SelectAtmosphere(Numeric& p, Numeric& t, VectorView vmrs, const ArrayOfString& spec_list)
 {
   bool new_plot=false;
   
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("Atmospheric properties")) {
-      float temperature = float(abs_t[level]);
+      float temperature = float(t);
       if (ImGui::SliderFloat("Temperature [K]", &temperature, 150.0f, 600.0f)) {
         if (temperature < 0.01)
-          abs_t[level] = 0.01; 
+          t = 0.01; 
         else
-          abs_t[level] = Numeric(temperature);
+          t = Numeric(temperature);
         new_plot = true;
       }
       ImGui::Separator();
       
-      float pressure = float(abs_p[level]);
+      float pressure = float(p);
       if (ImGui::SliderFloat("Pressure [Pa]", &pressure, 0.01f, 1'000'000.0f, "%g", 10.0f)) {
         if (pressure < 0.01)
-          abs_p[level] = 0.01; 
+          p = 0.01; 
         else
-          abs_p[level] = Numeric(pressure);
+          p = Numeric(pressure);
         new_plot = true;
       }
       ImGui::Separator();
       
       for (Index i=0; i<spec_list.nelem(); i++) {
-        float vmr = float(abs_vmrs(i, level) * 1e6);
+        float vmr = float(vmrs[i] * 1e6);
         if (ImGui::SliderFloat(spec_list[i].c_str(), &vmr, 0.00f, 1'000'000.0f, "%g", 10.0f)) {
           if (vmr < 0)
-            abs_vmrs(i, level) = 0;
+            vmrs[i] = 0;
           else
-            abs_vmrs(i, level) = Numeric(vmr) / 1e6;
+            vmrs[i] = Numeric(vmr) / 1e6;
           new_plot = true;
         }
         ImGui::Separator();
@@ -213,5 +213,75 @@ bool ARTSGUI::MainMenu::Select(ArrayOfArrayOfIndex& truths, const ArrayOfString&
     }
     ImGui::EndMainMenuBar();
   }
+  return pressed;
+}
+
+bool ARTSGUI::MainMenu::SelectLOS(VectorView los)
+{
+  bool pressed = false;
+  
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Line-of-sight")) {
+      for (Index i=0; i<los.nelem(); i++) {
+        if (i == 0) {
+          float za = float(los[0]);
+          if (ImGui::SliderFloat("Zenith Angle", &za, 0.0f, 180.0f, "%.3f deg")) {
+            if (za<0.0f) za = 0.0f;
+            else if (za>180.0f) za = 180.0f;
+            los[0] = Numeric(za);
+            pressed = true;
+          }
+        } else if (i == 1) {
+          float aa = float(los[1]);
+          if (ImGui::SliderFloat("Azimuth Angle", &aa, 0.0f, 360.0f, "%.3f deg")) {
+            if (aa<0.0f) aa = 0.0f;
+            else if (aa>360.0f) aa = 360.0f;
+            los[1] = Numeric(aa);
+            pressed = true;
+          }
+        }
+        ImGui::Separator();
+      }
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+  
+  return pressed;
+}
+
+bool ARTSGUI::MainMenu::SelectMAG(VectorView mag)
+{
+  bool pressed = false;
+  
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Magnetic Field")) {
+      for (Index i=0; i<mag.nelem(); i++) {
+        if (i == 0) {
+          float u = float(mag[0]*1e9);
+          if (ImGui::SliderFloat("u", &u, -500'000.0f, 500'000.0f, "%.3f nT")) {
+            mag[0] = 1e9 * Numeric(u);
+            pressed = true;
+          }
+        } else if (i == 1) {
+          float v = float(mag[1]*1e9);
+          if (ImGui::SliderFloat("v", &v, -500'000.0f, 500'000.0f, "%.3f nT")) {
+            mag[1] = 1e9 * Numeric(v);
+            pressed = true;
+          }
+        } else if (i == 2) {
+          float w = float(mag[2]*1e9);
+          if (ImGui::SliderFloat("w", &w, -500'000.0f, 500'000.0f, "%.3f nT")) {
+            mag[2] = 1e9 * Numeric(w);
+            pressed = true;
+          }
+        }
+        ImGui::Separator();
+      }
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+  
   return pressed;
 }

@@ -20981,7 +20981,7 @@ void define_md_data_raw() {
     md_data_raw.push_back(create_mdrecord(
       NAME("PlotXsecAgenda"),
       DESCRIPTION(
-          "Plots XSEC line absorption of species.\n"),
+          "Plots xsec of species.\n"),
       AUTHORS("Richard Larsson"),
       OUT(),
       GOUT(),
@@ -20994,6 +20994,29 @@ void define_md_data_raw() {
          "rtp_nlte",
          "rtp_vmr",
          "abs_xsec_agenda"),
+      GIN("fmin", "fmax", "fnum"),
+      GIN_TYPE("Numeric", "Numeric", "Index"),
+      GIN_DEFAULT("1", "2", "500"),
+      GIN_DESC("Minimum frequency", "Maximum frequency", "Frequency grid points")));
+  
+    md_data_raw.push_back(create_mdrecord(
+      NAME("PlotPropmatAgenda"),
+      DESCRIPTION(
+          "Plots absorption of species.\n"),
+      AUTHORS("Richard Larsson"),
+      OUT(),
+      GOUT(),
+      GOUT_TYPE(),
+      GOUT_DESC(),
+      IN("abs_species",
+         "jacobian_quantities",
+         "rtp_pressure",
+         "rtp_temperature",
+         "rtp_nlte",
+         "rtp_vmr",
+         "rtp_mag",
+         "rtp_los",
+         "propmat_clearsky_agenda"),
       GIN("fmin", "fmax", "fnum"),
       GIN_TYPE("Numeric", "Numeric", "Index"),
       GIN_DEFAULT("1", "2", "500"),
