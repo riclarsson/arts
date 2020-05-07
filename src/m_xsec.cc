@@ -406,6 +406,7 @@ void PlotPropmatAgenda(
   // Set atmospheric variables
   new_plot |= ARTSGUI::MainMenu::SelectAtmosphere(rtp_pressure, rtp_temperature, rtp_vmr, vmr_list);
   new_plot |= ARTSGUI::MainMenu::SelectLOS(rtp_los);
+  new_plot |= ARTSGUI::MainMenu::SelectMAG(rtp_mag);
   
   // Plotting defaults:
   ImGui::GetPlotStyle().LineWeight = 4;

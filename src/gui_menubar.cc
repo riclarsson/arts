@@ -260,19 +260,19 @@ bool ARTSGUI::MainMenu::SelectMAG(VectorView mag)
         if (i == 0) {
           float u = float(mag[0]*1e9);
           if (ImGui::SliderFloat("u", &u, -500'000.0f, 500'000.0f, "%.3f nT")) {
-            mag[0] = 1e9 * Numeric(u);
+            mag[0] = 1e-9 * Numeric(u);
             pressed = true;
           }
         } else if (i == 1) {
           float v = float(mag[1]*1e9);
           if (ImGui::SliderFloat("v", &v, -500'000.0f, 500'000.0f, "%.3f nT")) {
-            mag[1] = 1e9 * Numeric(v);
+            mag[1] = 1e-9 * Numeric(v);
             pressed = true;
           }
         } else if (i == 2) {
           float w = float(mag[2]*1e9);
           if (ImGui::SliderFloat("w", &w, -500'000.0f, 500'000.0f, "%.3f nT")) {
-            mag[2] = 1e9 * Numeric(w);
+            mag[2] = 1e-9 * Numeric(w);
             pressed = true;
           }
         }
