@@ -555,10 +555,6 @@ if (ARTS_GUI)
   # glew
   find_package(GLEW REQUIRED)
   include_directories(${GLEW_INCLUDE_DIRS})
-
-  # Link to ARTS
-  target_link_libraries(artscore
-  )
   
   add_library(artsgui STATIC
     gui_inc.cc
@@ -578,6 +574,10 @@ if (ARTS_GUI)
           matpack
   )
   target_link_libraries(artscore artsgui)
+
+  # Set compile flag to know we are compiling the GUI
+  target_compile_options(artsgui PRIVATE -DCOMPILE_ARTS_GUI)
+  target_compile_options(artscore PRIVATE -DCOMPILE_ARTS_GUI)
   
   ############## GUI TEST ###################
   add_executable(test_gui test_gui.cc)

@@ -1,8 +1,11 @@
 #include "absorption.h"
 #include "auto_md.h"
+
+#ifdef COMPILE_ARTS_GUI
 #include "gui_menubar.h"
 #include "gui_windows.h"
 #include "gui_plot.h"
+#endif
 
 void PlotBandXsec(
   const ArrayOfArrayOfSpeciesTag& abs_species,
@@ -90,6 +93,8 @@ void PlotBandXsec(
     vmr_list.push_back(species_list[i] + " VMR [ppmv]");
   }
   
+#ifdef COMPILE_ARTS_GUI
+
   // Plotting data
   ARTSGUI::Plotting::Data f(f_grid);
   ARTSGUI::Plotting::ArrayOfData xsec_data(0);
@@ -179,6 +184,9 @@ void PlotBandXsec(
   
   EndWhileLoopARTSGUI;
   CleanupARTSGUI;
+#else  // not ARTS_GUI
+  throw std::runtime_error("Not compiled with GUI...");
+#endif
 }
 
 void PlotXsecAgenda(
@@ -234,6 +242,8 @@ void PlotXsecAgenda(
   ArrayOfIndex check_species(species_list.nelem(), false);
   check_species[0] = true;
   
+#ifdef COMPILE_ARTS_GUI
+
   // Plotting data
   ARTSGUI::Plotting::Data f(f_grid);
   ARTSGUI::Plotting::ArrayOfData xsec_data(1, ARTSGUI::Plotting::Data(abs_xsec_per_species[0](joker, 0)));
@@ -308,6 +318,9 @@ void PlotXsecAgenda(
   
   EndWhileLoopARTSGUI;
   CleanupARTSGUI;
+#else  // not ARTS_GUI
+  throw std::runtime_error("Not compiled with GUI...");
+#endif
 }
 
 void PlotPropmatAgenda(
@@ -360,7 +373,9 @@ void PlotPropmatAgenda(
   }
   ArrayOfIndex check_species(species_list.nelem(), false);
   check_species[0] = true;
-  
+
+#ifdef COMPILE_ARTS_GUI
+
   // Plotting data
   ARTSGUI::Plotting::Data f(f_grid);
   ARTSGUI::Plotting::ArrayOfData abs_data(1, ARTSGUI::Plotting::Data(propmat_clearsky[0].Kjj()));
@@ -462,4 +477,7 @@ void PlotPropmatAgenda(
   
   EndWhileLoopARTSGUI;
   CleanupARTSGUI;
+#else  // not ARTS_GUI
+  throw std::runtime_error("Not compiled with GUI...");
+#endif
 }
