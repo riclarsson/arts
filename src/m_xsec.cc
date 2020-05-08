@@ -370,6 +370,9 @@ void PlotPropmatAgenda(
   if (not is_unique(species_list))
     throw std::runtime_error("Requires a unique set of species to work");
   
+  Index component_option=0;
+  const Index max_component=propmat_clearsky[0].NumberOfNeededVectors();
+  
   // Create the plotting window
   InitializeARTSGUI;
   
@@ -407,8 +410,20 @@ void PlotPropmatAgenda(
   }
   ImGui::End();
   
-  // Add help menu at end
-  ARTSGUI::MainMenu::arts_help();
+  // Special component menu bar
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Component")) {
+      if (ImGui::MenuItem("I", NULL, false, 1<=max_component)) {component_option = 0; new_plot = true;}
+      if (ImGui::MenuItem("Q", NULL, false, 2<=max_component)) {component_option = 1; new_plot = true;}
+      if (ImGui::MenuItem("U", NULL, false, 3<=max_component)) {component_option = 2; new_plot = true;}
+      if (ImGui::MenuItem("V", NULL, false, 5<=max_component)) {component_option = 4; new_plot = true;}
+      if (ImGui::MenuItem("u", NULL, false, 4<=max_component)) {component_option = 3; new_plot = true;}
+      if (ImGui::MenuItem("v", NULL, false, 6<=max_component)) {component_option = 5; new_plot = true;}
+      if (ImGui::MenuItem("w", NULL, false, 7<=max_component)) {component_option = 6; new_plot = true;}
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
   
   if (new_plot) {
     propmat_clearsky_agendaExecute(ws, propmat_clearsky, nlte_source, dpropmat_clearsky_dx, dnlte_dx_source, nlte_dx_dsource_dx,
@@ -427,7 +442,13 @@ void PlotPropmatAgenda(
     
     for (Index species=0; species<species_list.nelem(); species++) {
       if (check_species[species]) {
-        abs_data[iline].overwrite(propmat_clearsky[species].Kjj());
+        if (component_option == 0) abs_data[iline].overwrite(propmat_clearsky[species].Kjj());
+        if (component_option == 1) abs_data[iline].overwrite(propmat_clearsky[species].K12());
+        if (component_option == 2) abs_data[iline].overwrite(propmat_clearsky[species].K13());
+        if (component_option == 3) abs_data[iline].overwrite(propmat_clearsky[species].K23());
+        if (component_option == 4) abs_data[iline].overwrite(propmat_clearsky[species].K14());
+        if (component_option == 5) abs_data[iline].overwrite(propmat_clearsky[species].K24());
+        if (component_option == 6) abs_data[iline].overwrite(propmat_clearsky[species].K34());
         abs_lines[iline] = ARTSGUI::Plotting::Line(species_list[species], &f, &abs_data[iline]);
         iline += 1;
       }
@@ -435,6 +456,9 @@ void PlotPropmatAgenda(
     
     abs_frame.lines(abs_lines);
   }
+  
+  // Add help menu at end
+  ARTSGUI::MainMenu::arts_help();
   
   EndWhileLoopARTSGUI;
   CleanupARTSGUI;
