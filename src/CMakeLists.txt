@@ -560,7 +560,14 @@ if (ARTS_GUI)
   target_link_libraries(artscore
   )
   
-  add_library(artsgui STATIC gui_inc.cc gui_help.cc gui_plot.cc gui_menubar.cc gui_plotdata.cc)
+  add_library(artsgui STATIC
+    gui_inc.cc
+    gui_help.cc
+    gui_plot.cc
+    gui_menubar.cc
+    gui_plotdata.cc
+    gui_windows.cc
+  )
   target_link_libraries(artsgui
           imgui
           implot
@@ -568,7 +575,8 @@ if (ARTS_GUI)
           ${OPENGL_LIBRARIES}
           ${GLEW_LIBRARIES}
           ${EXTRA_LIBS}
-          matpack)
+          matpack
+  )
   target_link_libraries(artscore artsgui)
   
   ############## GUI TEST ###################

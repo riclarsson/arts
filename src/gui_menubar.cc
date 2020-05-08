@@ -250,33 +250,21 @@ bool ARTSGUI::MainMenu::SelectLOS(VectorView los)
   return pressed;
 }
 
-bool ARTSGUI::MainMenu::SelectMAG(VectorView mag)
+bool ARTSGUI::MainMenu::SelectMAG(VectorView mag, Config& cfg)
 {
   bool pressed = false;
   
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("Magnetic Field")) {
       for (Index i=0; i<mag.nelem(); i++) {
-        if (i == 0) {
-          float u = float(mag[0]*1e9);
-          if (ImGui::SliderFloat("u", &u, -500'000.0f, 500'000.0f, "%.3f nT")) {
-            mag[0] = 1e-9 * Numeric(u);
-            pressed = true;
-          }
-        } else if (i == 1) {
-          float v = float(mag[1]*1e9);
-          if (ImGui::SliderFloat("v", &v, -500'000.0f, 500'000.0f, "%.3f nT")) {
-            mag[1] = 1e-9 * Numeric(v);
-            pressed = true;
-          }
-        } else if (i == 2) {
-          float w = float(mag[2]*1e9);
-          if (ImGui::SliderFloat("w", &w, -500'000.0f, 500'000.0f, "%.3f nT")) {
-            mag[2] = 1e-9 * Numeric(w);
-            pressed = true;
-          }
-        }
+        float m = float(mag[i] * 1e9);
+        pressed |= ImGui::SliderFloat(i == 0 ? "u" : i == 1 ? "v" : "w", &m, -500'000.0f, 500'000.0f, "%.3f nT");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Copy")) {cfg.mag_copy = m;}
+        ImGui::SameLine();
+        if (ImGui::MenuItem("Paste", NULL, false, not std::isnan(cfg.mag_copy))) {m = cfg.mag_copy; pressed=true;}
         ImGui::Separator();
+        if (pressed) mag[i] = 1e-9 * Numeric(m);
       }
       ImGui::EndMenu();
     }

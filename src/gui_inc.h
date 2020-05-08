@@ -12,6 +12,8 @@
 
 #include "gui_macros.h"
 
+#include <limits>
+
 extern "C" {
   inline static void glfw_error_callback(int error, const char* description)
   {
@@ -26,9 +28,11 @@ namespace ARTSGUI {
     bool fullscreen;
     bool autoscale_x;
     int width, height, xpos, ypos;
+    float mag_copy;
     Config(bool fullscreen_on=false) : io(ImGui::GetIO()),
     show_about_help(false), show_metrics_help(false), show_style_help(false), 
-    fullscreen(fullscreen_on), autoscale_x(false), width(1280), height(720), xpos(50), ypos(50)
+    fullscreen(fullscreen_on), autoscale_x(false), width(1280), height(720), xpos(50), ypos(50),
+    mag_copy(std::numeric_limits<float>::quiet_NaN())
     {
       (void)io;
       io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls

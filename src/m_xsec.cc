@@ -1,6 +1,7 @@
 #include "absorption.h"
 #include "auto_md.h"
 #include "gui_menubar.h"
+#include "gui_windows.h"
 #include "gui_plot.h"
 
 void PlotBandXsec(
@@ -122,16 +123,8 @@ void PlotBandXsec(
   // Plotting defaults:
   ImGui::GetPlotStyle().LineWeight = 4;
   
-  //Cursors and sizes
-  int width = 0, height = 0;
-  glfwGetWindowSize(window, &width, &height);
-  ImVec2 pos = ImGui::GetCursorPos();
-  ImVec2 size = {float(width)-2*pos.x, float(height)-pos.y};
-  
-  // Show a simple window
-  ImGui::SetNextWindowPos(pos);
-  ImGui::SetNextWindowSize(size);
-  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
+  // Draw a fullscreen plotting window
+  if (ARTSGUI::Windows::full(window, ImGui::GetCursorPos(), "Plot tool")) {
     ARTSGUI::Plotting::PlotFrame(xsec_frame);
     
     // Menu bar for plot
@@ -274,16 +267,8 @@ void PlotXsecAgenda(
   // Plotting defaults:
   ImGui::GetPlotStyle().LineWeight = 4;
   
-  //Cursors and sizes
-  int width = 0, height = 0;
-  glfwGetWindowSize(window, &width, &height);
-  ImVec2 pos = ImGui::GetCursorPos();
-  ImVec2 size = {float(width)-2*pos.x, float(height)-pos.y};
-  
-  // Show a simple window
-  ImGui::SetNextWindowPos(pos);
-  ImGui::SetNextWindowSize(size);
-  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
+  // Draw a fullscreen plotting window
+  if (ARTSGUI::Windows::full(window, ImGui::GetCursorPos(), "Plot tool")) {
     ARTSGUI::Plotting::PlotFrame(xsec_frame);
     
     // Menu bar for plot
@@ -406,21 +391,13 @@ void PlotPropmatAgenda(
   // Set atmospheric variables
   new_plot |= ARTSGUI::MainMenu::SelectAtmosphere(rtp_pressure, rtp_temperature, rtp_vmr, vmr_list);
   new_plot |= ARTSGUI::MainMenu::SelectLOS(rtp_los);
-  new_plot |= ARTSGUI::MainMenu::SelectMAG(rtp_mag);
+  new_plot |= ARTSGUI::MainMenu::SelectMAG(rtp_mag, config);
   
   // Plotting defaults:
   ImGui::GetPlotStyle().LineWeight = 4;
   
-  //Cursors and sizes
-  int width = 0, height = 0;
-  glfwGetWindowSize(window, &width, &height);
-  ImVec2 pos = ImGui::GetCursorPos();
-  ImVec2 size = {float(width)-2*pos.x, float(height)-pos.y};
-  
-  // Show a simple window
-  ImGui::SetNextWindowPos(pos);
-  ImGui::SetNextWindowSize(size);
-  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar)) {
+  // Draw a fullscreen plotting window
+  if (ARTSGUI::Windows::full(window, ImGui::GetCursorPos(), "Plot tool")) {
     ARTSGUI::Plotting::PlotFrame(abs_frame);
     
     // Menu bar for plot

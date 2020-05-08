@@ -16,7 +16,7 @@ void imgui_help(Config& cfg);
 void arts_help();
 bool SelectAtmosphere(Numeric& p, Numeric& t, VectorView vmrs, const ArrayOfString& spec_list);
 bool SelectLOS(VectorView los);
-bool SelectMAG(VectorView mag);
+bool SelectMAG(VectorView mag, Config& cfg);
 bool Select(ArrayOfIndex& truths, const ArrayOfString& options, const String& menuname);
 bool Select(ArrayOfArrayOfIndex& truths, const ArrayOfString& dropdowns, const ArrayOfArrayOfString& options, const String& menuname);
 
