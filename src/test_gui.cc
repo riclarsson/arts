@@ -1,5 +1,7 @@
 #include "gui_menubar.h"
 #include "gui_plot.h"
+#include "gui_windows.h"
+#include "constants.h"
 
 int main(int, char**)
 {
@@ -9,31 +11,38 @@ int main(int, char**)
   ARTSGUI::Config config;
   
   // Test data
-  constexpr int n=3000;
+  constexpr int n=300;
+  constexpr Numeric fac = 1.0 / Numeric(2*n);
   auto x = ARTSGUI::Plotting::Data(n);
   auto y1 = ARTSGUI::Plotting::Data(n);
   auto y2 = ARTSGUI::Plotting::Data(n);
+  auto y3 = ARTSGUI::Plotting::Data(n);
   Vector tmp(n);
   for (int i=0; i<n; i++)
-    tmp[i] = (6.28*5*i)/n;
+    tmp[i] =  -Constant::pi/2 + (Constant::pi*i)/n + fac;
+  tmp[n-1] = Constant::pi/2 - fac;
   x.set(tmp);
   
   for (int i=0; i<n; i++)
-    tmp[i] = std::sin(tmp[i]);
+    tmp[i] = std::sin(-Constant::pi/2 + (Constant::pi*i)/n + fac);
+  tmp[n-1] = std::sin(Constant::pi/2 - fac);
   y1.set(tmp);
-  
   for (int i=0; i<n; i++)
-    tmp[i] = (6.28*5*i)/n;
-  for (int i=0; i<n; i++)
-    tmp[i] = std::cos(tmp[i]);
+    tmp[i] = std::cos(-Constant::pi/2 + (Constant::pi*i)/n + fac);
+  tmp[n-1] = std::cos(Constant::pi/2 - fac);
   y2.set(tmp);
+  for (int i=0; i<n; i++)
+    tmp[i] = std::tan(-Constant::pi/2 + (Constant::pi*i)/n + fac);
+  tmp[n-1] = std::tan(Constant::pi/2 - fac);
+  y3.set(tmp);
   
   ARTSGUI::Plotting::Line line1("Sine-curve", &x, &y1);
   ARTSGUI::Plotting::Line line2("Cosine-curve", &x, &y2);
+  ARTSGUI::Plotting::Line line3("Tangent-curve", &x, &y3);
   
-  ARTSGUI::Plotting::Frame frame("Test plot", "X", "Y");
-  frame.push_back(line1);
-  frame.push_back(line2);
+  ARTSGUI::Plotting::Frame frame1("Test sine", "X", "Y", line1);
+  ARTSGUI::Plotting::Frame frame2("Test cos", "X", "Y", line2);
+  ARTSGUI::Plotting::Frame frame3("Test tan", "X", "Y", line3);
   
   // Style
   ARTSGUI::LayoutAndStyleSettings();
@@ -48,25 +57,39 @@ int main(int, char**)
   // Plotting defaults:
   ImGui::GetPlotStyle().LineWeight = 4;
   
-  //Cursors and sizes
-  int width = 0, height = 0;
-  glfwGetWindowSize(window, &width, &height);
-  ImVec2 pos = ImGui::GetCursorPos();
-  ImVec2 size = {float(width)-2*pos.x, float(height)-pos.y};
+  const auto pos = ImGui::GetCursorPos();
   
-  // Show a simple window
-  ImGui::SetNextWindowPos(pos);
-  ImGui::SetNextWindowSize(size);
-  if (ImGui::Begin("Plot tool", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar)) {
-    if (ImGui::BeginPlot(frame.title().c_str(), frame.xlabel().c_str(), frame.ylabel().c_str(), {-1, -1}, ImPlotFlags_MousePos | ImPlotFlags_Legend | ImPlotFlags_Highlight | ImPlotFlags_Selection | ImPlotFlags_ContextMenu)) {
-      for (auto& line: frame)
-        ImGui::Plot(line.name().c_str(), line.getter(), (void*)&line, line.size());
-      ImGui::EndPlot();
-    }
+  if (ARTSGUI::Windows::sub<2, 2, 0, 0>(window, pos, "Plot tool 1")) {
+    ARTSGUI::Plotting::PlotFrame(frame1);
     
     // Menu bar for plot
-    ARTSGUI::PlotMenu::range(frame);
-    ARTSGUI::PlotMenu::scale(frame);
+    ARTSGUI::PlotMenu::range(frame1);
+    ARTSGUI::PlotMenu::scale(frame1);
+  }
+  ImGui::End();
+  
+  if (ARTSGUI::Windows::sub<2, 2, 0, 1>(window, pos, "Plot tool 2")) {
+    ARTSGUI::Plotting::PlotFrame(frame2);
+    
+    // Menu bar for plot
+    ARTSGUI::PlotMenu::range(frame2);
+    ARTSGUI::PlotMenu::scale(frame2);
+  }
+  ImGui::End();
+  
+  if (ARTSGUI::Windows::sub<2, 3, 1, 1, 1, 2>(window, pos, "Plot tool 3")) {
+    ARTSGUI::Plotting::PlotFrame(frame3);
+    
+    // Menu bar for plot
+    ARTSGUI::PlotMenu::range(frame3);
+    ARTSGUI::PlotMenu::scale(frame3);
+  }
+  ImGui::End();
+  
+  if (ARTSGUI::Windows::sub<2, 3, 1, 0>(window, pos, "Text tool 4")) {
+    ImGui::Text("The layout can be somewhat crazy but it must be set at compile time...\n"
+                "Note that each call to a windowing function takes a name and if that\n"
+                "name is not unique, there is a hidden error in the layout...\n");
   }
   ImGui::End();
   
