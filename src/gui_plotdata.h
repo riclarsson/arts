@@ -27,6 +27,7 @@ public:
   bool set(ConstVectorView x) {if (x.nelem() not_eq nelem()) return false; else vec = x; return true;}
   void overwrite(Vector&& x) {vec = std::move(x);}
   Index nelem() const {return vec.nelem();}
+  VectorView view() {return vec;}
 };  // Data
 
 using ArrayOfData = Array<Data>;
@@ -151,6 +152,10 @@ public:
   // Names
   const String& name() const {return mname;}
   void name(const String& name) {mname = name;}
+  
+  // Dataviews
+  VectorView xview() noexcept {return mx -> view();}
+  VectorView yview() noexcept {return my -> view();}
 };  // Line
 
 using ArrayOfLine = Array<Line>;
@@ -159,12 +164,12 @@ class Frame {
   String mtitle;
   String mxlabel;
   String mylabel;
-  ImPlotRange mrange;
+  ImPlotLimits mlimits;
   ArrayOfLine mlines;
 public:
-  Frame(const String& title, const String& x, const String& y) : mtitle(title), mxlabel(x), mylabel(y), mrange(), mlines(0) {}
-  Frame(const String& title, const String& x, const String& y, const Line& line) : mtitle(title), mxlabel(x), mylabel(y), mrange(), mlines(1, line) {}
-  Frame(const String& title, const String& x, const String& y, const ArrayOfLine& lines) : mtitle(title), mxlabel(x), mylabel(y), mrange(), mlines(lines) {}
+  Frame(const String& title, const String& x, const String& y) : mtitle(title), mxlabel(x), mylabel(y), mlimits(), mlines(0) {}
+  Frame(const String& title, const String& x, const String& y, const Line& line) : mtitle(title), mxlabel(x), mylabel(y), mlimits(), mlines(1, line) {}
+  Frame(const String& title, const String& x, const String& y, const ArrayOfLine& lines) : mtitle(title), mxlabel(x), mylabel(y), mlimits(), mlines(lines) {}
   
   // Names
   const String& title() const {return mtitle;}
@@ -178,6 +183,7 @@ public:
   void push_back(Line& line) {mlines.push_back(line);}
   void pop_back() {mlines.pop_back();}
   void set_empty() {mlines.resize(0);}
+  Line& operator[](Index i) {return mlines[i];}
   const Line& operator[](Index i) const {return mlines[i];}
   void lines(const ArrayOfLine& x) {mlines=x;}
   Index nelem() const {return mlines.nelem();}
@@ -187,13 +193,13 @@ public:
   decltype(mlines.cend()) cend() const {return mlines.cend();}
   
   // Range of frame
-  ImPlotRange range() const {return mrange;}
-  void range(ImPlotRange x) {mrange=x;}
-  bool invalid_range() const {using std::isnan; return isnan(mrange.XMax) or isnan(mrange.XMin) or isnan(mrange.YMax) or isnan(mrange.XMin);}
+  ImPlotLimits limits() const {return mlimits;}
+  void limits(ImPlotLimits x) {mlimits=x;}
+  bool invalid_range() const {using std::isnan; return isnan(mlimits.X.Max) or isnan(mlimits.X.Min) or isnan(mlimits.Y.Max) or isnan(mlimits.Y.Min);}
 };  // Frame
 
 /** Plots a frame  in the current window */
-void PlotFrame(Frame& frame);
+bool PlotFrame(Frame& frame, Config& cfg, bool select_frequency);
 
 };  // Plotting
 };  // ARTSGUI

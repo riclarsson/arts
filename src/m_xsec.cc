@@ -130,12 +130,10 @@ void PlotBandXsec(
   
   // Draw a fullscreen plotting window
   if (ARTSGUI::Windows::full(window, ImGui::GetCursorPos(), "Plot tool")) {
-    ARTSGUI::Plotting::PlotFrame(xsec_frame);
+    new_plot |= ARTSGUI::Plotting::PlotFrame(xsec_frame, config, true);
     
     // Menu bar for plot
-    ARTSGUI::PlotMenu::range(xsec_frame);
     ARTSGUI::PlotMenu::scale(xsec_frame);
-    new_plot |= ARTSGUI::PlotMenu::SelectFrequency(f, f_grid, xsec_frame, config);
   }
   ImGui::End();
   
@@ -143,6 +141,8 @@ void PlotBandXsec(
   ARTSGUI::MainMenu::arts_help();
   
   if (new_plot) {
+    f_grid = f.view();
+    
     Index numlines=0;
     for (Index species=0; species<band_list.nelem(); species++) {
       for (Index band=0; band<band_list[species].nelem(); band++) {
@@ -279,12 +279,10 @@ void PlotXsecAgenda(
   
   // Draw a fullscreen plotting window
   if (ARTSGUI::Windows::full(window, ImGui::GetCursorPos(), "Plot tool")) {
-    ARTSGUI::Plotting::PlotFrame(xsec_frame);
+    new_plot |= ARTSGUI::Plotting::PlotFrame(xsec_frame, config, true);
     
     // Menu bar for plot
-    ARTSGUI::PlotMenu::range(xsec_frame);
     ARTSGUI::PlotMenu::scale(xsec_frame);
-    new_plot |= ARTSGUI::PlotMenu::SelectFrequency(f, f_grid, xsec_frame, config);
   }
   ImGui::End();
   
@@ -292,6 +290,7 @@ void PlotXsecAgenda(
   ARTSGUI::MainMenu::arts_help();
   
   if (new_plot) {
+    f_grid = f.view();
     abs_xsec_agendaExecute(ws, abs_xsec_per_species, src_xsec_per_species, dabs_xsec_per_species_dx, dsrc_xsec_per_species_dx,
                            abs_species, jacobian_quantities, asa, f_grid, abs_p, abs_t, rtp_nlte, abs_vmrs, abs_xsec_agenda);
     
@@ -416,12 +415,10 @@ void PlotPropmatAgenda(
   
   // Draw a fullscreen plotting window
   if (ARTSGUI::Windows::full(window, ImGui::GetCursorPos(), "Plot tool")) {
-    ARTSGUI::Plotting::PlotFrame(abs_frame);
+    new_plot |= ARTSGUI::Plotting::PlotFrame(abs_frame, config, true);
     
-    // Menu bar for plot
-    ARTSGUI::PlotMenu::range(abs_frame);
+    // Plot menu bar
     ARTSGUI::PlotMenu::scale(abs_frame);
-    new_plot |= ARTSGUI::PlotMenu::SelectFrequency(f, f_grid, abs_frame, config);
   }
   ImGui::End();
   
@@ -441,6 +438,7 @@ void PlotPropmatAgenda(
   }
   
   if (new_plot) {
+    f_grid = f.view();
     propmat_clearsky_agendaExecute(ws, propmat_clearsky, nlte_source, dpropmat_clearsky_dx, dnlte_dx_source, nlte_dx_dsource_dx,
                                    jacobian_quantities, f_grid, rtp_mag, rtp_los, rtp_pressure, rtp_temperature, rtp_nlte,
                                    rtp_vmr, propmat_clearsky_agenda);;

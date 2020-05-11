@@ -8,22 +8,22 @@ void ARTSGUI::PlotMenu::range(ARTSGUI::Plotting::Frame& frame)
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("Frames")) {
       if (ImGui::BeginMenu(frame.title().c_str())) {
-        ImPlotRange range = ImGui::GetPlotRange();
+        ImPlotLimits limits = ImGui::GetPlotLimits();
         bool change = false;
-        change |= ImGui::InputFloat2("X", &range.XMin, "%g", ImGuiInputTextFlags_CharsScientific);
-        change |= ImGui::InputFloat2("Y", &range.YMin, "%g", ImGuiInputTextFlags_CharsScientific);
+        change |= ImGui::InputFloat2("X", &limits.X.Min, "%g", ImGuiInputTextFlags_CharsScientific);
+        change |= ImGui::InputFloat2("Y", &limits.Y.Min, "%g", ImGuiInputTextFlags_CharsScientific);
         
         ImGui::Separator();
         
         if (ImGui::MenuItem("Copy"))
-          frame.range(range);
+          frame.limits(limits);
         
         if (ImGui::MenuItem("Paste", NULL, false, enable_paste)) {
-          range = frame.range();
+          limits = frame.limits();
           change = true;
         }
         
-        if (change) ImGui::SetPlotRange(range);
+        if (change) ImGui::SetPlotLimits(limits);
         
         ImGui::Separator();
         ImGui::EndMenu();
@@ -65,15 +65,14 @@ void ARTSGUI::PlotMenu::scale(ARTSGUI::Plotting::Frame& frame)
   }
 }
 
-bool ARTSGUI::PlotMenu::SelectFrequency(ARTSGUI::Plotting::Data& f, VectorView f_grid, ARTSGUI::Plotting::Frame& frame, ARTSGUI::Config& cfg)
+bool ARTSGUI::PlotMenu::SelectFrequency(VectorView f, ARTSGUI::Plotting::Frame& frame, ARTSGUI::Config& cfg)
 {
   bool new_plot = false;
   
   if (ImGui::BeginMainMenuBar()) {
     bool change  = false;
-    float f0 = float(f_grid[0]);
-    float f1 = float(f_grid[f_grid.nelem()-1]);
-    
+    float f0 = float(f[0]);
+    float f1 = float(f[f.nelem()-1]);
     if (ImGui::BeginMenu("Frequency")) {
       
       ImGui::Checkbox("Autoscale", &cfg.autoscale_x);
@@ -86,17 +85,19 @@ bool ARTSGUI::PlotMenu::SelectFrequency(ARTSGUI::Plotting::Data& f, VectorView f
     }
     
     if (cfg.autoscale_x) {
-      if (frame.invalid_range())
-        frame.range(ImGui::GetPlotRange());
+      if (frame.invalid_range()) {
+        frame.limits(ImGui::GetPlotLimits());
+      }
       else {
-        ImPlotRange range = ImGui::GetPlotRange();
-        if (range.XMax not_eq frame.range().XMax or range.XMin not_eq frame.range().XMin) {
-          frame.range(range);
+        ImPlotLimits limits = ImGui::GetPlotLimits();
+        
+        if (limits.X.Max not_eq frame.limits().X.Max or limits.X.Min not_eq frame.limits().X.Min) {
+          frame.limits(limits);
           change = true;
         }
       }
-      f0 = frame.range().XMin;
-      f1 = frame.range().XMax;
+      f0 = frame.limits().X.Min;
+      f1 = frame.limits().X.Max;
     }
     
     if (change) {
@@ -105,10 +106,9 @@ bool ARTSGUI::PlotMenu::SelectFrequency(ARTSGUI::Plotting::Data& f, VectorView f
       if (f1 < f0 + 0.01f)
         f1 = f0 + 0.01f;
       
-      Numeric step = Numeric(f1 - f0) / (Numeric(f_grid.nelem()) - 1);
-      for (Index i = 0; i < f_grid.nelem() - 1; i++) f_grid[i] = Numeric(f0) + Numeric(i) * step;
-      f_grid[f_grid.nelem() - 1] = Numeric(f1);
-      f.set(f_grid);
+      Numeric step = Numeric(f1 - f0) / (Numeric(f.nelem()) - 1);
+      for (Index i = 0; i < f.nelem() - 1; i++) f[i] = Numeric(f0) + Numeric(i) * step;
+      f[f.nelem() - 1] = Numeric(f1);
       new_plot = true;
     }
     

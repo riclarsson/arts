@@ -60,7 +60,7 @@ int main(int, char**)
   const auto pos = ImGui::GetCursorPos();
   
   if (ARTSGUI::Windows::sub<2, 2, 0, 0>(window, pos, "Plot tool 1")) {
-    ARTSGUI::Plotting::PlotFrame(frame1);
+    ARTSGUI::Plotting::PlotFrame(frame1, config, false);
     
     // Menu bar for plot
     ARTSGUI::PlotMenu::range(frame1);
@@ -69,7 +69,7 @@ int main(int, char**)
   ImGui::End();
   
   if (ARTSGUI::Windows::sub<2, 2, 0, 1>(window, pos, "Plot tool 2")) {
-    ARTSGUI::Plotting::PlotFrame(frame2);
+    ARTSGUI::Plotting::PlotFrame(frame2, config, false);
     
     // Menu bar for plot
     ARTSGUI::PlotMenu::range(frame2);
@@ -78,7 +78,7 @@ int main(int, char**)
   ImGui::End();
   
   if (ARTSGUI::Windows::sub<2, 3, 1, 1, 1, 2>(window, pos, "Plot tool 3")) {
-    ARTSGUI::Plotting::PlotFrame(frame3);
+    ARTSGUI::Plotting::PlotFrame(frame3, config, false);
     
     // Menu bar for plot
     ARTSGUI::PlotMenu::range(frame3);
