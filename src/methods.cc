@@ -21021,4 +21021,27 @@ void define_md_data_raw() {
       GIN_TYPE("Numeric", "Numeric", "Index"),
       GIN_DEFAULT("1", "2", "500"),
       GIN_DESC("Minimum frequency", "Maximum frequency", "Frequency grid points")));
+  
+    md_data_raw.push_back(create_mdrecord(
+      NAME("PlotIYAgenda"),
+      DESCRIPTION(
+          "Plots iy.\n"),
+      AUTHORS("Richard Larsson"),
+      OUT(),
+      GOUT(),
+      GOUT_TYPE(),
+      GOUT_DESC(),
+      IN("iy_aux_vars",
+         "iy_unit",
+         "cloudbox_on",
+         "jacobian_do",
+         "nlte_field",
+         "rte_pos",
+         "rte_los",
+         "rte_pos2",
+         "iy_main_agenda"),
+      GIN("fmin", "fmax", "fnum"),
+      GIN_TYPE("Numeric", "Numeric", "Index"),
+      GIN_DEFAULT("1", "2", "500"),
+      GIN_DESC("Minimum frequency", "Maximum frequency", "Frequency grid points")));
 }

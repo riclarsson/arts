@@ -233,10 +233,51 @@ bool ARTSGUI::MainMenu::SelectLOS(VectorView los)
           }
         } else if (i == 1) {
           float aa = float(los[1]);
-          if (ImGui::SliderFloat("Azimuth Angle", &aa, 0.0f, 360.0f, "%.3f deg")) {
+          if (ImGui::SliderFloat("Azimuth Angle", &aa, -180.0f, 180.0f, "%.3f deg")) {
             if (aa<0.0f) aa = 0.0f;
             else if (aa>360.0f) aa = 360.0f;
             los[1] = Numeric(aa);
+            pressed = true;
+          }
+        }
+        ImGui::Separator();
+      }
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+  
+  return pressed;
+}
+
+bool ARTSGUI::MainMenu::SelectPOS(VectorView pos)
+{
+  bool pressed = false;
+  
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Position")) {
+      for (Index i=0; i<pos.nelem(); i++) {
+        if (i == 0) {
+          float alt = float(pos[0]/1e3);
+          if (ImGui::SliderFloat("Altitude", &alt, 0.0f, 500.0f, "%.3f km")) {
+            if (alt<0.0f) alt = 0.0f;
+            pos[0] = Numeric(alt)*1e3;
+            pressed = true;
+          }
+        } else if (i == 1) {
+          float lat = float(pos[1]);
+          if (ImGui::SliderFloat("Latitude", &lat, -90.0f, 90.0f, "%.3f deg")) {
+            if (lat<-90.0f) lat = -90.0f;
+            else if (lat>90.0f) lat = 90.0f;
+            pos[1] = Numeric(lat);
+            pressed = true;
+          }
+        } else if (i == 2) {
+          float lon = float(pos[2]);
+          if (ImGui::SliderFloat("Longitude", &lon, -180.0f, 180.0f, "%.3f deg")) {
+            if (lon<-180.0f) lon = -180.0f;
+            else if (lon>180.0f) lon = 180.0f;
+            pos[2] = Numeric(lon);
             pressed = true;
           }
         }

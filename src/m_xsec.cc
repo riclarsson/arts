@@ -348,6 +348,7 @@ void PlotPropmatAgenda(
   Vector rtp_vmr = rtp_vmr_in;
   Vector rtp_mag = rtp_mag_in;
   Vector rtp_los = rtp_los_in;
+  const ArrayOfIndex jac_pos = equivalent_propmattype_indexes(jacobian_quantities);
 
   propmat_clearsky_agendaExecute(ws, propmat_clearsky, nlte_source, dpropmat_clearsky_dx, dnlte_dx_source, nlte_dx_dsource_dx,
                                  jacobian_quantities, f_grid, rtp_mag, rtp_los, rtp_pressure, rtp_temperature, rtp_nlte,
@@ -422,16 +423,30 @@ void PlotPropmatAgenda(
   }
   ImGui::End();
   
-  // Special component menu bar
+  // Special component menu bar (Make a check-lke selection)
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("Component")) {
-      if (ImGui::MenuItem("I", NULL, false, 1<=max_component)) {component_option = 0; new_plot = true;}
-      if (ImGui::MenuItem("Q", NULL, false, 2<=max_component)) {component_option = 1; new_plot = true;}
-      if (ImGui::MenuItem("U", NULL, false, 3<=max_component)) {component_option = 2; new_plot = true;}
-      if (ImGui::MenuItem("V", NULL, false, 5<=max_component)) {component_option = 4; new_plot = true;}
-      if (ImGui::MenuItem("u", NULL, false, 4<=max_component)) {component_option = 3; new_plot = true;}
-      if (ImGui::MenuItem("v", NULL, false, 6<=max_component)) {component_option = 5; new_plot = true;}
-      if (ImGui::MenuItem("w", NULL, false, 7<=max_component)) {component_option = 6; new_plot = true;}
+      Index component_option_adder = 0;
+      if (ImGui::MenuItem("I", NULL, false, 1<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("Q", NULL, false, 2<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("U", NULL, false, 3<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("V", NULL, false, 5<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("u", NULL, false, 4<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("v", NULL, false, 6<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("w", NULL, false, 7<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      for (auto ind : jac_pos) {
+        auto& jac = jacobian_quantities[ind];
+        if (ImGui::BeginMenu((propmattype_string(jac)+" - "+jac.MainTag()+" - "+jac.Subtag()+" - "+jac.SubSubtag()).c_str())) {
+          if (ImGui::MenuItem("I", NULL, false, 1<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+          if (ImGui::MenuItem("Q", NULL, false, 2<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+          if (ImGui::MenuItem("U", NULL, false, 3<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+          if (ImGui::MenuItem("V", NULL, false, 5<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+          if (ImGui::MenuItem("u", NULL, false, 4<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+          if (ImGui::MenuItem("v", NULL, false, 6<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+          if (ImGui::MenuItem("w", NULL, false, 7<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+          ImGui::EndMenu();
+        }
+      }
       ImGui::EndMenu();
     }
     ImGui::EndMainMenuBar();
@@ -455,13 +470,23 @@ void PlotPropmatAgenda(
     
     for (Index species=0; species<species_list.nelem(); species++) {
       if (check_species[species]) {
-        if (component_option == 0) abs_data[iline].overwrite(propmat_clearsky[species].Kjj());
-        if (component_option == 1) abs_data[iline].overwrite(propmat_clearsky[species].K12());
-        if (component_option == 2) abs_data[iline].overwrite(propmat_clearsky[species].K13());
-        if (component_option == 3) abs_data[iline].overwrite(propmat_clearsky[species].K23());
-        if (component_option == 4) abs_data[iline].overwrite(propmat_clearsky[species].K14());
-        if (component_option == 5) abs_data[iline].overwrite(propmat_clearsky[species].K24());
-        if (component_option == 6) abs_data[iline].overwrite(propmat_clearsky[species].K34());
+        Index component_option_adder = 0;
+        if (component_option == component_option_adder) abs_data[iline].overwrite(propmat_clearsky[species].Kjj()); component_option_adder++;
+        if (component_option == component_option_adder) abs_data[iline].overwrite(propmat_clearsky[species].K12()); component_option_adder++;
+        if (component_option == component_option_adder) abs_data[iline].overwrite(propmat_clearsky[species].K13()); component_option_adder++;
+        if (component_option == component_option_adder) abs_data[iline].overwrite(propmat_clearsky[species].K23()); component_option_adder++;
+        if (component_option == component_option_adder) abs_data[iline].overwrite(propmat_clearsky[species].K14()); component_option_adder++;
+        if (component_option == component_option_adder) abs_data[iline].overwrite(propmat_clearsky[species].K24()); component_option_adder++;
+        if (component_option == component_option_adder) abs_data[iline].overwrite(propmat_clearsky[species].K34()); component_option_adder++;
+        for (auto ind : jac_pos) {
+          if (component_option == component_option_adder) abs_data[iline].overwrite(dpropmat_clearsky_dx[ind].Kjj()); component_option_adder++;
+          if (component_option == component_option_adder) abs_data[iline].overwrite(dpropmat_clearsky_dx[ind].K12()); component_option_adder++;
+          if (component_option == component_option_adder) abs_data[iline].overwrite(dpropmat_clearsky_dx[ind].K13()); component_option_adder++;
+          if (component_option == component_option_adder) abs_data[iline].overwrite(dpropmat_clearsky_dx[ind].K23()); component_option_adder++;
+          if (component_option == component_option_adder) abs_data[iline].overwrite(dpropmat_clearsky_dx[ind].K14()); component_option_adder++;
+          if (component_option == component_option_adder) abs_data[iline].overwrite(dpropmat_clearsky_dx[ind].K24()); component_option_adder++;
+          if (component_option == component_option_adder) abs_data[iline].overwrite(dpropmat_clearsky_dx[ind].K34()); component_option_adder++;
+        }
         abs_lines[iline] = ARTSGUI::Plotting::Line(species_list[species], &f, &abs_data[iline]);
         iline += 1;
       }
@@ -479,3 +504,126 @@ void PlotPropmatAgenda(
   throw std::runtime_error("Not compiled with GUI...");
 #endif
 }
+
+
+
+void PlotIYAgenda(
+  Workspace& ws,
+  const ArrayOfString& iy_aux_vars,
+  const String& iy_unit,
+  const Index& cloudbox_on,
+  const Index& jacobian_do,
+  const EnergyLevelMap& nlte_field,
+  const Vector& rte_pos,
+  const Vector& rte_los,
+  const Vector& rte_pos2,
+  const Agenda& iy_main_agenda,
+  const Numeric& fmin,
+  const Numeric& fmax,
+  const Index& fnum,
+  const Verbosity&)
+{
+  // Output of methods
+  Matrix iy;
+  ArrayOfMatrix iy_aux;
+  Ppath ppath;
+  ArrayOfTensor3 diy_dx;
+  Tensor3 iy_transmission;
+  
+  Vector f_grid;
+  nlinspace(f_grid, fmin, fmax, fnum);
+
+  Vector rtp_los = rte_los;
+  Vector rtp_pos = rte_pos;
+  
+  iy_main_agendaExecute(ws, iy, iy_aux, ppath, diy_dx, true, iy_transmission, iy_aux_vars, 1,
+                        iy_unit, cloudbox_on, jacobian_do, f_grid, nlte_field, 
+                        rtp_pos, rtp_los, rte_pos2, iy_main_agenda);
+
+#ifdef COMPILE_ARTS_GUI
+
+  // Plotting data
+  ARTSGUI::Plotting::Data f(f_grid);
+  ARTSGUI::Plotting::ArrayOfData iy_data(1, ARTSGUI::Plotting::Data(iy(joker, 0)));
+  ARTSGUI::Plotting::ArrayOfLine iy_lines(1, ARTSGUI::Plotting::Line("I", &f, &iy_data[0]));
+  ARTSGUI::Plotting::Frame iy_frame("Absorption", "Frequency [Hz]", String("Radiation [") + iy_unit + String("]"), iy_lines);
+  
+  Index component_option=0;
+  const Index max_component=iy.ncols();
+  
+  // Create the plotting window
+  InitializeARTSGUI;
+  
+  // Our states
+  ARTSGUI::Config config;
+  
+  // Our style
+  ARTSGUI::LayoutAndStyleSettings();
+  
+  // Main loop
+  BeginWhileLoopARTSGUI;
+  
+  bool new_plot = false;
+  
+  // Main menu bar
+  ARTSGUI::MainMenu::fullscreen(config, window);
+  ARTSGUI::MainMenu::quitscreen(config, window);
+  
+  // Options
+  new_plot |= ARTSGUI::MainMenu::SelectLOS(rtp_los);
+  new_plot |= ARTSGUI::MainMenu::SelectPOS(rtp_pos);
+  
+  // Plotting defaults:
+  ImGui::GetPlotStyle().LineWeight = 4;
+  
+  // Draw a fullscreen plotting window
+  if (ARTSGUI::Windows::full(window, ImGui::GetCursorPos(), "Plot tool")) {
+    new_plot |= ARTSGUI::Plotting::PlotFrame(iy_frame, config, true);
+    
+    // Plot menu bar
+    ARTSGUI::PlotMenu::scale(iy_frame);
+  }
+  ImGui::End();
+  
+  // Special component menu bar (Make a check-lke selection)
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Component")) {
+      Index component_option_adder = 0;
+      if (ImGui::MenuItem("I", NULL, false, 1<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("Q", NULL, false, 2<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("U", NULL, false, 3<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      if (ImGui::MenuItem("V", NULL, false, 4<=max_component)) {component_option = component_option_adder; new_plot = true;} component_option_adder++;
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+  
+  if (new_plot) {
+    f_grid = f.view();
+    iy_main_agendaExecute(ws, iy, iy_aux, ppath, diy_dx, true, iy_transmission, iy_aux_vars, 1,
+                          iy_unit, cloudbox_on, jacobian_do, f_grid, nlte_field, 
+                          rtp_pos, rtp_los, rte_pos2, iy_main_agenda);
+
+    Index iline=0;
+    
+    Index component_option_adder = 0;
+    if (component_option == component_option_adder) iy_data[iline].overwrite(iy(joker, 0)); component_option_adder++;
+    if (component_option == component_option_adder) iy_data[iline].overwrite(iy(joker, 1)); component_option_adder++;
+    if (component_option == component_option_adder) iy_data[iline].overwrite(iy(joker, 2)); component_option_adder++;
+    if (component_option == component_option_adder) iy_data[iline].overwrite(iy(joker, 3)); component_option_adder++;
+    iy_lines[iline] = ARTSGUI::Plotting::Line("I", &f, &iy_data[iline]);
+    iline += 1;
+    
+    iy_frame.lines(iy_lines);
+  }
+  
+  // Add help menu at end
+  ARTSGUI::MainMenu::arts_help();
+  
+  EndWhileLoopARTSGUI;
+  CleanupARTSGUI;
+#else  // not ARTS_GUI
+  throw std::runtime_error("Not compiled with GUI...");
+#endif
+}
+
