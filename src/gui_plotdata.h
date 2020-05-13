@@ -18,16 +18,21 @@ namespace Plotting {
 /** Holds the plotting data --- might be modified to allow updating data more easily */
 class Data {
   Vector vec;
+  Numeric s, o;
 public:
-  Data(std::size_t n=0) : vec(n) {}
-  Data(const Vector& v) : vec(v) {}
-  Data(Vector&& v) : vec(std::move(v)) {}
-  const Vector& get() const {return vec;}
+  Data(std::size_t n=0) : vec(n), s(1.0), o(0.0) {}
+  Data(const Vector& v) : vec(v), s(1.0), o(0.0) {}
+  Data(Vector&& v) : vec(std::move(v)), s(1.0), o(0.0) {}
+  Numeric get(int i) const {return vec[i] / s - o / s;}
   bool set(const Vector& x) {if (x.nelem() not_eq nelem()) return false; else vec = x; return true;}
   bool set(ConstVectorView x) {if (x.nelem() not_eq nelem()) return false; else vec = x; return true;}
   void overwrite(Vector&& x) {vec = std::move(x);}
   Index nelem() const {return vec.nelem();}
   VectorView view() {return vec;}
+  void scale(Numeric x) {s=x;}
+  void offset(Numeric x) {o=x;}
+  Numeric scale() const {return s;}
+  Numeric offset() const {return o;}
 };  // Data
 
 using ArrayOfData = Array<Data>;
@@ -49,8 +54,8 @@ class Line {
   std::size_t typemodifier;
   Matrix mmul;
   
-  float x(int i) {if (mx not_eq nullptr) return float(mx -> get()[i]); else return float(i);}
-  float y(int i) {if (my not_eq nullptr) return float(my -> get()[i]); else return 0.0f;}
+  float x(int i) {if (mx not_eq nullptr) return float(mx -> get(i)); else return float(i);}
+  float y(int i) {if (my not_eq nullptr) return float(my -> get(i)); else return 0.0f;}
   
   float avg_x(int i0) {float sum_x=0.0f; for(std::size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) sum_x += x(int(i)); return sum_x / float(typemodifier);}
   float avg_y(int i0) {float sum_y=0.0f; for(std::size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) sum_y += y(int(i)); return sum_y / float(typemodifier);}
@@ -62,8 +67,8 @@ class Line {
     };
   }
   
-  float mul_x(int i0) {if (mx not_eq nullptr) return float(mmul(i0, joker) * mx -> get()); else return float(i0); }
-  float mul_y(int i0) {if (my not_eq nullptr) return float(mmul(i0, joker) * my -> get()); else return float(i0); }
+  float mul_x(int i0) {if (mx not_eq nullptr) return float(mmul(i0, joker) * mx -> view()); else return float(i0); }
+  float mul_y(int i0) {if (my not_eq nullptr) return float(mmul(i0, joker) * my -> view()); else return float(i0); }
   LineGetter mul() const
   {
     return [](void * data, int i) {
@@ -154,8 +159,8 @@ public:
   void name(const String& name) {mname = name;}
   
   // Dataviews
-  VectorView xview() noexcept {return mx -> view();}
-  VectorView yview() noexcept {return my -> view();}
+  Data * x() noexcept {return mx;}
+  Data * y() noexcept {return my;}
 };  // Line
 
 using ArrayOfLine = Array<Line>;
@@ -199,7 +204,7 @@ public:
 };  // Frame
 
 /** Plots a frame  in the current window */
-bool PlotFrame(Frame& frame, Config& cfg, bool select_frequency);
+bool PlotFrame(Frame& frame, Config& cfg, bool x_is_frequency);
 
 };  // Plotting
 };  // ARTSGUI

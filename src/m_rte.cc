@@ -772,15 +772,17 @@ void iyEmissionStandard(
     const bool temperature_jacobian =
         j_analytical_do and do_temperature_jacobian(jacobian_quantities);
 
-    Agenda l_propmat_clearsky_agenda(propmat_clearsky_agenda);
-    Workspace l_ws(ws);
     ArrayOfString fail_msg;
     bool do_abort = false;
 
     // Loop ppath points and determine radiative properties
 #pragma omp parallel for if (!arts_omp_in_parallel()) \
-    firstprivate(l_ws, l_propmat_clearsky_agenda, a, B, dB_dT, S, da_dx, dS_dx)
+    firstprivate(a, B, dB_dT, S, da_dx, dS_dx) schedule(guided)
     for (Index ip = 0; ip < np; ip++) {
+      
+      thread_local Workspace l_ws(ws);
+      thread_local Agenda l_propmat_clearsky_agenda(propmat_clearsky_agenda);
+      
       if (do_abort) continue;
       try {
         get_stepwise_blackbody_radiation(

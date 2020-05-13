@@ -65,21 +65,68 @@ void ARTSGUI::PlotMenu::scale(ARTSGUI::Plotting::Frame& frame)
   }
 }
 
-bool ARTSGUI::PlotMenu::SelectFrequency(VectorView f, ARTSGUI::Plotting::Frame& frame, ARTSGUI::Config& cfg)
+void change_f(VectorView f, Numeric f0, Numeric f1, Numeric scale, Numeric offset)
+{
+  if (f0 < 1e-1f - offset / scale)
+    f0 = 1e-1f - offset / scale;
+  if (f1 < f0 + 1e-1f)
+    f1 = f0 + 1e-1f;
+  
+  
+  Numeric step = scale * (f1 - f0) / (Numeric(f.nelem()) - 1);
+  for (Index i = 0; i < f.nelem() - 1; i++)
+    f[i] = scale * f0 + Numeric(i) * step + offset;
+  f[f.nelem() - 1] = scale * f1 + offset;
+}
+
+bool ARTSGUI::PlotMenu::SelectFrequency(ARTSGUI::Plotting::Frame& frame, ARTSGUI::Config& cfg)
 {
   bool new_plot = false;
   
   if (ImGui::BeginMainMenuBar()) {
-    bool change  = false;
-    float f0 = float(f[0]);
-    float f1 = float(f[f.nelem()-1]);
     if (ImGui::BeginMenu("Frequency")) {
       
       ImGui::Checkbox("Autoscale", &cfg.autoscale_x);
-      
-      if (ImGui::SliderFloat("Min Freq", &f0, 0.01f, f1, "%g", 10.0f)) change = true;
       ImGui::Separator();
-      if (ImGui::SliderFloat("Max Freq", &f1, f0, 1e15f, "%g", 10.0f)) change = true;
+      
+      for (auto& line: frame) {
+        if (ImGui::BeginMenu("Select Frequency Range")) {
+          if (ImGui::MenuItem("Hz")) {line.x() -> scale(1.0); frame.xlabel("Frequency [Hz]");}
+          if (ImGui::MenuItem("kHz")) {line.x() -> scale(1'000.0); frame.xlabel("Frequency [kHz]");}
+          if (ImGui::MenuItem("MHz")) {line.x() -> scale(1'000'000.0); frame.xlabel("Frequency [MHz]");}
+          if (ImGui::MenuItem("GHz")) {line.x() -> scale(1'000'000'000.0); frame.xlabel("Frequency [GHz]");}
+          if (ImGui::MenuItem("THz")) {line.x() -> scale(1'000'000'000'000.0); frame.xlabel("Frequency [THz]");}
+          if (ImGui::MenuItem("PHz")) {line.x() -> scale(1'000'000'000'000'000.0); frame.xlabel("Frequency [PHz]");}
+          if (ImGui::MenuItem("EHz")) {line.x() -> scale(1'000'000'000'000'000'000.0); frame.xlabel("Frequency [EHz]");}
+          ImGui::EndMenu();
+        }
+        ImGui::Separator();
+        
+        if (ImGui::BeginMenu((frame.title() + ": " + line.name()).c_str(), not cfg.autoscale_x))  {
+          Numeric f0 = line.x() -> get(0);
+          Numeric f1 = line.x() -> get(int(line.x()->view().nelem()-1));
+          const Numeric negoffset = 0.1 - line.x()->offset() / line.x()->scale();
+          const Numeric posoffset = 10'000 - line.x()->offset() / line.x()->scale();
+          if (ImGui::SliderScalar(String("Min " + frame.xlabel()).c_str(), ImGuiDataType_Double, &f0, &negoffset, &f1)) {
+            change_f(line.x()->view(), f0, f1, line.x() -> scale(), line.x() -> offset());
+            new_plot = true;
+          }
+          if (ImGui::SliderScalar(String("Max " + frame.xlabel()).c_str(), ImGuiDataType_Double, &f1, &f0, &posoffset)) {
+            change_f(line.x()->view(), f0, f1, line.x() -> scale(), line.x() -> offset());
+            new_plot = true;
+          }
+          ImGui::Separator();
+          
+          Numeric o = line.x() -> offset() / line.x() -> scale();
+          const Numeric o0=-100.0, o1=100.0;
+          if (ImGui::SliderScalar((String("Offset ") + frame.xlabel()).c_str(), ImGuiDataType_Double, &o, &o0, &o1)) {
+            line.x() -> offset(o * line.x() -> scale());
+          }
+          ImGui::Separator();
+          
+          ImGui::EndMenu();
+        }
+      }
       ImGui::Separator();
       ImGui::EndMenu();
     }
@@ -87,29 +134,18 @@ bool ARTSGUI::PlotMenu::SelectFrequency(VectorView f, ARTSGUI::Plotting::Frame& 
     if (cfg.autoscale_x) {
       if (frame.invalid_range()) {
         frame.limits(ImGui::GetPlotLimits());
-      }
-      else {
+      } else {
         ImPlotLimits limits = ImGui::GetPlotLimits();
-        
         if (limits.X.Max not_eq frame.limits().X.Max or limits.X.Min not_eq frame.limits().X.Min) {
           frame.limits(limits);
-          change = true;
+          
+          Numeric f0 = frame.limits().X.Min;
+          Numeric f1 = frame.limits().X.Max;
+          for (auto& line: frame)
+            change_f(line.x() -> view(), f0, f1, line.x() -> scale(), line.x() -> offset());
+          new_plot = true;
         }
       }
-      f0 = frame.limits().X.Min;
-      f1 = frame.limits().X.Max;
-    }
-    
-    if (change) {
-      if (f0 < 0.01f)
-        f0 = 0.01f;
-      if (f1 < f0 + 0.01f)
-        f1 = f0 + 0.01f;
-      
-      Numeric step = Numeric(f1 - f0) / (Numeric(f.nelem()) - 1);
-      for (Index i = 0; i < f.nelem() - 1; i++) f[i] = Numeric(f0) + Numeric(i) * step;
-      f[f.nelem() - 1] = Numeric(f1);
-      new_plot = true;
     }
     
     ImGui::EndMainMenuBar();

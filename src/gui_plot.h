@@ -35,7 +35,7 @@ void range(ARTSGUI::Plotting::Frame& frame);
  */
 void scale(ARTSGUI::Plotting::Frame& frame);
 
-bool SelectFrequency(VectorView f, ARTSGUI::Plotting::Frame& frame, ARTSGUI::Config& cfg);
+bool SelectFrequency(ARTSGUI::Plotting::Frame& frame, ARTSGUI::Config& cfg);
 };  // PlotMenuGUI
 };  // ARTSGUI
   

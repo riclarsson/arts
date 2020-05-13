@@ -5,6 +5,7 @@
 #include "gui_menubar.h"
 #include "gui_windows.h"
 #include "gui_plot.h"
+#include "gui_plotdata.h"
 #endif
 
 void PlotBandXsec(
@@ -579,9 +580,6 @@ void PlotIYAgenda(
   // Draw a fullscreen plotting window
   if (ARTSGUI::Windows::full(window, ImGui::GetCursorPos(), "Plot tool")) {
     new_plot |= ARTSGUI::Plotting::PlotFrame(iy_frame, config, true);
-    
-    // Plot menu bar
-    ARTSGUI::PlotMenu::scale(iy_frame);
   }
   ImGui::End();
   
@@ -611,7 +609,7 @@ void PlotIYAgenda(
     if (component_option == component_option_adder) iy_data[iline].overwrite(iy(joker, 1)); component_option_adder++;
     if (component_option == component_option_adder) iy_data[iline].overwrite(iy(joker, 2)); component_option_adder++;
     if (component_option == component_option_adder) iy_data[iline].overwrite(iy(joker, 3)); component_option_adder++;
-    iy_lines[iline] = ARTSGUI::Plotting::Line("I", &f, &iy_data[iline]);
+//     iy_lines[iline] = ARTSGUI::Plotting::Line("I", &f, &iy_data[iline]);
     iline += 1;
     
     iy_frame.lines(iy_lines);
