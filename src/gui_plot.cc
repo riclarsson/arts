@@ -67,10 +67,10 @@ void ARTSGUI::PlotMenu::scale(ARTSGUI::Plotting::Frame& frame)
 
 void change_f(VectorView f, Numeric f0, Numeric f1, Numeric scale, Numeric offset)
 {
-  if (f0 < 1e-1f - offset / scale)
-    f0 = 1e-1f - offset / scale;
-  if (f1 < f0 + 1e-1f)
-    f1 = f0 + 1e-1f;
+  if (f0 < (1.0 - offset) / scale)
+    f0 = (1.0 - offset) / scale;
+  if (f1 < f0 + (1.0 - offset) / scale)
+    f1 = f0 + (1.0 - offset) / scale;
   
   
   Numeric step = scale * (f1 - f0) / (Numeric(f.nelem()) - 1);
@@ -105,7 +105,7 @@ bool ARTSGUI::PlotMenu::SelectFrequency(ARTSGUI::Plotting::Frame& frame, ARTSGUI
         if (ImGui::BeginMenu((frame.title() + ": " + line.name()).c_str(), not cfg.autoscale_x))  {
           Numeric f0 = line.x() -> get(0);
           Numeric f1 = line.x() -> get(int(line.x()->view().nelem()-1));
-          const Numeric negoffset = 0.1 - line.x()->offset() / line.x()->scale();
+          const Numeric negoffset = (1.0 - line.x()->offset()) / line.x()->scale();
           const Numeric posoffset = 10'000 - line.x()->offset() / line.x()->scale();
           if (ImGui::SliderScalar(String("Min " + frame.xlabel()).c_str(), ImGuiDataType_Double, &f0, &negoffset, &f1)) {
             change_f(line.x()->view(), f0, f1, line.x() -> scale(), line.x() -> offset());
