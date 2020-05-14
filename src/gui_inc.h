@@ -1,10 +1,10 @@
 #ifndef GUI_INC_H
 #define GUI_INC_H
 
-#include "../3rdparty/gui/imgui/imgui.h"
-#include "../3rdparty/gui/imgui/imgui_impl_glfw.h"
-#include "../3rdparty/gui/imgui/imgui_impl_opengl3.h"
-#include "../3rdparty/gui/implot/implot.h"
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+#include <implot.h>
 #include <stdio.h>
 
 #include <GL/glew.h>     // Initialize with glewInit()
