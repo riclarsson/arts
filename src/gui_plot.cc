@@ -67,11 +67,10 @@ void ARTSGUI::PlotMenu::scale(ARTSGUI::Plotting::Frame& frame)
 
 void change_f(VectorView f, Numeric f0, Numeric f1, Numeric scale, Numeric offset)
 {
-  if (f0 < (1.0 - offset) / scale)
+  if (scale * f0 + offset < 1.0)
     f0 = (1.0 - offset) / scale;
-  if (f1 < f0 + (1.0 - offset) / scale)
-    f1 = f0 + (1.0 - offset) / scale;
-  
+  if (scale * f1 - scale * f0 < 1.0)
+    f1 = f0 + 1.0 / scale;
   
   Numeric step = scale * (f1 - f0) / (Numeric(f.nelem()) - 1);
   for (Index i = 0; i < f.nelem() - 1; i++)
@@ -86,44 +85,58 @@ bool ARTSGUI::PlotMenu::SelectFrequency(ARTSGUI::Plotting::Frame& frame, ARTSGUI
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("Frequency")) {
       
+      // Set the autoscale functionality ON
       ImGui::Checkbox("Autoscale", &cfg.autoscale_x);
       ImGui::Separator();
       
-      for (auto& line: frame) {
-        if (ImGui::BeginMenu("Select Frequency Range")) {
-          if (ImGui::MenuItem("Hz")) {line.x() -> scale(1.0); frame.xlabel("Frequency [Hz]");}
-          if (ImGui::MenuItem("kHz")) {line.x() -> scale(1'000.0); frame.xlabel("Frequency [kHz]");}
-          if (ImGui::MenuItem("MHz")) {line.x() -> scale(1'000'000.0); frame.xlabel("Frequency [MHz]");}
-          if (ImGui::MenuItem("GHz")) {line.x() -> scale(1'000'000'000.0); frame.xlabel("Frequency [GHz]");}
-          if (ImGui::MenuItem("THz")) {line.x() -> scale(1'000'000'000'000.0); frame.xlabel("Frequency [THz]");}
-          if (ImGui::MenuItem("PHz")) {line.x() -> scale(1'000'000'000'000'000.0); frame.xlabel("Frequency [PHz]");}
-          if (ImGui::MenuItem("EHz")) {line.x() -> scale(1'000'000'000'000'000'000.0); frame.xlabel("Frequency [EHz]");}
-          ImGui::EndMenu();
-        }
-        ImGui::Separator();
+      // Select Frequency globally for all lines
+      if (ImGui::BeginMenu("Select Frequency Range", frame.nelem() and not cfg.autoscale_x)) {
+        auto & line = frame[0];
+        bool update_all=false;
+        if (ImGui::MenuItem("Hz")) {line.x() -> scale(1.0); frame.xlabel("Frequency [Hz]"); update_all=true;}
+        if (ImGui::MenuItem("kHz")) {line.x() -> scale(1'000.0); frame.xlabel("Frequency [kHz]"); update_all=true;}
+        if (ImGui::MenuItem("MHz")) {line.x() -> scale(1'000'000.0); frame.xlabel("Frequency [MHz]"); update_all=true;}
+        if (ImGui::MenuItem("GHz")) {line.x() -> scale(1'000'000'000.0); frame.xlabel("Frequency [GHz]"); update_all=true;}
+        if (ImGui::MenuItem("THz")) {line.x() -> scale(1'000'000'000'000.0); frame.xlabel("Frequency [THz]"); update_all=true;}
+        if (ImGui::MenuItem("PHz")) {line.x() -> scale(1'000'000'000'000'000.0); frame.xlabel("Frequency [PHz]"); update_all=true;}
+        if (ImGui::MenuItem("EHz")) {line.x() -> scale(1'000'000'000'000'000'000.0); frame.xlabel("Frequency [EHz]"); update_all=true;}
+        ImGui::EndMenu();
         
+        // Update all other lines
+        if (update_all)
+          for (auto& line2 : frame)
+            line2.x() -> scale(line.x() -> scale());
+      }
+      ImGui::Separator();
+      
+      // Set line frequency properties
+      for (auto& line: frame) {
         if (ImGui::BeginMenu((frame.title() + ": " + line.name()).c_str(), not cfg.autoscale_x))  {
-          Numeric f0 = line.x() -> get(0);
-          Numeric f1 = line.x() -> get(int(line.x()->view().nelem()-1));
-          const Numeric negoffset = (1.0 - line.x()->offset()) / line.x()->scale();
-          const Numeric posoffset = 10'000 - line.x()->offset() / line.x()->scale();
-          if (ImGui::SliderScalar(String("Min " + frame.xlabel()).c_str(), ImGuiDataType_Double, &f0, &negoffset, &f1)) {
+          Numeric scaled_o = line.x() -> offset() * line.x() -> invscale();  // Offset in current unit
+          constexpr Numeric o0=-10.0, o1=-o0;  // Range description so [o0, o1]
+          Numeric f0 = line.x() -> get(0);  // Get lowest frequency
+          Numeric f1 = line.x() -> get(int(line.x() -> view().nelem()-1));  // Get highest frequency
+          const Numeric negoffset = line.x() -> invscale() - scaled_o;  //  Close to 1 physical Hz
+          const Numeric posoffset = 10'000 + negoffset;  // Close to 10'000 times scale plus 1 in physical Hz
+          
+          // Scale the minimum frequency within limits [negoffset, f1]
+          if (ImGui::SliderScalar(("Min " + frame.xlabel()).c_str(), ImGuiDataType_Double, &f0, &negoffset, &f1)) {
             change_f(line.x()->view(), f0, f1, line.x() -> scale(), line.x() -> offset());
             new_plot = true;
           }
-          if (ImGui::SliderScalar(String("Max " + frame.xlabel()).c_str(), ImGuiDataType_Double, &f1, &f0, &posoffset)) {
+          
+          // Scale the minimum frequency within limits [f0, posoffset]
+          if (ImGui::SliderScalar(("Max " + frame.xlabel()).c_str(), ImGuiDataType_Double, &f1, &f0, &posoffset)) {
             change_f(line.x()->view(), f0, f1, line.x() -> scale(), line.x() -> offset());
             new_plot = true;
           }
           ImGui::Separator();
           
-          Numeric o = line.x() -> offset() / line.x() -> scale();
-          const Numeric o0=-100.0, o1=100.0;
-          if (ImGui::SliderScalar((String("Offset ") + frame.xlabel()).c_str(), ImGuiDataType_Double, &o, &o0, &o1)) {
-            line.x() -> offset(o * line.x() -> scale());
+          // Set the offset of the line
+          if (ImGui::SliderScalar(("Offset " + frame.xlabel()).c_str(), ImGuiDataType_Double, &scaled_o, &o0, &o1)) {
+            line.x() -> offset(scaled_o * line.x() -> scale());
           }
           ImGui::Separator();
-          
           ImGui::EndMenu();
         }
       }
@@ -131,6 +144,7 @@ bool ARTSGUI::PlotMenu::SelectFrequency(ARTSGUI::Plotting::Frame& frame, ARTSGUI
       ImGui::EndMenu();
     }
     
+    // Deal with autoscaling
     if (cfg.autoscale_x) {
       if (frame.invalid_range()) {
         frame.limits(ImGui::GetPlotLimits());

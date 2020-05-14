@@ -18,20 +18,21 @@ namespace Plotting {
 /** Holds the plotting data --- might be modified to allow updating data more easily */
 class Data {
   Vector vec;
-  Numeric s, o;
+  Numeric s, o, invs;
 public:
-  Data(std::size_t n=0) : vec(n), s(1.0), o(0.0) {}
-  Data(const Vector& v) : vec(v), s(1.0), o(0.0) {}
-  Data(Vector&& v) : vec(std::move(v)), s(1.0), o(0.0) {}
-  Numeric get(int i) const {return vec[i] / s - o / s;}
+  Data(std::size_t n=0) : vec(n), s(1.0), o(0.0), invs(1.0) {}
+  Data(const Vector& v) : vec(v), s(1.0), o(0.0), invs(1.0) {}
+  Data(Vector&& v) : vec(std::move(v)), s(1.0), o(0.0), invs(1.0) {}
+  Numeric get(int i) const {return (vec[i] - o) * invs;}
   bool set(const Vector& x) {if (x.nelem() not_eq nelem()) return false; else vec = x; return true;}
   bool set(ConstVectorView x) {if (x.nelem() not_eq nelem()) return false; else vec = x; return true;}
   void overwrite(Vector&& x) {vec = std::move(x);}
   Index nelem() const {return vec.nelem();}
   VectorView view() {return vec;}
-  void scale(Numeric x) {s=x;}
+  void scale(Numeric x) {s=x; invs=1.0/x;}
   void offset(Numeric x) {o=x;}
   Numeric scale() const {return s;}
+  Numeric invscale() const {return invs;}
   Numeric offset() const {return o;}
 };  // Data
 
@@ -57,8 +58,8 @@ class Line {
   float x(int i) {if (mx not_eq nullptr) return float(mx -> get(i)); else return float(i);}
   float y(int i) {if (my not_eq nullptr) return float(my -> get(i)); else return 0.0f;}
   
-  float avg_x(int i0) {float sum_x=0.0f; for(std::size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) sum_x += x(int(i)); return sum_x / float(typemodifier);}
-  float avg_y(int i0) {float sum_y=0.0f; for(std::size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) sum_y += y(int(i)); return sum_y / float(typemodifier);}
+  float avg_x(int i0) {float out=0.0f; for (std::size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) out += x(int(i)); return out / float(typemodifier);}
+  float avg_y(int i0) {float out=0.0f; for (std::size_t i=typemodifier*i0; i<typemodifier*i0+typemodifier; i++) out += y(int(i)); return out / float(typemodifier);}
   LineGetter avg() const
   {
     return [](void * data, int i) {
@@ -67,8 +68,8 @@ class Line {
     };
   }
   
-  float mul_x(int i0) {if (mx not_eq nullptr) return float(mmul(i0, joker) * mx -> view()); else return float(i0); }
-  float mul_y(int i0) {if (my not_eq nullptr) return float(mmul(i0, joker) * my -> view()); else return float(i0); }
+  float mul_x(int i0) {float out=0.0f; for (int i=0; i<mmul.ncols(); i++) out += float(mmul(i0, i) * mx -> get(i)); return out;}
+  float mul_y(int i0) {float out=0.0f; for (int i=0; i<mmul.ncols(); i++) out += float(mmul(i0, i) * my -> get(i)); return out;}
   LineGetter mul() const
   {
     return [](void * data, int i) {
@@ -77,10 +78,9 @@ class Line {
     };
   }
   
+  bool ok() const {return mx not_eq nullptr and my not_eq nullptr and mx -> nelem() == my -> nelem();}
 public:
-  Line(const String& name, Data* x, Data* y) : mname(name), mx(x), my(y), mtype(LineType::Average), typemodifier(1), mmul(0, 0) {}
-  Line(const String& name, Data* y) : mname(name), mx(nullptr), my(y), mtype(LineType::Average), typemodifier(1), mmul(0, 0) {}
-  Line(const String& name="") : mname(name), mx(nullptr), my(nullptr), mtype(LineType::Average), typemodifier(1), mmul(0, 0) {}
+  Line(const String& name="", Data* x=nullptr, Data* y=nullptr) : mname(name), mx(x), my(y), mtype(LineType::Average), typemodifier(1), mmul(0, 0) {}
   
   void changeX(Data* x) {mx = x;}
   void changeY(Data* y) {my = y;}
@@ -89,7 +89,7 @@ public:
   // LineType data
   int size() const
   {
-    if(my not_eq nullptr) {
+    if(ok()) {
       switch (mtype) {
         case LineType::Average: return int(my -> nelem() / typemodifier);
         case LineType::MatrixMultiplier: return int(mmul.nrows());
@@ -100,7 +100,7 @@ public:
   
   LineGetter getter() const
   {
-    if(my not_eq nullptr) {
+    if(ok()) {
       switch (mtype) {
         case LineType::Average: return avg();
         case LineType::MatrixMultiplier: return mul();
@@ -111,7 +111,7 @@ public:
   
   std::size_t maxsize() const
   {
-    if(my not_eq nullptr)
+    if(ok())
       return my -> nelem();
     else
       return 0;
@@ -158,8 +158,10 @@ public:
   const String& name() const {return mname;}
   void name(const String& name) {mname = name;}
   
-  // Dataviews
+  // Dataview, can be nullptr
   Data * x() noexcept {return mx;}
+  
+  // Dataview, can be nullptr
   Data * y() noexcept {return my;}
 };  // Line
 
