@@ -540,22 +540,6 @@ arts_test_cmdline("check-docs" -C)
 
 ############# GUI ###############
 if (ARTS_GUI)
-  cmake_minimum_required(VERSION 3.6)
-
-  # glfw
-  find_package(glfw3 REQUIRED)
-  include_directories(${GLFW_INCLUDE_DIRS})
-  link_libraries(${GLFW_LIBRARY_DIRS})
-
-  # opengl
-  set(OpenGL_GL_PREFERENCE GLVND)
-  find_package(OpenGL REQUIRED)
-  include_directories(${OPENGL_INCLUDE_DIRS})
-
-  # glew
-  find_package(GLEW REQUIRED)
-  include_directories(${GLEW_INCLUDE_DIRS})
-  
   add_library(artsgui STATIC
     gui_inc.cc
     gui_help.cc
@@ -567,11 +551,6 @@ if (ARTS_GUI)
   target_link_libraries(artsgui
           imgui
           implot
-          glfw
-          ${OPENGL_LIBRARIES}
-          ${GLEW_LIBRARIES}
-          ${EXTRA_LIBS}
-          matpack
   )
   target_link_libraries(artscore artsgui)
 
@@ -581,5 +560,5 @@ if (ARTS_GUI)
   
   ############## GUI TEST ###################
   add_executable(test_gui test_gui.cc)
-  target_link_libraries(test_gui artscore ${ALL_ARTS_LIBRARIES})
+  target_link_libraries(test_gui ${ALL_ARTS_LIBRARIES})
 endif()
