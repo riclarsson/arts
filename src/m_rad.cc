@@ -107,12 +107,10 @@ void spectral_radiance_jacobianAddPathPropagation(
           const auto i = w.first + atm_block.x_start;
           ARTS_ASSERT(i < static_cast<Size>(nj))
           std::transform(
-              ray_path_spectral_radiance_jacobian[ip]
-                                                         [atm_block.target_pos]
-                                                             .begin(),
-              ray_path_spectral_radiance_jacobian[ip]
-                                                         [atm_block.target_pos]
-                                                             .end(),
+              ray_path_spectral_radiance_jacobian[ip][atm_block.target_pos]
+                  .begin(),
+              ray_path_spectral_radiance_jacobian[ip][atm_block.target_pos]
+                  .end(),
               spectral_radiance_jacobian[i].begin(),
               spectral_radiance_jacobian[i].begin(),
               [x = w.second](auto &a, auto &b) { return x * a + b; });
@@ -160,11 +158,10 @@ void spectral_radiance_jacobianApplyUnit(
 }
 ARTS_METHOD_ERROR_CATCH
 
-void spectral_radianceApplyUnit(
-    StokvecVector &spectral_radiance,
-    const AscendingGrid &frequency_grid,
-    const PropagationPathPoint &ray_path_point,
-    const String &spectral_radiance_unit) try {
+void spectral_radianceApplyUnit(StokvecVector &spectral_radiance,
+                                const AscendingGrid &frequency_grid,
+                                const PropagationPathPoint &ray_path_point,
+                                const String &spectral_radiance_unit) try {
   ARTS_USER_ERROR_IF(spectral_radiance.size() != frequency_grid.size(),
                      "spectral_radiance must have same size as frequency_grid")
   const auto F = rtepack::unit_converter(
@@ -202,8 +199,8 @@ void measurement_vectorFromSensor(
   measurement_vector.resize(measurement_vector_sensor.size());
   measurement_vector = 0.0;
 
-  measurement_vector_jacobian.resize(measurement_vector_sensor.size(), jacobian_targets.x_size()
-                                     );
+  measurement_vector_jacobian.resize(measurement_vector_sensor.size(),
+                                     jacobian_targets.x_size());
   measurement_vector_jacobian = 0.0;
 
   if (measurement_vector_sensor.empty()) return;

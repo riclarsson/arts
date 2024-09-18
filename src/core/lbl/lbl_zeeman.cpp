@@ -276,9 +276,9 @@ model::model(const QuantumIdentifier& qid) noexcept {
 Numeric model::Strength(Rational Ju, Rational Jl, pol type, Index n) const {
   using Math::pow2;
 
-  auto ml             = Ml(Ju, Jl, type, n);
-  auto mu             = Mu(Ju, Jl, type, n);
-  auto dm             = Rational(dM(type));
+  auto ml = Ml(Ju, Jl, type, n);
+  auto mu = Mu(Ju, Jl, type, n);
+  auto dm = Rational(dM(type));
   return type == pol::no
              ? 1.0
              : polarization_factor(type) *
@@ -360,21 +360,30 @@ Numeric magnetic_angles::theta() const {
 }
 
 Numeric magnetic_angles::dtheta_du() const {
-  return H == 0 ? 0
-                : (-H * sa * sz + u * uct) /
-                      (H * std::sqrt(Math::pow4(H) - Math::pow2(uct)));
+  using Math::pow2;
+  using Math::pow3;
+  using std::sqrt;
+  const Numeric rat = pow2(uct / H);
+  const Numeric nom = u * uct - sa * sz * pow2(H);
+  return (H == 0.0 or rat == 1.0) ? 0 : nom / (sqrt(1.0 - rat) * pow3(H));
 }
 
 Numeric magnetic_angles::dtheta_dv() const {
-  return H == 0 ? 0
-                : (-H * ca * sz + v * uct) /
-                      (H * std::sqrt(Math::pow4(H) - Math::pow2(uct)));
+  using Math::pow2;
+  using Math::pow3;
+  using std::sqrt;
+  const Numeric rat = pow2(uct / H);
+  const Numeric nom = v * uct - ca * sz * pow2(H);
+  return (H == 0.0 or rat == 1.0) ? 0 : nom / (sqrt(1 - rat) * pow3(H));
 }
 
 Numeric magnetic_angles::dtheta_dw() const {
-  return H == 0 ? 0
-                : (-H * cz + w * uct) /
-                      (H * std::sqrt(Math::pow4(H) - Math::pow2(uct)));
+  using Math::pow2;
+  using Math::pow3;
+  using std::sqrt;
+  const Numeric rat = pow2(uct / H);
+  const Numeric nom = w * uct - cz * pow2(H);
+  return (H == 0.0 or rat == 1.0) ? 0 : nom / (sqrt(1.0 - rat) * pow3(H));
 }
 
 Numeric magnetic_angles::eta() const {

@@ -5,9 +5,8 @@
 #include <zconf.h>
 
 #include <algorithm>
-#include <iomanip>
 #include <iterator>
-#include <memory>
+#include <ranges>
 #include <tuple>
 #include <unordered_map>
 #include <variant>
@@ -16,6 +15,8 @@
 #include "compare.h"
 #include "configtypes.h"
 #include "debug.h"
+#include "enumsAtmKey.h"
+#include "enumsSpeciesEnum.h"
 #include "igrf13.h"
 #include "interp.h"
 #include "interpolation.h"
@@ -27,7 +28,7 @@
 #include "predef_data.h"
 #include "predefined_absorption_models.h"
 #include "quantum_numbers.h"
-#include "species.h"
+#include "sorted_grid.h"
 #include "species_tags.h"
 #include "xml_io.h"
 
@@ -733,4 +734,55 @@ void atmospheric_fieldHydrostaticPressure(
       }
       break;
   }
+}
+
+void atmospheric_fieldRegrid(AtmField &atmospheric_field,
+                             const AtmKey &key,
+                             const AscendingGrid &alt,
+                             const AscendingGrid &lat,
+                             const AscendingGrid &lon,
+                             const String &extrapolation) {
+  ARTS_USER_ERROR_IF(alt.size() * lat.size() * lon.size() == 0,
+                     R"(Cannot regrid to empty grid
+
+alt: {:Bs,} [{} elements]
+lat: {:Bs,} [{} elements]
+lon: {:Bs,} [{} elements]
+)",
+                     alt,
+                     alt.size(),
+                     lat,
+                     lat.size(),
+                     lon,
+                     lon.size())
+
+  const InterpolationExtrapolation extrap =
+      to<InterpolationExtrapolation>(extrapolation);
+
+  GriddedField3 new_field{
+      .data_name  = String{toString(key)},
+      .data       = Tensor3(alt.size(), lat.size(), lon.size()),
+      .grid_names = {String{"Altitude"},
+                     String{"Latitude"},
+                     String{"Longitude"}},
+      .grids      = {alt, lat, lon},
+  };
+
+  Atm::Data &data = atmospheric_field[key];
+
+  for (Index i = 0; i < alt.size(); i++) {
+    for (Index j = 0; j < lat.size(); j++) {
+      for (Index k = 0; k < lon.size(); k++) {
+        new_field(i, j, k) = data.at(alt[i], lat[j], lon[k]);
+      }
+    }
+  }
+
+  data.data    = std::move(new_field);
+  data.alt_upp = extrap;
+  data.alt_low = extrap;
+  data.lat_upp = extrap;
+  data.lat_low = extrap;
+  data.lon_upp = extrap;
+  data.lon_low = extrap;
 }

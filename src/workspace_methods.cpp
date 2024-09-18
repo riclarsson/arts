@@ -2143,7 +2143,8 @@ variables are not considered
   };
 
   wsm_data["ray_pathGeometricUplooking"] = {
-      .desc      = R"--(Wraps *ray_pathGeometric* for straight uplooking paths from the surface altitude at the position
+      .desc =
+          R"--(Wraps *ray_pathGeometric* for straight uplooking paths from the surface altitude at the position
 )--",
       .author    = {"Richard Larsson"},
       .out       = {"ray_path"},
@@ -2155,7 +2156,8 @@ variables are not considered
   };
 
   wsm_data["ray_pathGeometricDownlooking"] = {
-      .desc      = R"--(Wraps *ray_pathGeometric* for straight downlooking paths from the top-of-the-atmosphere altitude
+      .desc =
+          R"--(Wraps *ray_pathGeometric* for straight downlooking paths from the top-of-the-atmosphere altitude
 )--",
       .author    = {"Richard Larsson"},
       .out       = {"ray_path"},
@@ -2691,6 +2693,35 @@ Wraps:
                     "Whether or not to load isotopologue data",
                     "Whether or not to load NLTE data"},
       .pass_workspace = true,
+  };
+
+  wsm_data["atmospheric_fieldRegrid"] = {
+      .desc =
+          R"--(Regrid the input atmospheric field to a new grid
+
+The atmospheric field will have a *GriddedField3* with the input grid
+after the regridding.
+)--",
+      .author    = {"Richard Larsson"},
+      .out       = {"atmospheric_field"},
+      .in        = {"atmospheric_field"},
+      .gin       = {"parameter", "alt", "lat", "lon", "extrapolation"},
+      .gin_type  = {"AtmKey",
+                    "AscendingGrid",
+                    "AscendingGrid",
+                    "AscendingGrid",
+                    "String"},
+      .gin_value = {std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    String{"Nearest"}},
+      .gin_desc =
+          {"The parameter to regrid",
+           "The altitude grid",
+           "The latitude grid",
+           "The longitude grid",
+           "The extrapolation to use (post regridding - pre regridding the current extrapolation is used)"},
   };
 
   wsm_data["ReadCatalogData"] = {
@@ -3477,13 +3508,13 @@ Description of the special input arguments:
       .desc =
           R"--(Uses Set the FOV to the sun input for Disort calculations.
 )--",
-      .author    = {"Richard Larsson"},
-      .out       = {"disort_settings"},
-      .in        = {"disort_settings",
-                    "frequency_grid",
-                    "surface_field",
-                    "sun",
-                    "ray_path_point"},
+      .author = {"Richard Larsson"},
+      .out    = {"disort_settings"},
+      .in     = {"disort_settings",
+                 "frequency_grid",
+                 "surface_field",
+                 "sun",
+                 "ray_path_point"},
   };
 
   wsm_data["disort_settingsNoLayerThermalEmission"] = {
@@ -3518,9 +3549,9 @@ Note that you must have set the optical thickness before calling this.
       .desc =
           R"(Space radiation into Disort is isotropic cosmic background radiation.
 )",
-      .author    = {"Richard Larsson"},
-      .out       = {"disort_settings"},
-      .in        = {"disort_settings", "frequency_grid"},
+      .author = {"Richard Larsson"},
+      .out    = {"disort_settings"},
+      .in     = {"disort_settings", "frequency_grid"},
   };
 
   wsm_data["disort_settingsNoSurfaceEmission"] = {
@@ -3535,12 +3566,12 @@ Note that you must have set the optical thickness before calling this.
       .desc =
           R"(Surface radiation into Disort is isotropic from surface temperature.
 )",
-      .author    = {"Richard Larsson"},
-      .out       = {"disort_settings"},
-      .in        = {"disort_settings",
-                    "frequency_grid",
-                    "ray_path_point",
-                    "surface_field"},
+      .author = {"Richard Larsson"},
+      .out    = {"disort_settings"},
+      .in     = {"disort_settings",
+                 "frequency_grid",
+                 "ray_path_point",
+                 "surface_field"},
   };
 
   wsm_data["disort_settingsNoLegendre"] = {
