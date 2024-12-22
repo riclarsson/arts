@@ -57,6 +57,9 @@ struct line {
   */
   [[nodiscard]] Numeric s(Numeric T, Numeric Q) const;
 
+  constexpr Numeric el() const { return e0; }
+  constexpr Numeric eu() const { return e0 + Constant::h * f0; }
+
   [[nodiscard]] constexpr Numeric nlte_k(Numeric ru, Numeric rl) const {
     return (rl * gu / gl - ru) * a / Math::pow3(f0);
   }
