@@ -71,10 +71,10 @@ auto bind_phase_matrix_data_tro_gridded(py::module_& m,
       // Bind the extraction of stokes coefficients
       .def("extract_stokes_coeffs",
            &PMD::extract_stokes_coeffs,
-           "Extract stokes coefficients from phase matrix")
+           "Extract stokes coefficients from phase matrix");
 
       // Bind regrid method
-      .def("regrid", &PMD::regrid, "Regrid phase matrix");
+      //.def("regrid", &PMD::regrid, "Regrid phase matrix");
   return s;
 }
 
@@ -114,8 +114,8 @@ auto bind_phase_matrix_data_tro_spectral(py::module_& m,
            "Integrate phase matrix")
       .def("extract_stokes_coeffs",
            &PMD::extract_stokes_coeffs,
-           "Extract stokes coefficients from phase matrix")
-      .def("regrid", &PMD::regrid, "Regrid phase matrix");
+           "Extract stokes coefficients from phase matrix");
+      //.def("regrid", &PMD::regrid, "Regrid phase matrix");
   return s;
 }
 
@@ -151,12 +151,12 @@ auto bind_absorption_vector_data_aro(py::module_& m, const std::string& name) {
            "za_inc_grid"_a)
       .def("get_coeff_vector_view",
            &AVD::get_coeff_vector_view,
-           "Get coefficient vector view")
-      .def("regrid",
-           &AVD::regrid,
-           "grids"_a,
-           "weights"_a,
-           "Regrid absorption vector");
+           "Get coefficient vector view");
+      //.def("regrid",
+      //     &AVD::regrid,
+      //     "grids"_a,
+      //     "weights"_a,
+      //     "Regrid absorption vector");
   return s;
 }
 
@@ -173,12 +173,12 @@ auto bind_extinction_matrix_data_tro(py::module_& m, const std::string& name) {
            "f_grid"_a)
       .def("get_coeff_vector_view",
            &EMD::get_coeff_vector_view,
-           "Get coefficient vector view")
-      .def("regrid",
-           &EMD::regrid,
-           "grids"_a,
-           "weights"_a,
-           "Regrid extinction matrix");
+           "Get coefficient vector view");
+      //.def("regrid",
+      //     &EMD::regrid,
+      //     "grids"_a,
+      //     "weights"_a,
+      //     "Regrid extinction matrix");
   return s;
 }
 
@@ -197,12 +197,12 @@ auto bind_extinction_matrix_data_aro(py::module_& m, const std::string& name) {
            "za_inc_grid"_a)
       .def("get_coeff_vector_view",
            &EMD::get_coeff_vector_view,
-           "Get coefficient vector view")
-      .def("regrid",
-           &EMD::regrid,
-           "grids"_a,
-           "weights"_a,
-           "Regrid extinction matrix");
+           "Get coefficient vector view");
+      //.def("regrid",
+      //     &EMD::regrid,
+      //     "grids"_a,
+      //     "weights"_a,
+      //     "Regrid extinction matrix");
   return s;
 }
 
@@ -337,9 +337,6 @@ void py_scattering_species(py::module_& m) try {
               &ScatteringSpeciesProperty::pproperty,
               "Particulate property");
 
-  //
-  // Modified gamma PSD
-  //
 
 //   using BulkScatteringPropertiesTROSpectral =
 //       std::variant<scattering::BulkScatteringProperties<
@@ -358,8 +355,10 @@ void py_scattering_species(py::module_& m) try {
           scattering::Format::ARO,
           scattering::Representation::Gridded>>;
 
-  py::class_<MGDSingleMoment>(m, "MGDSingleMoment").doc() =
-      "Modified gamma PSD single moment";
+  //
+  // Modified gamma PSD
+  //
+
   py::class_<ScatteringHabit>(m, "ScatteringHabit").doc() = "Scattering habit";
   py::class_<HenyeyGreensteinScatterer>(m, "HenyeyGreensteinScatterer")
       .def(py::init<ExtSSACallback, Numeric>(), "func"_a, "g"_a)
