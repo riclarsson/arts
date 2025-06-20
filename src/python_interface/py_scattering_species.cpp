@@ -591,9 +591,9 @@ void py_scattering_species(py::module_& m) try {
            [](ParticleHabit &habit, Index ind) {return habit[ind % habit.size()];},
            py::rv_policy::reference_internal)
       .def("__len__", [](ParticleHabit &habit) {return habit.size();})
-      .def("size", [](ParticleHabit &habit) {return habit.size();})
-      .def("get_sizes", [](ParticleHabit &habit, const SizeParameter &param) {return habit.get_sizes(param);})
-      .def("get_size_mass_info", [](ParticleHabit &habit, const SizeParameter &param) {return habit.get_size_mass_info(param);})
+      .def("size", [](ParticleHabit &habit) {return habit.size();}, "Gett the size of the particle habit")
+      .def("get_sizes", [](ParticleHabit &habit, const SizeParameter &param) {return habit.get_sizes(param);}, "Get the sizes of the particle habit")
+      .def("get_size_mass_info", [](ParticleHabit &habit, const SizeParameter &param) {return habit.get_size_mass_info(param);}, "Get the size mass information if the particle habit")
       .doc() = "Particle habit";
 
   py::class_<ScatteringHabit>(m, "ScatteringHabit")
@@ -606,7 +606,7 @@ void py_scattering_species(py::module_& m) try {
          &ScatteringHabit::get_bulk_scattering_properties_tro_spectral,
          "point"_a,
          "f_grid"_a,
-         "f_tol"_a)
+         "f_tol"_a, "Get the bulk scattering properties in TRO spectral format")
     .doc() = "A scattering habit combines a particle habit with a PSD so that it can be used as a scattering species.";
 
 } catch (std::exception& e) {
