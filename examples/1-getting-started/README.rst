@@ -9,14 +9,6 @@ to ensure consistent results and experience.  Feel free
 to take these examples and expand them for your personal
 use-case.
 
-To date it consists of
-
-1. Basics --- the basic interfaces of the pyarts package. 
-   No real physics, just pure definition of how the workspace
-   and its variables can be set and accessed.
-2. Clearsky radiance --- shows some examples of how to set up
-   pyarts to run clearsky simulations.
-
 Once you're familiar with the basics, have a look at
 :doc:`the other examples <examples>` which demonstrate more ARTS
 features.
