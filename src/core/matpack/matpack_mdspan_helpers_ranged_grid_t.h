@@ -131,7 +131,8 @@ class ranged_grid_t {
                          Size N,
                          Numeric extrapolation_limit = 0.5,
                          const char* info            = "UNNAMED") const {
-    return lagrange_interp::make_lags<>(grid, x, N, extrapolation_limit, info);
+    return lagrange_interp::make_lags<transform>(
+        grid, x, N, extrapolation_limit, info);
   }
 };
 }  // namespace matpack

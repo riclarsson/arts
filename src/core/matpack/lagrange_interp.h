@@ -504,8 +504,7 @@ struct lag_t {
  * Check limits
  ******************************************************************/
 
-template <transformer transform = lagrange_interp::identity,
-          Size Extent           = std::dynamic_extent>
+template <transformer transform, Size Extent = std::dynamic_extent>
 constexpr order_t check_limit(
     const std::span<const Numeric, std::dynamic_extent>& xi,
     const std::span<const Numeric, Extent>& xn,
@@ -705,9 +704,9 @@ constexpr auto make_lags(const Orig& xi,
 }
 
 //! Dynamic version of make_lags
-template <transformer transform = identity,
-          Size Extent           = std::dynamic_extent,
-          class FlagT           = lag_t<-1, transform>>
+template <transformer transform,
+          Size Extent,
+          class FlagT = lag_t<-1, transform>>
 constexpr auto make_lags(std::span<const Numeric, std::dynamic_extent> xi,
                          std::span<const Numeric, Extent> xn,
                          const Index polyorder       = 1,

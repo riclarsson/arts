@@ -2,8 +2,10 @@
 
 #include <configtypes.h>
 
+#include <concepts>
 #include <experimental/mdspan>
 #include <ranges>
+#include <type_traits>
 
 #include "matpack_mdspan_common_sizes.h"
 
@@ -25,17 +27,53 @@ using mdview_t = stdx::mdspan<T, stdx::dextents<Index, N>>;
 template <typename T, Size N>
 class data_t;
 
+template <typename T>
+struct is_data_t : std::false_type {};
+
+template <typename T, Size N>
+struct is_data_t<data_t<T, N>> : std::true_type {};
+
+template <typename T, Size N>
+void is_data_t_reffable(const data_t<T, N>&) {}
+
 //! Our view holder
 template <typename T, Size N>
 struct view_t;
+
+template <typename T>
+struct is_view_t : std::false_type {};
+
+template <typename T, Size N>
+struct is_view_t<view_t<T, N>> : std::true_type {};
+
+template <typename T, Size N>
+void is_view_t_reffable(const view_t<T, N>&) {}
 
 //! Our strided view holder
 template <typename T, Size N>
 struct strided_view_t;
 
+template <typename T>
+struct is_strided_view_t : std::false_type {};
+
+template <typename T, Size N>
+struct is_strided_view_t<strided_view_t<T, N>> : std::true_type {};
+
+template <typename T, Size N>
+void is_strided_view_t_reffable(const strided_view_t<T, N>&) {}
+
 //! Our constant-sized data holder
 template <typename T, Size... N>
 struct cdata_t;
+
+template <typename T>
+struct is_cdata_t : std::false_type {};
+
+template <typename T, Size... N>
+struct is_cdata_t<cdata_t<T, N...>> : std::true_type {};
+
+template <typename T, Size... N>
+void is_cdata_t_reffable(const cdata_t<T, N...>&) {}
 
 template <typename T>
 concept has_value_type =
@@ -68,26 +106,23 @@ concept has_mapping_type =
 template <has_element_type T>
 using mapping_type = typename std::remove_cvref_t<T>::mapping_type;
 
-// Use forward declarations of concepts
-template <typename T, typename U, Size N>
-static constexpr bool is_data =
-    std::same_as<std::remove_cvref_t<T>, data_t<U, N>>;
-
 ////////////////////////////////////////////////////////////////////////////////
 // Any matpack core type - /////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class T>
-concept any_data = std::remove_cvref_t<T>::matpack_magic_data;
+concept any_data = is_data_t<std::remove_cvref_t<T>>::value or
+                   requires(T a) { is_data_t_reffable(a); };
 
 template <class T>
-concept any_view = std::remove_cvref_t<T>::matpack_magic_view;
+concept any_view = is_view_t<std::remove_cvref_t<T>>::value;
 
 template <class T>
-concept any_strided_view = std::remove_cvref_t<T>::matpack_magic_strided_view;
+concept any_strided_view = is_strided_view_t<std::remove_cvref_t<T>>::value;
 
 template <class T>
-concept any_cdata = std::remove_cvref_t<T>::matpack_magic_cdata;
+concept any_cdata = is_cdata_t<std::remove_cvref_t<T>>::value or
+                    requires(T a) { is_cdata_t_reffable(a); };
 
 template <class T>
 concept any_md =

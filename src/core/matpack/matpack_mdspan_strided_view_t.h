@@ -13,8 +13,6 @@
 namespace matpack {
 template <class T, Size N>
 struct strided_view_t final : public mdstrided_t<T, N> {
-  constexpr static bool matpack_magic_strided_view = true;
-
   using base = mdstrided_t<T, N>;
 
   constexpr mdstrided_t<T, N> base_md() const { return *this; }

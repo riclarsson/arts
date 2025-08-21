@@ -12,8 +12,6 @@
 namespace matpack {
 template <typename T, Size... dims>
 struct [[nodiscard]] cdata_t {
-  constexpr static bool matpack_magic_cdata = true;
-
   constexpr static Size N     = sizeof...(dims);
   constexpr static Size ndata = (dims * ...);
 
@@ -37,7 +35,7 @@ struct [[nodiscard]] cdata_t {
   std::array<T, ndata> data{};
 
   static constexpr std::array<Index, N> shape_ = {dims...};
-  static constexpr const std::array<Index, N>& shape() { return shape_; }
+  static consteval const std::array<Index, N>& shape() { return shape_; }
 
   constexpr stdx::mdspan<const T, stdx::extents<Size, dims...>> cview() const {
     return stdx::mdspan<const T, stdx::extents<Size, dims...>>{
@@ -93,9 +91,9 @@ struct [[nodiscard]] cdata_t {
 
    */
 
-  static constexpr auto rank() { return view_t<T, N>::rank(); }
-  static constexpr auto rank_dynamic() { return view_t<T, N>::rank_dynamic(); }
-  static constexpr auto static_extent() {
+  static consteval auto rank() { return view_t<T, N>::rank(); }
+  static consteval auto rank_dynamic() { return view_t<T, N>::rank_dynamic(); }
+  static consteval auto static_extent() {
     return view_t<T, N>::static_extent();
   }
 
@@ -105,13 +103,13 @@ struct [[nodiscard]] cdata_t {
   static constexpr bool is_unique     = view_t<T, N>::is_always_unique();
 
   //! Sizes
-  [[nodiscard]] constexpr auto ncols() const { return extent(N - 1); }
-  [[nodiscard]] constexpr auto nrows() const { return extent(N - 2); }
-  [[nodiscard]] constexpr auto npages() const { return extent(N - 3); }
-  [[nodiscard]] constexpr auto nbooks() const { return extent(N - 4); }
-  [[nodiscard]] constexpr auto nshelves() const { return extent(N - 5); }
-  [[nodiscard]] constexpr auto nvitrines() const { return extent(N - 6); }
-  [[nodiscard]] constexpr auto nlibraries() const { return extent(N - 7); }
+  [[nodiscard]] consteval auto ncols() const { return extent(N - 1); }
+  [[nodiscard]] consteval auto nrows() const { return extent(N - 2); }
+  [[nodiscard]] consteval auto npages() const { return extent(N - 3); }
+  [[nodiscard]] consteval auto nbooks() const { return extent(N - 4); }
+  [[nodiscard]] consteval auto nshelves() const { return extent(N - 5); }
+  [[nodiscard]] consteval auto nvitrines() const { return extent(N - 6); }
+  [[nodiscard]] consteval auto nlibraries() const { return extent(N - 7); }
 
   template <typename Self, Index M>
   constexpr auto view_as(this Self&& self, const std::array<Index, M>& exts) {
@@ -214,10 +212,7 @@ struct [[nodiscard]] cdata_t {
     return std::forward<Self>(self).data.data();
   }
 
-  template <typename Self>
-  constexpr auto empty(this Self&& self) {
-    return std::forward<Self>(self).view().empty();
-  }
+  static consteval auto empty() { return ndata == 0; }
 
   template <typename Self>
   constexpr decltype(auto) front(this Self&& self) {
@@ -229,10 +224,7 @@ struct [[nodiscard]] cdata_t {
     return std::forward<Self>(self).data.back();
   }
 
-  template <typename Self>
-  constexpr auto extent(this Self&& self, Index i) {
-    return std::forward<Self>(self).view().extent(i);
-  }
+  static constexpr auto extent(Index i) { return shape_[i]; }
 
   template <typename Self>
   constexpr auto extents(this Self&& self) {
@@ -244,10 +236,7 @@ struct [[nodiscard]] cdata_t {
     return std::forward<Self>(self).view().mapping();
   }
 
-  template <typename Self>
-  constexpr auto size(this Self&& self) {
-    return std::forward<Self>(self).view().size();
-  }
+  static consteval auto size() { return ndata; }
 
   template <typename Self>
   constexpr auto stride(this Self&& self, integral auto i) {

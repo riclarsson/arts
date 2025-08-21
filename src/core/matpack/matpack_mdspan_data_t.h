@@ -54,8 +54,6 @@ class [[nodiscard]] data_t {
   friend struct strided_view_t;
 
  public:
-  constexpr static bool matpack_magic_data = true;
-
   using base = view_t<T, N>::base;
 
   constexpr auto base_md() const { return view.base_md(); }
