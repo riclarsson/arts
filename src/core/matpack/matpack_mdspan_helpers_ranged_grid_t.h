@@ -106,32 +106,33 @@ class ranged_grid_t {
     return grid[std::forward<Op>(x)];
   }
 
-  template <Size N,
-            lagrange_interp::transformer transform = lagrange_interp::identity>
+  template <Size N, lagrange_interp::transformer transform>
   [[nodiscard]] auto lag(Numeric x) const {
     return lagrange_interp::lag_t<N, transform>{grid, x, lag_sorting_t{}};
   }
 
-  template <lagrange_interp::transformer transform = lagrange_interp::identity>
+  template <lagrange_interp::transformer transform>
   [[nodiscard]] auto lag(Numeric x, Size N) const {
     return lagrange_interp::lag_t<-1, transform>{grid, x, N, lag_sorting_t{}};
   }
 
   template <Size N,
-            lagrange_interp::transformer transform = lagrange_interp::identity>
-  [[nodiscard]] auto lag(std::span<const Numeric> x,
+            lagrange_interp::transformer transform,
+            Size Extent = std::dynamic_extent>
+  [[nodiscard]] auto lag(std::span<const Numeric, Extent> x,
                          Numeric extrapolation_limit = 0.5,
                          const char* info            = "UNNAMED") const {
-    return lagrange_interp::make_lags<N, transform>(
+    return lagrange_interp::make_lags<N, transform, Extent>(
         grid, x, extrapolation_limit, info);
   }
 
-  template <lagrange_interp::transformer transform = lagrange_interp::identity>
-  [[nodiscard]] auto lag(std::span<const Numeric> x,
+  template <lagrange_interp::transformer transform,
+            Size Extent = std::dynamic_extent>
+  [[nodiscard]] auto lag(std::span<const Numeric, Extent> x,
                          Size N,
                          Numeric extrapolation_limit = 0.5,
                          const char* info            = "UNNAMED") const {
-    return lagrange_interp::make_lags<transform>(
+    return lagrange_interp::make_lags<transform, Extent>(
         grid, x, N, extrapolation_limit, info);
   }
 };

@@ -583,7 +583,7 @@ The actual minimum value is {8}
       std::format("Error in check_limit for {}:\n{}", info, e.what()));
 }
 
-template <transformer transform = lagrange_interp::identity,
+template <transformer transform,
           matpack::ranked_md<1> Orig,
           matpack::ranked_md<1> New>
 constexpr order_t check_limit(const Orig& xi,
@@ -600,7 +600,7 @@ constexpr order_t check_limit(const Orig& xi,
   }
 }
 
-template <transformer transform = lagrange_interp::identity,
+template <transformer transform,
           matpack::ranked_md<1> Orig,
           Size N>
 constexpr order_t check_limit(const Orig& xi,

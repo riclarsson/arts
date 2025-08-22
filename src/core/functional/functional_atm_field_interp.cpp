@@ -133,9 +133,10 @@ std::vector<std::pair<Index, Numeric>> flat_weight(const GeodeticField3& gf3,
         }
         return out;
       },
-      nalt == 1 ? altlags{gf3.lag<0, 0>(alt)} : altlags{gf3.lag<0, 1>(alt)},
-      nlat == 1 ? latlags{gf3.grid<1>().lag<0>(lat)}
-                : latlags{gf3.grid<1>().lag<1>(lat)},
+      nalt == 1 ? altlags{gf3.grid<0>().lag<0, lagrange_interp::identity>(alt)}
+                : altlags{gf3.grid<0>().lag<1, lagrange_interp::identity>(alt)},
+      nlat == 1 ? latlags{gf3.grid<1>().lag<0, lagrange_interp::identity>(lat)}
+                : latlags{gf3.grid<1>().lag<1, lagrange_interp::identity>(lat)},
       nlon == 1
           ? lonlags{gf3.grid<2>().lag<0, lagrange_interp::loncross>(lon)}
           : lonlags{gf3.grid<2>().lag<1, lagrange_interp::loncross>(lon)});

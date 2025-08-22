@@ -121,8 +121,7 @@ struct gridded_data_t {
 
   constexpr auto operator<=>(const gridded_data_t&) const = default;
 
-  template <Size Grid,
-            lagrange_interp::transformer transform = lagrange_interp::identity>
+  template <Size Grid, lagrange_interp::transformer transform>
   [[nodiscard]] auto lag(const grid_t<Grid>& other,
                          Index order,
                          Numeric extrapol) const {
@@ -130,16 +129,13 @@ struct gridded_data_t {
         grid<Grid>(), other, order, extrapol, gridname<Grid>().c_str());
   }
 
-  template <Size Grid,
-            Index N,
-            lagrange_interp::transformer transform = lagrange_interp::identity>
+  template <Size Grid, Index N, lagrange_interp::transformer transform>
   [[nodiscard]] auto lag(const grid_t<Grid>& other, Numeric extrapol) const {
     return lagrange_interp::make_lags<N, transform>(
         grid<Grid>(), other, extrapol, gridname<Grid>().c_str());
   }
 
-  template <Size Grid,
-            lagrange_interp::transformer transform = lagrange_interp::identity>
+  template <Size Grid, lagrange_interp::transformer transform>
   [[nodiscard]] auto lag(const grid_value_t<Grid>& other, Index order) const {
     if constexpr (std::same_as<grid_t<Grid>, AscendingGrid>) {
       return lagrange_interp::lag_t<-1, transform>(
@@ -158,9 +154,7 @@ struct gridded_data_t {
     }
   }
 
-  template <Size Grid,
-            Index N,
-            lagrange_interp::transformer transform = lagrange_interp::identity>
+  template <Size Grid, Index N, lagrange_interp::transformer transform>
   [[nodiscard]] auto lag(const grid_value_t<Grid>& other) const {
     if constexpr (std::same_as<grid_t<Grid>, AscendingGrid>) {
       return lagrange_interp::lag_t<N, transform>(
