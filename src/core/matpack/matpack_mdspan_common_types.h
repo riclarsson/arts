@@ -34,7 +34,7 @@ template <typename T, Size N>
 struct is_data_t<data_t<T, N>> : std::true_type {};
 
 template <typename T, Size N>
-void is_data_t_reffable(const data_t<T, N>&) {}
+consteval void is_data_t_reffable(const data_t<T, N>&) {}
 
 //! Our view holder
 template <typename T, Size N>
@@ -46,9 +46,6 @@ struct is_view_t : std::false_type {};
 template <typename T, Size N>
 struct is_view_t<view_t<T, N>> : std::true_type {};
 
-template <typename T, Size N>
-void is_view_t_reffable(const view_t<T, N>&) {}
-
 //! Our strided view holder
 template <typename T, Size N>
 struct strided_view_t;
@@ -58,9 +55,6 @@ struct is_strided_view_t : std::false_type {};
 
 template <typename T, Size N>
 struct is_strided_view_t<strided_view_t<T, N>> : std::true_type {};
-
-template <typename T, Size N>
-void is_strided_view_t_reffable(const strided_view_t<T, N>&) {}
 
 //! Our constant-sized data holder
 template <typename T, Size... N>
@@ -73,7 +67,7 @@ template <typename T, Size... N>
 struct is_cdata_t<cdata_t<T, N...>> : std::true_type {};
 
 template <typename T, Size... N>
-void is_cdata_t_reffable(const cdata_t<T, N...>&) {}
+consteval void is_cdata_t_reffable(const cdata_t<T, N...>&) {}
 
 template <typename T>
 concept has_value_type =
