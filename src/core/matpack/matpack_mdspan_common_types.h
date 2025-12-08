@@ -4,6 +4,8 @@
 
 #include <experimental/mdspan>
 #include <ranges>
+#include <type_traits>
+#include <utility>
 
 #include "matpack_mdspan_common_sizes.h"
 
@@ -37,6 +39,60 @@ struct strided_view_t;
 template <typename T, Size... N>
 struct cdata_t;
 
+//! Helper traits
+namespace {
+template <typename T, Size... dims>
+consteval std::true_type is_data_t_helper(const data_t<T, dims...>*);
+consteval std::false_type is_data_t_helper(...);
+template <typename T, Size... dims>
+consteval std::true_type is_view_t_helper(const view_t<T, dims...>*);
+consteval std::false_type is_view_t_helper(...);
+template <typename T, Size... dims>
+consteval std::true_type is_strided_view_t_helper(
+    const strided_view_t<T, dims...>*);
+consteval std::false_type is_strided_view_t_helper(...);
+template <typename T, Size... dims>
+consteval std::true_type is_cdata_t_helper(const cdata_t<T, dims...>*);
+consteval std::false_type is_cdata_t_helper(...);
+}  // namespace
+
+//! Type trait to detect cdata_t or types derived from data_t
+template <typename T>
+struct is_data_t
+    : decltype(is_data_t_helper(std::declval<std::remove_cvref_t<T>*>())){};
+
+//! Type trait to detect strided_view_t or types derived from view_t
+template <typename T>
+struct is_view_t
+    : decltype(is_view_t_helper(std::declval<std::remove_cvref_t<T>*>())){};
+
+//! Type trait to detect strided_view_t or types derived from strided_view_t
+template <typename T>
+struct is_strided_view_t : decltype(is_strided_view_t_helper(
+                               std::declval<std::remove_cvref_t<T>*>())){};
+
+//! Type trait to detect cdata_t or types derived from cdata_t
+template <typename T>
+struct is_cdata_t
+    : decltype(is_cdata_t_helper(std::declval<std::remove_cvref_t<T>*>())){};
+
+template <typename T>
+concept any_data = is_data_t<std::remove_cvref_t<T>>::value;
+
+template <typename T>
+concept any_view = is_view_t<std::remove_cvref_t<T>>::value;
+
+template <typename T>
+concept any_strided_view = is_strided_view_t<std::remove_cvref_t<T>>::value;
+
+template <typename T>
+concept any_cdata = is_cdata_t<std::remove_cvref_t<T>>::value;
+
+//! Collection of all matpack core types
+template <class T>
+concept any_md =
+    any_data<T> or any_strided_view<T> or any_view<T> or any_cdata<T>;
+
 template <typename T>
 concept has_value_type =
     requires { typename std::remove_cvref_t<T>::value_type; };
@@ -68,40 +124,12 @@ concept has_mapping_type =
 template <has_element_type T>
 using mapping_type = typename std::remove_cvref_t<T>::mapping_type;
 
-// Use forward declarations of concepts
-template <typename T, typename U, Size N>
-static constexpr bool is_data =
-    std::same_as<std::remove_cvref_t<T>, data_t<U, N>>;
-
 ////////////////////////////////////////////////////////////////////////////////
 // Any matpack core type - /////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
 template <class T>
-concept any_data = std::remove_cvref_t<T>::matpack_magic_data;
-
-template <class T>
-concept any_view = std::remove_cvref_t<T>::matpack_magic_view;
-
-template <class T>
-concept any_strided_view = std::remove_cvref_t<T>::matpack_magic_strided_view;
-
-template <class T>
-concept any_cdata = std::remove_cvref_t<T>::matpack_magic_cdata;
-
-template <class T>
-concept any_md =
-    any_data<T> or any_strided_view<T> or any_view<T> or any_cdata<T>;
-
-template <class T>
 concept mut_any_md = any_md<T> and mdmutable<T>;
-
-template <class T>
-concept const_any_md = any_md<T> and not mdmutable<T>;
-
-template <class T, class U>
-concept any_convertible_md =
-    any_md<T> and std::convertible_to<value_type<T>, U>;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Any matpack core type of rank N - ///////////////////////////////////////////

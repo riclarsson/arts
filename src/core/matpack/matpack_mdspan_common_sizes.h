@@ -198,7 +198,7 @@ concept rankable = has_rank<T> or has_NumIndices<T> or
 
 //! Get the rank of the multidimensional array at compile time
 template <rankable T>
-constexpr Size rank() {
+consteval Size rank() {
   if constexpr (has_NumIndices<T>)
     return std::remove_cvref_t<T>::NumIndices;
   else if constexpr (has_IsVectorAtCompileTime<T>)
