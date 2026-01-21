@@ -1167,7 +1167,7 @@ void test_mult() {
     Vector y(3);
     Vector x(std::vector<Numeric>{1, 2});
     Matrix A = build_test_matrix(3, 2);
-    mult(y, A, x);
+    mult(y, A, x); 
     std::cout << "A (in):\n"
               << std::format("{}", A) << '\n'
               << "x (in):\n"
