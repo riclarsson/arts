@@ -2,6 +2,7 @@
 #include <nonstd.h>
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <print>
 
@@ -98,6 +99,14 @@ int main(int argc, char** argv) try {
 
   const std::filesystem::path path = argv[1];
   auto species = read_split_species(path / "isotopologues/");
+
+  if (species.empty()) {
+    std::println(stderr,
+                 "No species isotopologue info found in {}/{}",
+                 argv[1],
+                 "isotopologues/");
+    return EXIT_FAILURE;
+  }
 
   species.insert_range(read_split_species(argv[2]));
 

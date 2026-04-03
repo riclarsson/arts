@@ -1,5 +1,5 @@
 add_library(species STATIC
-  isotopologues.cc isotopologues_class.cc auto_isotopologues.h auto_species_enum_info.cc
+  isotopologues.cc isotopologues_class.cc auto_isotopologues.h auto_isotopologues.cc auto_species_enum_info.cc
 )
 target_link_libraries(species PUBLIC arts_enum_options util xml_io species_info species_enum_info)
 target_include_directories(species PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -24,7 +24,7 @@ target_link_libraries(make_species_enum PUBLIC species_enum_info)
 target_include_directories(make_species_enum PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_command(
-  OUTPUT auto_species_enum_info.cc auto_species_enum_info.h
+  OUTPUT auto_species_enum_info.cc auto_species_enum_info.h auto_isotopologues.cc auto_partition_functions.h
   COMMAND make_species_enum ${ARTS_CAT_DATA_DIR}
   DEPENDS make_species_enum
 )

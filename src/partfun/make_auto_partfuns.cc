@@ -378,13 +378,6 @@ int main(int argn, char** argv) try {
 
   make_files(xmlfiles);
 
-  // for (auto& fn : xmlfiles) {
-  //   auto xmlfile = std::filesystem::canonical(fn);
-  //   make_cc(xmlfile);
-  // }
-
-  // make_h(xmlfiles);
-
   return EXIT_SUCCESS;
 } catch (std::exception& e) {
   std::cerr << "Failed:\n" << e.what() << '\n';
