@@ -18,6 +18,7 @@ species/0003.O3.xml
 species/0007.O2.xml
 species/0024.N2.xml
 species/0113.liquidcloud.xml
+species/0116.free_electrons.xml
 isotopologues/H2O-161.xml
 isotopologues/O2-66.xml
 isotopologues/N2-44.xml
