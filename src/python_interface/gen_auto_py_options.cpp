@@ -10,7 +10,7 @@
 #include "pydocs.h"
 
 namespace {
-void enum_option(std::ostream& os, const EnumeratedOption& wso) {
+void enum_option(std::ostream& os, const EnumeratedOption& wso) try {
   std::print(os,
              R"-x-(
 void enum_{0}(py::module_& m) {{
@@ -90,9 +90,12 @@ void enum_{0}(py::module_& m) {{
   }
 
   os << "}\n";
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in enum_option: {}", e.what());
+  throw;
 }
 
-void enum_options(const std::string& fname) {
+void enum_options(const std::string& fname) try {
   const auto& wsos = internal_options();
 
   auto cc = std::ofstream(fname + ".cpp");
@@ -132,7 +135,15 @@ void enum_options(const std::string& fname) {
 }
 }  // namespace Python
 )-x-";
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in enum_options: {}", e.what());
+  throw;
 }
 }  // namespace
 
-int main() { enum_options("py_auto_options"); }
+int main() try {
+  enum_options("py_auto_options");
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in main: {}", e.what());
+  return 1;
+}

@@ -23,7 +23,8 @@ using HitranMap = std::map<Index, std::map<char, std::pair<Index, Numeric>>>;
  *
  * Last Updated: 2021-11-25
  */
-const HitranMap molparam_map{
+const HitranMap molparam_map{};
+/*
     {1,
      {
          // H2O
@@ -425,6 +426,7 @@ const HitranMap molparam_map{
          {'2', {Species::find_species_index("ClNO2", "7466"), 2.40264E-01}},
      }},
 };
+*/
 using OurHitranMap = std::map<Index, std::map<char, SpeciesIsotope>>;
 
 /** Turns the string-map required at compile time into a species-map
