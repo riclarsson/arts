@@ -5,6 +5,9 @@
 #include <mystring.h>
 
 #include <memory>
+
+#include "hpy_opaque.h"
+
 namespace Python {
 template <typename type>
 struct ValueHolder {

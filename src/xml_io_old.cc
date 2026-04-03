@@ -59,8 +59,8 @@ ArtscatMeta ReadFromArtscat3Stream(std::istream& is) {
   try {
     if (artsid.length() != 0) {
       // Set the species
-      const auto isotopologue =
-          SpeciesIsotope(Species::update_isot_name(artsid));
+      const auto& isotopologue =
+          SpeciesIsotope::from_name(Species::update_isot_name(artsid));
       ARTS_USER_ERROR_IF(
           isotopologue.is_joker(),
           "A line catalog species can only be of the form \"Plain\", meaning it\nhas the form SPECIES-ISONUM.\n"
@@ -258,8 +258,8 @@ ArtscatMeta ReadFromArtscat4Stream(std::istream& is) {
   try {
     if (artsid.length() != 0) {
       // Set line ID
-      const auto isotopologue =
-          SpeciesIsotope(Species::update_isot_name(artsid));
+      const auto& isotopologue =
+          SpeciesIsotope::from_name(Species::update_isot_name(artsid));
       ARTS_USER_ERROR_IF(
           isotopologue.is_joker(),
           "A line catalog species can only be of the form \"Plain\", meaning it\nhas the form SPECIES-ISONUM.\n"

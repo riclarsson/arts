@@ -14,43 +14,45 @@ void enum_option(std::ostream& os, const EnumeratedOption& wso) {
   std::print(os,
              R"-x-(
 void enum_{0}(py::module_& m) {{
-   py::class_<{0}> _g{0}(m, "{0}");
-
-   _g{0}.doc() = PythonWorkspaceGroupInfo<{0}>::desc();
-
-   xml_interface(_g{0});
-   
-   _g{0}.def("__str__", [](const {0}& x){{return std::format("{{}}", x);}});
-   _g{0}.def("__repr__", [](const {0}& x){{return std::format("\"{{}}\"", x);}});
-
-   _g{0}.def(py::init<>());
-
-   _g{0}.def(py::init<{0}>());
-
-   _g{0}.def("__init__", []({0} *y, const std::string& x){{
-      new (y) {0}{{to<{0}>(x)}};
-   }});
-   py::implicitly_convertible<std::string, {0}>();
-
-   _g{0}.def("__hash__", [](const {0}& x){{return std::hash<{0}>{{}}(x);}}, "Allows hashing");
-
-   _g{0}.def("__copy__", []({0} t) -> {0}{{return t;}});
-
-   _g{0}.def("__deepcopy__", []({0} t, py::dict&) -> {0}{{return t;}});
-
-   _g{0}.def(py::self == py::self, "`self == other`");
-   _g{0}.def(py::self != py::self, "`self != other`");
-   _g{0}.def(py::self <= py::self, "`self <= other`");
-   _g{0}.def(py::self >= py::self, "`self >= other`");
-   _g{0}.def(py::self < py::self, "`self < other`");
-   _g{0}.def(py::self > py::self, "`self > other`");
-
-   _g{0}.def_static("get_options", [] {{return enumtyps::{0}Types;}}, "Get a list of all options");
-
-   _g{0}.def_static("get_options_as_strings", [] {{return enumstrs::{0}Names<>;}}, "Get a list of all options as strings");
-
-)-x-",
+  py::class_<{0}> _g{0}(m, "{0}");
+  _g{0}.doc() = PythonWorkspaceGroupInfo<{0}>::desc();
+  xml_interface(_g{0});
+  _g{0}.def("__str__", [](const {0}& x){{return std::format("{{}}", x);}});
+  _g{0}.def("__repr__", [](const {0}& x){{return std::format("\"{{}}\"", x);}});
+  _g{0}.def(py::init<>());
+  _g{0}.def(py::init<{0}>());
+  _g{0}.def("__init__", []({0} *y, const std::string& x){{
+    new (y) {0}{{to<{0}>(x)}};
+  }});
+  py::implicitly_convertible<std::string, {0}>();
+  _g{0}.def("__hash__", [](const {0}& x){{return std::hash<{0}>{{}}(x);}}, "Allows hashing");
+  _g{0}.def("__copy__", []({0} t) -> {0}{{return t;}});
+  _g{0}.def("__deepcopy__", []({0} t, py::dict&) -> {0}{{return t;}});
+  _g{0}.def(py::self == py::self, "`self == other`");
+  _g{0}.def(py::self != py::self, "`self != other`");
+  _g{0}.def(py::self <= py::self, "`self <= other`");
+  _g{0}.def(py::self >= py::self, "`self >= other`");
+  _g{0}.def(py::self < py::self, "`self < other`");
+  _g{0}.def(py::self > py::self, "`self > other`");
+  _g{0}.def_static("get_options", [] {{return enumtyps::{0}Types;}}, "Get a list of all options");
+  _g{0}.def_static("get_options_as_strings", [] (Size i) {{)-x-",
              wso.name);
+
+  for (Size i = 0; i < wso.values_and_desc.front().size() - 1; i++) {
+    std::print(os,
+               R"-x-(
+    if (i == {1}) return enumstrs::{0}Names<{1}>;)-x-",
+               wso.name,
+               i);
+  }
+  std::println(os,
+               R"-x-(
+    throw std::invalid_argument("Valid input [0, {1})");
+  }},
+  "i"_a=Size{{{0}}},
+  "Get a list of all options as strings");)-x-",
+               wso.preferred_print,
+               wso.values_and_desc.front().size() - 1);
 
   constexpr std::array pykeywords{
       "None"sv, "any"sv, "all"sv, "print"sv, "lambda"sv};

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <enums.h>
+#include <enums-common-helper.h>
 
 #include "xml_io_base.h"
 #include "xml_io_stream.h"

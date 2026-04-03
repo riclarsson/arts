@@ -9,12 +9,6 @@
 #include "nanobind/stl/variant.h"
 #include "surf.h"
 
-NB_MAKE_OPAQUE(std::vector<Jacobian::AtmTarget>)
-NB_MAKE_OPAQUE(std::vector<Jacobian::SurfaceTarget>)
-NB_MAKE_OPAQUE(std::vector<Jacobian::LineTarget>)
-NB_MAKE_OPAQUE(std::vector<Jacobian::SensorTarget>)
-NB_MAKE_OPAQUE(std::vector<Jacobian::ErrorTarget>)
-
 namespace Python {
 void py_jac(py::module_& m) try {
   py::class_<ErrorKey> errkey(m, "ErrorKey");

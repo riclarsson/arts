@@ -35,7 +35,7 @@ SpeciesTagType Tag::Type() const noexcept { return type; }
 
 bool Tag::is_joker() const {
   assert(spec_ind >= 0);
-  return Joker == Isotopologue().isotname;
+  return Isotope::Joker == Isotopologue().isotname;
 }
 
 namespace {
@@ -109,12 +109,12 @@ SpeciesTag parse_tag(std::string_view text) {
   // If there is no text remaining after the previous next(), then we are a
   // wild-tag species. Otherwise we have to process the tag a bit more
   if (text.size() == 0) {
-    tag.spec_ind = isot(species, Joker, orig);
+    tag.spec_ind = isot(species, Isotope::Joker, orig);
     tag.type     = SpeciesTagType::Plain;
     check(text, orig);
   } else {
     if (const std::string_view tag_key = next(text); tag_key == "CIA") {
-      tag.spec_ind = isot(species, Joker, orig);
+      tag.spec_ind = isot(species, Isotope::Joker, orig);
       try {
         tag.cia_2nd_species = spec(next(text), orig);
       } catch (std::exception& e) {
@@ -127,7 +127,7 @@ SpeciesTag parse_tag(std::string_view text) {
       tag.type = SpeciesTagType::Cia;
       check(text, orig);
     } else if (tag_key == "XFIT") {
-      tag.spec_ind = isot(species, Joker, orig);
+      tag.spec_ind = isot(species, Isotope::Joker, orig);
       tag.type     = SpeciesTagType::XsecFit;
       check(text, orig);
     } else {

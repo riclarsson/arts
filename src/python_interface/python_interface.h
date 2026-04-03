@@ -6,7 +6,7 @@
 #include <py_auto_wsg.h>
 #include <workspace.h>
 
-#include "workspace_class.h"
+#include "hpy_opaque.h"
 
 using ssize_t = Py_ssize_t;
 

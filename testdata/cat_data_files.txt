@@ -12,3 +12,13 @@ predef/H2O-SelfContCKDMT430.xml
 predef/H2O-ForeignContCKDMT430.xml
 xsec/O3-XFIT.xml
 xsec/O3-XFIT.xml.bin
+species/0001.H2O.xml
+species/0002.CO2.xml
+species/0003.O3.xml
+species/0007.O2.xml
+species/0024.N2.xml
+isotopologues/H2O-161.xml
+isotopologues/O2-66.xml
+isotopologues/N2-44.xml
+isotopologues/CO2-626.xml
+isotopologues/H2O-161.xml

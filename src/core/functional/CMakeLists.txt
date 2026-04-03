@@ -8,7 +8,7 @@ add_library(functional_numeric_ternary STATIC
   functional_atm.cpp
 )
 
-target_link_libraries(functional_numeric_ternary PUBLIC matpack geodesy artstime igrf)
+target_link_libraries(functional_numeric_ternary PUBLIC matpack geodesy arts_enum_options artstime igrf)
 target_include_directories(functional_numeric_ternary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 ### META-package

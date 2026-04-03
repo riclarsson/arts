@@ -216,7 +216,7 @@ State state_from(std::string_view s) {
 Identifier::Identifier(std::string_view s_) try {
   std::string_view s = s_;
 
-  isot  = SpeciesIsotope(next(s));
+  isot  = SpeciesIsotope::from_name(next(s));
   state = state_from(s);
 } catch (std::exception& e) {
   throw std::runtime_error(std::format(
@@ -244,7 +244,7 @@ Level level_from(std::string_view s) {
 
 LevelIdentifier::LevelIdentifier(const std::string_view s_) try {
   std::string_view s = s_;
-  isot               = SpeciesIsotope(next(s));
+  isot               = SpeciesIsotope::from_name(next(s));
   state              = level_from(s);
 } catch (std::exception& e) {
   throw std::runtime_error(std::format(

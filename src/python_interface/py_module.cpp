@@ -1,6 +1,8 @@
 #include <nanobind/nanobind.h>
 #include <parameters.h>
-#include <python_interface.h>
+
+#include "hpy_opaque.h"
+#include "python_interface.h"
 
 extern Parameters parameters;
 
@@ -108,6 +110,7 @@ NB_MODULE(arts, m) try {
   py_xsec(m);
   py_predefined(m);
   py_star(m);
+  py_file(m);
   py_agenda(m);
   py_atm(m);
   py_surf(m);
@@ -139,7 +142,6 @@ NB_MODULE(arts, m) try {
   py_hitran(m);
   py_igrf(m);
   py_zeeman(m);
-  py_file(m);
 
   py::set_leak_warnings(false);
   py::set_implicit_cast_warnings(false);
