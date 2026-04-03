@@ -22,4 +22,8 @@ isotopologues/H2O-161.xml
 isotopologues/O2-66.xml
 isotopologues/N2-44.xml
 isotopologues/CO2-626.xml
-isotopologues/H2O-161.xml
+partition-functions/H2O-161.xml
+partition-functions/O2-66.xml
+partition-functions/N2-44.xml
+partition-functions/CO2-626.xml
+partition-functions/H2O-161.xml
