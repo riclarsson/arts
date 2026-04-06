@@ -55,13 +55,18 @@ std::map<Index, std::map<char, std::pair<Index, Numeric>>> molparam_map{{)");
 }}  // namespace Hitran)");
 }
 
-int main() try {
-  std::filesystem::path path = "/Users/richard/Work/arts-cat-data/";
-  auto data                  = read(path / "hitran/");
+int main(int argc, char** argv) try {
+  if (argc != 2) {
+    std::println(stderr, "Usage: {} <species>", argv[0]);
+    return EXIT_FAILURE;
+  }
+
+  const std::filesystem::path path = argv[1];
+  auto data                        = read(path / "hitran/");
 
   std::ofstream h("hitran_species_map.h", std::ios::out);
 
-  write_header(h, from(std::move(data)));
+  write_header(h, from(data));
 
   return EXIT_SUCCESS;
 } catch (const std::exception& e) {
