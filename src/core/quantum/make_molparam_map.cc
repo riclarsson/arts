@@ -17,12 +17,12 @@ std::vector<HitranSpeciesInfo> read(std::filesystem::path path) {
   return out;
 }
 
-std::map<Index, std::map<char, std::pair<Index, Numeric>>> from(
+std::map<Index, std::map<char, std::pair<String, Numeric>>> from(
     const std::vector<HitranSpeciesInfo>& data) {
-  std::map<Index, std::map<char, std::pair<Index, Numeric>>> out;
+  std::map<Index, std::map<char, std::pair<String, Numeric>>> out;
 
   for (const auto& x : data) {
-    out[x.hitind][x.hitchar] = {Species::find_species_index(x.spec), x.ratio};
+    out[x.hitind][x.hitchar] = {x.spec.FullName(), x.ratio};
   }
 
   return out;
@@ -31,7 +31,7 @@ std::map<Index, std::map<char, std::pair<Index, Numeric>>> from(
 
 void write_header(
     std::ostream& os,
-    const std::map<Index, std::map<char, std::pair<Index, Numeric>>>& data) {
+    const std::map<Index, std::map<char, std::pair<String, Numeric>>>& data) {
   std::println(os, R"(#pragma once
 
 #include <map>
@@ -46,7 +46,7 @@ std::map<Index, std::map<char, std::pair<Index, Numeric>>> molparam_map{{)");
     std::print(os, "    {{{}, {{", mol);
     for (const auto& [isochar, pair] : iso_map) {
       std::print(
-          os, "{{'{}', {{{}, {}}}}}, ", isochar, pair.first, pair.second);
+          os, "{{'{}', {{\"{}\"_isot_index, {}}}}}, ", isochar, pair.first, pair.second);
     }
     std::println(os, "}}}},");
   }
