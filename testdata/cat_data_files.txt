@@ -30,12 +30,13 @@ species/0055.SO.xml
 species/0064.He.xml
 species/0113.liquidcloud.xml
 species/0116.free_electrons.xml
-hitran/H2O-161.xml
+hitran/CO2-626.xml
 isotopologues/H2O-161.xml
 isotopologues/O2-66.xml
 isotopologues/N2-44.xml
 isotopologues/CO2-626.xml
 isotopologues/O2-68.xml
+isotopologues/O3-666.xml
 isotopologues/CO-26.xml
 isotopologues/OCS-622.xml
 isotopologues/OCS-624.xml
@@ -50,6 +51,7 @@ partition-functions/N2-44.xml
 partition-functions/CO2-626.xml
 partition-functions/O2-68.xml
 partition-functions/CO-26.xml
+partition-functions/O3-666.xml
 partition-functions/OCS-622.xml
 partition-functions/OCS-624.xml
 partition-functions/PH3-1111.xml
