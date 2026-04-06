@@ -1,3 +1,4 @@
+#include <hitran_species_info.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/operators.h>
 #include <nanobind/stl/array.h>
@@ -117,7 +118,8 @@ void py_species(py::module_& m) try {
           "__init__",
           [](SpeciesIsotope* self, const std::string& name) {
             try {
-              auto x = SpeciesIsotope::from_name(name);
+              auto x =
+                  SpeciesIsotope::from_name(Species::update_isot_name(name));
               new (self) SpeciesIsotope(x);
             } catch (std::exception& e) {
               throw std::runtime_error(std::format(
@@ -135,6 +137,12 @@ void py_species(py::module_& m) try {
       .def_ro("spec",
               &SpeciesIsotope::spec,
               "The species\n\n.. :class:`~pyarts3.arts.SpeciesEnum`")
+      .def_prop_ro(
+          "index",
+          [](const SpeciesIsotope& self) {
+            return Species::find_species_index(self);
+          },
+          "The index of the species in the isotopologue list\n\n.. :class:`int`")
       .def_ro(
           "isotname",
           &SpeciesIsotope::isotname,
@@ -274,6 +282,23 @@ Returns
   seinfo.def("__hash__", [](const SpeciesEnumInfo& self) {
     return std::hash<SpeciesEnumInfo>{}(self);
   });
+
+  py::class_<HitranSpeciesInfo> hsinfo(m, "HitranSpeciesInfo");
+  hsinfo.doc() = "Information about a HITRAN species";
+  generic_interface(hsinfo);
+  hsinfo
+      .def_rw("spec",
+              &HitranSpeciesInfo::spec,
+              "The species\n\n.. :class:`~pyarts3.arts.SpeciesIsotope")
+      .def_rw("hitind",
+              &HitranSpeciesInfo::hitind,
+              "The HITRAN species index\n\n.. :class:`int`")
+      .def_rw("hitchar",
+              &HitranSpeciesInfo::hitchar,
+              "The HITRAN isotopologue char\n\n.. :class:`str`")
+      .def_rw("ratio",
+              &HitranSpeciesInfo::ratio,
+              "The isotopologue ratio\n\n.. :class:`float`");
 } catch (std::exception& e) {
   throw std::runtime_error(
       std::format("DEV ERROR:\nCannot initialize species\n{}", e.what()));

@@ -31,6 +31,7 @@ String update_isot_name(const String& old_name) {
   if (old_name == "H2CO-1136") return "H2CO-136";
   if (old_name == "H2CO-1226") return "HDCO-26";
   if (old_name == "H2CO-2226") return "D2CO-26";
+  if (old_name == "HC3N-1224") return "HC3N-12224";
   return old_name;
 }
 

@@ -5,7 +5,7 @@
 #include <mystring.h>
 #include <nonstd.h>
 #include <species.h>
-#include <xml_io_stream.h>
+#include <xml.h>
 
 #include <array>
 #include <limits>
