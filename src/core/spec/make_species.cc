@@ -93,7 +93,7 @@ inline constexpr std::array Isotopologues{{)");
 int main(int argc, char** argv) try {
   if (argc != 3) {
     std::println(
-        stderr, "Usage: {} <arts-cat-data> <predefined-models>", argv[0]);
+        stderr, "Usage: {} <arts-cat-data> <builtin-predefined-models>", argv[0]);
     return EXIT_FAILURE;
   }
 

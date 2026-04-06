@@ -57,7 +57,7 @@ std::map<Index, std::map<char, std::pair<Index, Numeric>>> molparam_map{{)");
 
 int main(int argc, char** argv) try {
   if (argc != 2) {
-    std::println(stderr, "Usage: {} <species>", argv[0]);
+    std::println(stderr, "Usage: {} <arts-cat-data>", argv[0]);
     return EXIT_FAILURE;
   }
 
