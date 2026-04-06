@@ -30,7 +30,7 @@ species/0055.SO.xml
 species/0064.He.xml
 species/0113.liquidcloud.xml
 species/0116.free_electrons.xml
-hitran/CO2-626.xml
+hitran/H2O-161.xml
 isotopologues/H2O-161.xml
 isotopologues/O2-66.xml
 isotopologues/N2-44.xml
