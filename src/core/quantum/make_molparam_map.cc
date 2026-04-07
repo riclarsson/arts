@@ -40,7 +40,7 @@ void write_header(
 #include <isotopologues.h>
 
 namespace Hitran {{
-std::map<Index, std::map<char, std::pair<Index, Numeric>>> molparam_map{{)");
+inline std::map<Index, std::map<char, std::pair<Index, Numeric>>> molparam_map{{)");
 
   for (const auto& [mol, iso_map] : data) {
     std::print(os, "    {{{}, {{", mol);
@@ -64,7 +64,7 @@ int main(int argc, char** argv) try {
   const std::filesystem::path path = argv[1];
   auto data                        = read(path / "hitran/");
 
-  std::ofstream h("hitran_species_map.h", std::ios::out);
+  std::ofstream h("auto_hitran_species_map.h", std::ios::out);
 
   write_header(h, from(data));
 

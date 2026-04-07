@@ -1,4 +1,5 @@
 #include <hitran_species_info.h>
+#include <jpl_species_info.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/operators.h>
 #include <nanobind/stl/array.h>
@@ -289,7 +290,7 @@ Returns
   hsinfo
       .def_rw("spec",
               &HitranSpeciesInfo::spec,
-              "The species\n\n.. :class:`~pyarts3.arts.SpeciesIsotope")
+              "The species\n\n.. :class:`~pyarts3.arts.SpeciesIsotope`")
       .def_rw("hitind",
               &HitranSpeciesInfo::hitind,
               "The HITRAN species index\n\n.. :class:`int`")
@@ -299,6 +300,26 @@ Returns
       .def_rw("ratio",
               &HitranSpeciesInfo::ratio,
               "The isotopologue ratio\n\n.. :class:`float`");
+
+  py::class_<JplSpeciesInfo> jsinfo(m, "JplSpeciesInfo");
+  jsinfo.doc() = "Information about a JPL species";
+  generic_interface(jsinfo);
+  jsinfo
+      .def_rw(
+          "id", &JplSpeciesInfo::id, "The JPL species ID\n\n.. :class:`int`")
+      .def_rw("spec",
+              &JplSpeciesInfo::spec,
+              "The species\n\n.. :class:`~pyarts3.arts.SpeciesIsotope")
+      .def_rw("has_qn",
+              &JplSpeciesInfo::has_qn,
+              "The JPL species index\n\n.. :class:`bool`")
+      .def_rw(
+          "QT0",
+          &JplSpeciesInfo::QT0,
+          "The partition function at the reference temperature\n\n.. :class:`float`")
+      .def_rw("T0",
+              &JplSpeciesInfo::T0,
+              "The reference temperature\n\n.. :class:`float`");
 } catch (std::exception& e) {
   throw std::runtime_error(
       std::format("DEV ERROR:\nCannot initialize species\n{}", e.what()));

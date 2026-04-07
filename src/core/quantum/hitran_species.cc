@@ -5,7 +5,8 @@
 #include <cassert>
 #include <map>
 
-#include "hitran_species_map.h"
+//  Contributes the molparam_map
+#include "auto_hitran_species_map.h"
 
 namespace Hitran {
 namespace {
@@ -63,13 +64,21 @@ QuantumIdentifier from_mol_iso(Index molnum, char isonum) {
       return QuantumIdentifier{species_info->second};
     }
   }
-  ARTS_USER_ERROR(
-      "Species {} {}"
-      " does not exist in ARTS' HITRAN implementation\n"
-      "If you are using a new version of HITRAN that has added the species, please consider\n"
-      "contacting the ARTS developers so we can append the species to our list and make this work.\n",
-      molnum,
-      isonum);
+
+  ARTS_USER_ERROR(R"(
+One of two things have happened:
+
+    1.  The molecular number {0} and isotopologue character '{1}' do not correspond to any valid HITRAN species, or
+    2.  The species corresponding to the molecular number {0} and isotopologue character '{1}' has not yet been added to ARTS.
+
+Please confirm that the molecular number {0} and isotopologue character '{1}' are correct HITRAN identifiers for the species you want to use.
+
+If they are, ARTS must be recompiled with information to support the species.  Please see the ARTS developer documentation for instructions on
+how to add a new species to ARTS.  If you do add a new species, please consider contributing the required information to the ARTS development
+team so that we can add it to the next release of ARTS and avoid this issue for other users in the future.  Thanks!
+)",
+                  molnum,
+                  isonum);
 }
 
 SpeciesIsotopologueRatios isotopologue_ratios_impl(const HitranMap& data) {
@@ -83,8 +92,13 @@ SpeciesIsotopologueRatios isotopologue_ratios_impl(const HitranMap& data) {
 }
 }  // namespace
 
-QuantumIdentifier id_from_lookup(Index mol, char isochar) {
+QuantumIdentifier id_from_lookup(Index mol, char isochar) try {
   return from_mol_iso(mol, isochar);
+} catch (const std::exception& e) {
+  ARTS_USER_ERROR("Error occurred while looking up species index {} {}:\n{}",
+                  mol,
+                  isochar,
+                  e.what());
 }
 
 Numeric ratio_from_lookup(Index mol, char isochar) {

@@ -31,6 +31,11 @@ using std::exp;
 using std::expm1;
 
 namespace lbl {
+Numeric einstein_a(
+    Numeric s, Numeric gu, Numeric e0, Numeric f0, Numeric T, Numeric Q) {
+  return s * Math::pow3(f0) * Q / (gu * std::exp(-e0 / (Constant::k * T)));
+}
+
 void band_data::sort(LineByLineVariable v) {
   using enum LineByLineVariable;
   switch (v) {

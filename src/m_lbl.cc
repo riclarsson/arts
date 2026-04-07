@@ -337,6 +337,31 @@ void abs_bandsReadHITRAN(AbsorptionBands& abs_bands,
 }
 ARTS_METHOD_ERROR_CATCH
 
+void abs_bandsReadJPL(AbsorptionBands& abs_bands, const String& filename) try {
+  ARTS_TIME_REPORT
+
+  using namespace Quantum;
+
+  const AbsorptionBand default_band{
+      .lines     = {},
+      .lineshape = LineByLineLineshape::VP_LTE,
+      .cutoff    = {},
+  };
+
+  const auto data = lbl::read_jpl_lines(open_input_file(filename));
+
+  abs_bands = {};
+  for (auto& line : data) {
+    abs_bands[line.qid.qid].lines.emplace_back(line.from());
+  }
+
+  for (auto& [_, band] : abs_bands) {
+    band.cutoff    = {};
+    band.lineshape = LineByLineLineshape::VP_LTE;
+  }
+}
+ARTS_METHOD_ERROR_CATCH
+
 namespace {
 template <class Key, class T>
 const T& get_value(const Key& k, const std::unordered_map<Key, T>& m) {
