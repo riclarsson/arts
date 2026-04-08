@@ -8,7 +8,8 @@ Checks: >
   -modernize-use-trailing-return-type,
   -readability-identifier-naming,
   performance-*,
-  portability-*
+  portability-*,
+  -llvm-qualified-auto
 
 # identifier-naming not turned on, too noisy, too many special cases
 CheckOptions:
