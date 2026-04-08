@@ -46,7 +46,7 @@ void xml_io_stream<JplSpeciesInfo>::read(std::istream& is,
   tag.get_attribute_value("has_qn", v);
   std::ranges::transform(
       v, v.begin(), [](unsigned char c) { return std::tolower(c); });
-  x.has_qn = v == "true" or v != "0" or v == "yes" or v == "y" or v == "on";
+  x.has_qn = v == "true";
 
   tag.get_attribute_value("QT0", x.QT0);
   tag.get_attribute_value("T0", x.T0);
