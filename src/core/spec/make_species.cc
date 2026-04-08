@@ -56,12 +56,12 @@ inline constexpr std::array Isotopologues{{)");
       done++;
     }
 
-    if (nonstd::isdigit(info.afgl.front())) {
+    if (nonstd::isdigit(info.code.front())) {
       std::println(
           os,
           R"(  Isotope{{.spec="{}"_spec, .isotname="{}"sv, .mass={}, .builtin_ratio={}, .gi={}}},)",
           info.species,
-          info.afgl,
+          info.code,
           info.mass,
           info.default_ratio,
           info.degeneracy);
@@ -69,7 +69,7 @@ inline constexpr std::array Isotopologues{{)");
       std::println(os,
                    R"(  Isotope{{.spec="{}"_spec, .isotname="{}"sv}},)",
                    info.species,
-                   info.afgl);
+                   info.code);
     }
   }
 

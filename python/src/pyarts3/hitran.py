@@ -19,6 +19,7 @@ def pos2char(ind):
         return "'A'"
     elif ind == 12:
         return "'B'"
+    raise ValueError("Invalid isotopologue index: {}".format(ind))
 
 
 def get_latest_molparam_map(molparam_txt_file=None):

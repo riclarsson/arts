@@ -3,7 +3,7 @@
 #include <double_imanip.h>
 
 String SpeciesIsotopologueInfo::name() const {
-  return std::format("{}-{}", species, afgl);
+  return std::format("{}-{}", species, code);
 }
 
 void xml_io_stream<SpeciesIsotopologueInfo>::write(
@@ -15,7 +15,7 @@ void xml_io_stream<SpeciesIsotopologueInfo>::write(
                R"(<{0}> {1} {2} {3} {4} {5} </{0}>)",
                type_name,
                v.species,
-               v.afgl,
+               v.code,
                v.mass,
                v.default_ratio,
                v.degeneracy);
@@ -32,12 +32,12 @@ void xml_io_stream<SpeciesIsotopologueInfo>::read(std::istream& is,
         std::format("Expected opening tag <{}>, but got '{}'", type_name, val));
   }
 
-  is >> v.species >> v.afgl >> double_imanip{} >> v.mass >> v.default_ratio;
+  is >> v.species >> v.code >> double_imanip{} >> v.mass >> v.default_ratio;
   is >> v.degeneracy;
 
-  if (v.afgl.empty()) {
+  if (v.code.empty()) {
     throw std::runtime_error(
-        "Cannot read SpeciesIsotopologueInfo with empty species or afgl.");
+        "Cannot read SpeciesIsotopologueInfo with empty species or code.");
   }
 
   is >> val;

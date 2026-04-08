@@ -9,16 +9,19 @@
 
 struct SpeciesIsotopologueInfo {
   SpeciesEnum species;
-  String afgl;
+  String code;
   double mass;
   double default_ratio;
   std::int64_t degeneracy;
 
-  constexpr auto operator<=>(const SpeciesIsotopologueInfo& other) const =
-      default;
+  constexpr auto operator<=>(const SpeciesIsotopologueInfo& other) const {
+    if (auto cmp = species <=> other.species; cmp != 0) return cmp;
+    return code <=> other.code;
+  }
 
-  constexpr bool operator==(const SpeciesIsotopologueInfo& other) const =
-      default;
+  constexpr bool operator==(const SpeciesIsotopologueInfo& other) const {
+    return species == other.species && code == other.code;
+  }
 
   [[nodiscard]] String name() const;
 };
@@ -31,7 +34,7 @@ struct hash<SpeciesIsotopologueInfo> {
     std::size_t seed = 0;
 
     boost::hash_combine(seed, std::hash<SpeciesEnum>{}(g.species));
-    boost::hash_combine(seed, std::hash<String>{}(g.afgl));
+    boost::hash_combine(seed, std::hash<String>{}(g.code));
 
     return seed;
   }
@@ -74,6 +77,6 @@ struct std::formatter<SpeciesIsotopologueInfo> {
   template <class FmtContext>
   FmtContext::iterator format(const SpeciesIsotopologueInfo& v,
                               FmtContext& ctx) const {
-    return tags.format(ctx, v.afgl);
+    return tags.format(ctx, v.species, '-', v.code);
   }
 };

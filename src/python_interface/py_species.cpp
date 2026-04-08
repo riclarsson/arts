@@ -236,12 +236,12 @@ Returns
   isinfo
       .def_rw(
           "species",
-          &SpeciesIsotopologueInfo::afgl,
+          &SpeciesIsotopologueInfo::species,
           "The Species key of the isotopologue (e.g., in H2O-161, this is 'H2O')\n\n.. :class:`str`")
       .def_rw(
-          "afgl",
-          &SpeciesIsotopologueInfo::afgl,
-          "The AFGL key of the isotopologue (e.g., in H2O-161, this is '161')\n\n.. :class:`str`")
+          "code",
+          &SpeciesIsotopologueInfo::code,
+          "The key of the isotopologue (e.g., in H2O-161, this is '161')\n\n.. :class:`str`")
       .def_rw("mass",
               &SpeciesIsotopologueInfo::mass,
               "The mass of the species in atomic units\n\n.. :class:`float`")
@@ -265,13 +265,13 @@ Returns
   seinfo.doc() = "Information about a species enum";
   generic_interface(seinfo);
   seinfo
-      .def_rw("species",
+      .def_rw("enum_value",
               &SpeciesEnumInfo::enum_value,
               "The species enum value\n\n.. :class:`int`")
-      .def_rw("afgl",
+      .def_rw("shortname",
               &SpeciesEnumInfo::shortname,
               "The short name of the species\n\n.. :class:`str`")
-      .def_rw("mass",
+      .def_rw("longname",
               &SpeciesEnumInfo::longname,
               "The long name of the species\n\n.. :class:`str`");
   seinfo.def(py::self == py::self);

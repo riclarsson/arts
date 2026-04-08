@@ -340,14 +340,6 @@ ARTS_METHOD_ERROR_CATCH
 void abs_bandsReadJPL(AbsorptionBands& abs_bands, const String& filename) try {
   ARTS_TIME_REPORT
 
-  using namespace Quantum;
-
-  const AbsorptionBand default_band{
-      .lines     = {},
-      .lineshape = LineByLineLineshape::VP_LTE,
-      .cutoff    = {},
-  };
-
   const auto data = lbl::read_jpl_lines(open_input_file(filename));
 
   abs_bands = {};

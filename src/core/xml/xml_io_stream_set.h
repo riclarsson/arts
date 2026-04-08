@@ -1,9 +1,12 @@
 #pragma once
 
 #include <set>
+#include <string_view>
 
 #include "xml_io_base.h"
 #include "xml_io_stream.h"
+
+using namespace std::literals;
 
 template <typename T>
 struct xml_io_stream_name<std::set<T>> {

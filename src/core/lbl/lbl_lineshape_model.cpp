@@ -365,7 +365,7 @@ void xml_io_stream<lbl::line_shape::species_model>::write(
 
   for (auto& [key, elem] : x.data) {
     std::println(
-        os, "{} {} {} {}", key, elem.Type(), elem.X().size(), elem.X());
+        os, "{} {} {} {:IO}", key, elem.Type(), elem.X().size(), elem.X());
   }
 
   tag.write_to_end_stream(os);
@@ -385,7 +385,7 @@ void xml_io_stream<lbl::line_shape::species_model>::read(
     LineShapeModelVariable var;
     LineShapeModelType temptype;
     Vector v{};
-    is >> var >> var >> temptype >> m;
+    is >> var >> temptype >> m;
     v.resize(m);
     for (Index j = 0; j < m; ++j) {
       is >> double_imanip() >> v[j];

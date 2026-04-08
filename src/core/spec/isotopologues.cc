@@ -127,27 +127,3 @@ bool Isotope::operator!=(const Isotope& other) const {
   return not this->operator==(other);
 }
 }  // namespace Species
-
-void xml_io_stream<SpeciesIsotope>::write(std::ostream& os,
-                                          const SpeciesIsotope& x,
-                                          bofstream*,
-                                          std::string_view name) {
-  XMLTag tag(type_name, "name", name, "isot", x.FullName());
-  tag.write_to_stream(os);
-  tag.write_to_end_stream(os);
-}
-
-void xml_io_stream<SpeciesIsotope>::read(std::istream& is,
-                                         SpeciesIsotope& x,
-                                         bifstream*) {
-  XMLTag tag;
-  tag.read_from_stream(is);
-  tag.check_name(type_name);
-
-  String v;
-  tag.get_attribute_value("isot", v);
-  x = SpeciesIsotope::from_name(v);
-
-  tag.read_from_stream(is);
-  tag.check_end_name(type_name);
-}

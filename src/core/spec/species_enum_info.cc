@@ -20,7 +20,7 @@ void xml_io_stream<SpeciesEnumInfo>::write(std::ostream& os,
   }
 
   std::println(
-      os, R"(<{0}> {1} {2} </{0}>)"sv, type_name, v.shortname, v.longname);
+      os, R"(<{0}> {3} {1} {2} </{0}>)"sv, type_name, v.shortname, v.longname, v.enum_value);
 }
 
 void xml_io_stream<SpeciesEnumInfo>::read(std::istream& is,
