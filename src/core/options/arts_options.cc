@@ -288,6 +288,40 @@ values in relevant calculations.  Or it might simply disable a functionality.
       .name = "PartitionFunctionsType",
       .desc =
           R"(Type of partition function data.
+
+This is only used by the partition functions setup during compilation.
+Each type represent a different way to store and compute the partition function of
+an isotopologue in the :class:`~pyarts3.arts.PartitionFunctionsData` type.
+
+The types, how they compute, and how they store date are as follows:
+
+.. rubric:: Interp
+
+The data contains the temperature grid and the corresponding partition function values.  The first
+column is the temperature grid.  It must be in increasing order.
+The second column is the partition function values.  The partition function is simply computed
+by linear interpolation between the grid points.
+
+.. rubric:: Constant
+
+The data contains a single value, which is the constant partition function value for all temperatures.
+
+.. rubric:: Coeff
+
+The data contains the coefficients of a polynomial expansion
+of the partition function as a function of temperature.
+The partition function is computed by evaluating the polynomial at the given temperature.
+The order of the polynomial is that the first coefficient is the constant term,
+the second coefficient is the linear term, etc.
+
+.. rubric:: StaticInterp
+
+This is very similar to the interp-type, but the grid-values are assumed to be separated
+by a constant value.  This constant value allows for a more efficient lookup and interpolation
+of the partition function values.  The layout of the data is otherwise the same as the interp-type,
+with the first column being the temperature grid and the second column being
+the partition function values.  The first column must be in increasing order,
+and the difference between consecutive values must be constant.
 )",
       .values_and_desc =
           {Value{"Interp", "Interpolate the data"},

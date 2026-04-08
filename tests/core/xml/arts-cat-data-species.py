@@ -250,6 +250,9 @@ def all_species():
 
         key, ext = test_species(os.path.join(species_path, file))
         out[key] = ext
+    
+    assert len(out) == len(set(out.keys())), \
+        f"[Unmaintainable species data]: Duplicate species found: {list(out.keys())}"
 
     return out
 

@@ -23,3 +23,4 @@ and how to use existing features.
    dev.gui
    dev.doc
    dev.xml
+   dev.species
