@@ -12,6 +12,12 @@
 #include <ctime>
 
 Time::Time(const String& t) {
+  ARTS_USER_ERROR_IF(
+      t.size() < 19,
+      "Invalid time format: \"",
+      t,
+      "\"\nExpected format: YYYY-MM-DD HH:MM:SS[.fractional_seconds]");
+
   auto s = std::istringstream(t);
   s >> *this;
 }
@@ -104,17 +110,37 @@ std::ostream& operator<<(std::ostream& os, const Time& t)
 std::istream& operator>>(std::istream& is, Time& t)
 {
   String ymd, hms;
-  is >> ymd >> hms;
-  
+  is >> ymd;
+
+  ARTS_USER_ERROR_IF(
+      ymd.size() != 10,
+      "Time stream must look like \"YYYY-MM-DD HH:MM:SS[.fractional_seconds]\"\n"
+      "\"YYYY-MM-DD\"   looks like: \"",
+      ymd,
+      '\"');
+
+  is >> hms;
+
+  ARTS_USER_ERROR_IF(
+      hms.size() < 8 or (hms.size() > 8 and hms[8] != '.'),
+      "Time stream must look like \"YYYY-MM-DD HH:MM:SS[.fractional_seconds]\"\n"
+      "\"HH:MM:SS[.fractional_seconds]\"   looks like: \"",
+      hms,
+      '\"');
+
   ArrayOfString YMD, HMS;
   ymd.split(YMD, "-");
   hms.split(HMS, ":");
-  
-  ARTS_USER_ERROR_IF (YMD.nelem() not_eq HMS.nelem() and YMD.nelem() not_eq 3,
-    "Time stream must look like \"year-month-day hour:min:seconds\"\n"
-    "\"year-month-day\"   looks like: ", ymd, '\n',
-    "\"hour:min:seconds\" looks like: ", hms);
-  
+
+  ARTS_USER_ERROR_IF(
+      YMD.nelem() not_eq HMS.nelem() and YMD.nelem() not_eq 3,
+      "Time stream must look like \"YYYY-MM-DD HH:MM:SS[.fractional_seconds]\"\n"
+      "\"YYYY-MM-DD\"   looks like: ",
+      ymd,
+      '\n',
+      "\"HH:MM:SS[.fractional_seconds]\" looks like: ",
+      hms);
+
   // FIXME: C++20 has much better calendar handling
   std::tm x;
   x.tm_year = std::stoi(YMD[0]) - 1900;
