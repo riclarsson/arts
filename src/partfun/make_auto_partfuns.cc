@@ -50,7 +50,7 @@ inline constexpr std::array<Numeric, {0}> grid{{ {2:,} }};
 
   return coef[i] + (T - grid[i]) * (coef[i + 1] - coef[i]) / (grid[i + 1] - grid[i]);
 )",
-                              q.size() - 2),
+                                  q.size() - 2),
           .deriv    = std::format(R"(
   const Index i_low =
       std::distance(grid.cbegin(), std::lower_bound(grid.cbegin(), grid.cend(), T));
@@ -58,7 +58,7 @@ inline constexpr std::array<Numeric, {0}> grid{{ {2:,} }};
 
   return (coef[i + 1] - coef[i]) / (grid[i + 1] - grid[i]);
 )",
-                               q.size() - 2),
+                                  q.size() - 2),
           .includes = {"<algorithm>", "<array>"}};
 }
 
@@ -84,7 +84,7 @@ inline constexpr std::array<Numeric, {0}> Q{{ {1:,} }};
 
   return result;
 )",
-                              q.size()),
+                                  q.size()),
           .deriv    = std::format(R"(
   Numeric result = Q[1];
   Numeric TN     = 1.0;
@@ -96,8 +96,17 @@ inline constexpr std::array<Numeric, {0}> Q{{ {1:,} }};
 
   return result;
 )",
-                               q.size()),
+                                  q.size()),
           .includes = {"<array>"}};
+}
+
+func_body make_cpp_string_const(const Matrix& data) {
+  assert(data.size() == 1);
+
+  return {.data     = "",
+          .main     = std::format(R"( return {0}; )", data[0, 0]),
+          .deriv    = R"( return 0.0; )",
+          .includes = {}};
 }
 
 func_body make_cpp_string_static_interp(const Matrix& data) {
@@ -127,9 +136,9 @@ inline constexpr std::array<Numeric, {0}> Q{{ {1:,} }};
 
   return Q[i] + To * (Q[i + 1] - Q[i]);
 )",
-                              r_dT,
-                              Tv[0],
-                              Tv.size() - 2),
+                                  r_dT,
+                                  Tv[0],
+                                  Tv.size() - 2),
           .deriv    = std::format(R"(
   const Numeric Tx = (T - {1}) * {0};
   const Size iTx   = static_cast<Size>(Tx);
@@ -137,9 +146,9 @@ inline constexpr std::array<Numeric, {0}> Q{{ {1:,} }};
 
   return (Q[i + 1] - Q[i]) * {0};
 )",
-                               r_dT,
-                               Tv[0],
-                               Tv.size() - 2),
+                                  r_dT,
+                                  Tv[0],
+                                  Tv.size() - 2),
           .includes = {"<array>"}};
 }
 
@@ -223,9 +232,9 @@ std::string make_cpp_string_impl(const std::string_view filename,
 namespace {{{1}}}  // namespace
 
 namespace PartitionFunctions {{
-Numeric {0}(Numeric T) noexcept {{{2}}}
+Numeric {0}(Numeric T [[maybe_unused]]) noexcept {{{2}}}
 
-Numeric d{0}(Numeric T) noexcept {{{3}}}
+Numeric d{0}(Numeric T [[maybe_unused]]) noexcept {{{3}}}
 }}  // namespace PartitionFunctions
 )",
                      make_call_signature(filename),
@@ -243,6 +252,8 @@ std::string make_cpp_string(const std::string_view filename,
       return make_cpp_string_impl(filename, make_cpp_string_interp(data.data));
     case Coeff:
       return make_cpp_string_impl(filename, make_cpp_string_coeff(data.data));
+    case Constant:
+      return make_cpp_string_impl(filename, make_cpp_string_const(data.data));
     case StaticInterp:
       return make_cpp_string_impl(filename,
                                   make_cpp_string_static_interp(data.data));
@@ -366,13 +377,6 @@ int main(int argn, char** argv) try {
   const std::vector<std::string> xmlfiles{argv + 1, argv + argn};
 
   make_files(xmlfiles);
-
-  // for (auto& fn : xmlfiles) {
-  //   auto xmlfile = std::filesystem::canonical(fn);
-  //   make_cc(xmlfile);
-  // }
-
-  // make_h(xmlfiles);
 
   return EXIT_SUCCESS;
 } catch (std::exception& e) {

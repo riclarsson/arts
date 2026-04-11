@@ -1,7 +1,6 @@
 #include <atm.h>
 #include <atm_path.h>
 #include <debug.h>
-#include <hpy_arts.h>
 #include <nanobind/stl/array.h>
 #include <nanobind/stl/bind_vector.h>
 #include <nanobind/stl/function.h>
@@ -10,12 +9,14 @@
 #include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/vector.h>
-#include <python_interface.h>
 #include <quantum.h>
 #include <species_tags.h>
 
 #include <stdexcept>
 #include <unordered_map>
+
+#include "hpy_arts.h"
+#include "python_interface.h"
 
 namespace Python {
 void py_atm(py::module_ &m) try {

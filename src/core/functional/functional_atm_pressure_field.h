@@ -1,6 +1,7 @@
 #pragma once
 
 #include <artstime.h>
+#include <enums.h>
 #include <enumsFieldComponent.h>
 #include <matpack.h>
 #include <xml.h>

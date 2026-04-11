@@ -121,7 +121,7 @@ void abs_ecs_dataAddTran2011(LinemixingEcsData& abs_ecs_data) {
   using data = lbl::temperature::data;
 
   for (const std::string_view key : {"CO2-626", "CO2-628", "CO2-636"}) {
-    auto& ecs = abs_ecs_data[SpeciesIsotope(key)];
+    auto& ecs = abs_ecs_data[SpeciesIsotope::from_name(key)];
 
     ecs[SpeciesEnum::CarbonDioxide].scaling =
         data(T0, {Conversion::kaycm_per_atm2hz_per_pa(0.019)});

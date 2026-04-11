@@ -13,13 +13,13 @@
 #pragma once
 
 #include <config.h>
-#include <enumsFileType.h>
 #include <mystring.h>
 #include <time_report.h>
 
 #include <memory>
 #include <sstream>
 
+#include "enumsFileType.h"
 #include "xml_io_stream.h"
 
 #ifdef ENABLE_ZLIB

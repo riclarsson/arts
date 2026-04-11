@@ -1457,13 +1457,14 @@ This is based on the works cited here: https://hitran.org/mtckd/
                     std::nullopt,
                     std::nullopt,
                     std::nullopt},
-      .gin_desc  = {R"--(Reference temperature)--",
-                    R"--(Reference pressure)--",
-                    R"--(Self absorption [1/(cm-1 molecules/cm^2])--",
-                    R"--(Foreign absorption [1/(cm-1 molecules/cm^2)])--",
-                    R"--(Foreign closure absorption [1/(cm-1 molecules/cm^2)])--",
-                    R"--(Wavenumbers [cm-1])--",
-                    R"--(Self temperature exponent [-])--"},
+      .gin_desc =
+          {R"--(Reference temperature)--",
+           R"--(Reference pressure)--",
+           R"--(Self absorption [1/(cm-1 molecules/cm^2])--",
+           R"--(Foreign absorption [1/(cm-1 molecules/cm^2)])--",
+           R"--(Foreign closure absorption [1/(cm-1 molecules/cm^2)])--",
+           R"--(Wavenumbers [cm-1])--",
+           R"--(Self temperature exponent [-])--"},
   };
 
   wsm_data["abs_predef_dataInit"] = {
@@ -3285,6 +3286,36 @@ be computed from the line strength, or simply read from the Hitran data.
            "Compute the Zeeman parameters from the HITRAN data (will not activate Zeeman calculations, this must be done manually afterwards)"},
   };
 
+  wsm_data["abs_bandsReadJPL"] = {
+      .desc =
+          R"--(Reads JPL data from a file.
+
+The JPL file is assumed to have each line record
+filling up one line of text.
+
+The builtin JPL map is used to find species.  This set of species can
+be extended during compilation only.
+
+This is still a WIP and most species are missing.  They will be added
+as we need them.
+
+Note also that quantum numbers are not yet supported in the JPL data,
+and thus all lines and bands will be unable to use features that 
+relies on quantum numbers, such as line mixing, Zeeman parameters, etc.
+
+As JPL provides no pressure broadening data, a default 25 kHz/Pa
+Voigt air broadening profile is used for all lines, with a temperature
+exponent of 0.75.
+)--",
+      .author    = {"Richard Larsson"},
+      .out       = {"abs_bands"},
+      .in        = {},
+      .gin       = {"file"},
+      .gin_type  = {"String"},
+      .gin_value = {std::nullopt},
+      .gin_desc  = {"Filename"},
+  };
+
   wsm_data["abs_bandsLineMixingAdaptation"] = {
       .desc =
           R"--(Adapts select band to use ordered Line mixing coefficients.
@@ -4796,25 +4827,25 @@ Hence, a temperature of 0 means 0s the edges of the *freq_grid*.
   };
 
   wsm_data["spectral_rad_scat_pathSunsFirstOrderRayleigh"] = {
-      .desc           = R"--(Add *suns* to *spectral_rad_srcvec_path*.
+      .desc      = R"--(Add *suns* to *spectral_rad_srcvec_path*.
 )--",
-      .author         = {"Richard Larsson"},
-      .out            = {"spectral_rad_scat_path"},
-      .in             = {"spectral_propmat_scat_path",
-                         "ray_path",
-                         "ray_path_suns_path",
-                         "suns",
-                         "jac_targets",
-                         "freq_grid",
-                         "atm_field",
-                         "surf_field",
-                         "spectral_propmat_agenda",
-                         "rte_option"},
-      .gin            = {"depolarization_factor", "hse_derivative"},
-      .gin_type       = {"Numeric", "Index"},
-      .gin_value      = {Numeric{0.0}, Index{0}},
-      .gin_desc       = {R"--(The depolarization factor to use.)--",
-                         "Flag to compute the hypsometric distance derivatives"},
+      .author    = {"Richard Larsson"},
+      .out       = {"spectral_rad_scat_path"},
+      .in        = {"spectral_propmat_scat_path",
+                    "ray_path",
+                    "ray_path_suns_path",
+                    "suns",
+                    "jac_targets",
+                    "freq_grid",
+                    "atm_field",
+                    "surf_field",
+                    "spectral_propmat_agenda",
+                    "rte_option"},
+      .gin       = {"depolarization_factor", "hse_derivative"},
+      .gin_type  = {"Numeric", "Index"},
+      .gin_value = {Numeric{0.0}, Index{0}},
+      .gin_desc  = {R"--(The depolarization factor to use.)--",
+                    "Flag to compute the hypsometric distance derivatives"},
       .pass_workspace = true,
   };
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <enums.h>
 #include <enumsLineShapeModelCoefficient.h>
 #include <enumsLineShapeModelType.h>
 #include <matpack.h>

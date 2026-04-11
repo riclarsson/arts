@@ -9,6 +9,19 @@ _HITRAN_TO_ARTS_NAMES = {
 }
 
 
+def pos2char(ind):
+    """ Convert an isotoplogue index to a HITRAN char for that index """
+    if ind < 10:
+        return "'{}'".format(ind)
+    elif ind == 10:
+        return "'0'"
+    elif ind == 11:
+        return "'A'"
+    elif ind == 12:
+        return "'B'"
+    raise ValueError("Invalid isotopologue index: {}".format(ind))
+
+
 def get_latest_molparam_map(molparam_txt_file=None):
     """ Generates a version of latest_molparam_map used in hitran_species.cc
 
@@ -20,16 +33,6 @@ def get_latest_molparam_map(molparam_txt_file=None):
     3. isotopologue string: isotopologue identifier in HITRAN notation
     4. abundance: natural abundance of the isotopologue
     """
-    def pos2char(ind):
-        """ Convert an isotoplogue index to a HITRAN char for that index """
-        if ind < 10:
-            return "'{}'".format(ind)
-        elif ind == 10:
-            return "'0'"
-        elif ind == 11:
-            return "'A'"
-        elif ind == 12:
-            return "'B'"
 
     if molparam_txt_file:
         molparam_txt = open(molparam_txt_file, 'r').read().split('\n')
@@ -52,6 +55,28 @@ def get_latest_molparam_map(molparam_txt_file=None):
         else:
             out[spec].append([specnum, pos, vec[0], vec[1]])
             pos += 1
+    return out
+
+
+def to_cat_data(molparam_txt_file=None):
+    """ Converts the molparam.txt file to a format suitable for catdatabase input.
+
+    The output is printed to stream with print() as the intent is to use this
+    output in ARTS directly.
+    """
+
+    import pyarts3 as pyarts
+    data = get_latest_molparam_map(molparam_txt_file)
+
+    out = []
+    for spec in data:
+        for entry in data[spec]:
+            x = pyarts.arts.HitranSpeciesInfo()
+            x.spec = pyarts.arts.SpeciesIsotope(spec + '-' + entry[2])
+            x.hitind = int(entry[0])
+            x.hitchar = pos2char(entry[1])[1]
+            x.ratio = float(entry[3])
+            out.append(x)
     return out
 
 

@@ -50,6 +50,13 @@ with physical units of [m :math:`^5` per molecule :math:`^2`].
 )--",
   };
 
+  wsg_data["FileType"] = {
+      .file = "enumsFileType.h",
+      .desc =
+          R"--(A choice of file format types.
+)--",
+  };
+
   wsg_data["SpeciesEnumPair"] = {
       .file = "cia.h",
       .desc =

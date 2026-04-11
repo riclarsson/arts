@@ -1,5 +1,7 @@
 #pragma once
 
+#include <enums.h>
+
 #include "rtepack_mueller_matrix.h"
 #include "rtepack_propagation_matrix.h"
 #include "rtepack_spectral_matrix.h"

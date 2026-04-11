@@ -1,13 +1,15 @@
 #include <workspace.h>
 #include <workspace_group_friends.h>
 
+#include <cstdio>
+#include <cstdlib>
 #include <ranges>
 #include <string>
 
 #include "pydocs.h"
 
 namespace {
-void implement_convert_const_py_object() {
+void implement_convert_const_py_object() try {
   const auto& wsgs = internal_workspace_groups();
 
   std::ofstream os("py_auto_wsg_convert.cpp");
@@ -88,9 +90,13 @@ bool convert_ref(Wsv& wsv, const py::object * const x) {{
   }
 
   os << "\n  return false;\n}\n}\n";
+} catch (const std::exception& e) {
+  std::println(
+      stderr, "Error in implement_convert_const_py_object: {}", e.what());
+  throw;
 }
 
-void implement_from_const_py_object() {
+void implement_from_const_py_object() try {
   std::ofstream os("py_auto_wsg_from_const_py_object.cpp");
   std::println(os, R"--(#include <py_auto_wsg.h>
 #include <nanobind/stl/shared_ptr.h>
@@ -109,9 +115,12 @@ Wsv from(const py::object * const x) {{
 }}
 }}  // namespace Python
 )--");
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in implement_from_const_py_object: {}", e.what());
+  throw;
 }
 
-void implement_from_py_object() {
+void implement_from_py_object() try {
   const auto& wsgs = internal_workspace_groups();
 
   std::ofstream os("py_auto_wsg_from_py_object.cpp");
@@ -148,9 +157,12 @@ Wsv from(py::object * const x) {
 }
 }  // namespace Python
 )--";
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in implement_from_py_object: {}", e.what());
+  throw;
 }
 
-void implement_string_type() {
+void implement_string_type() try {
   std::ofstream os("py_auto_wsg_string_type.cpp");
   os << R"--(#include <py_auto_wsg.h>
 #include <nanobind/stl/shared_ptr.h>
@@ -167,9 +179,12 @@ std::string type(const py::object * const x) {
 }
 }  // namespace Python
 )--";
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in implement_string_type: {}", e.what());
+  throw;
 }
 
-void implement_to_py_wsv() {
+void implement_to_py_wsv() try {
   const auto& wsgs = internal_workspace_groups();
 
   std::ofstream os("py_auto_wsg_to_py_wsv.cpp");
@@ -203,9 +218,12 @@ py::object to_py(const Wsv& wsv) {{
 }
 }  // namespace Python
 )--";
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in implement_to_py_wsv: {}", e.what());
+  throw;
 }
 
-void groups(const std::string& fname) {
+void groups(const std::string& fname) try {
   const auto& wsgs = internal_workspace_groups();
 
   implement_from_const_py_object();
@@ -295,9 +313,12 @@ std::string type(const std::variant<std::shared_ptr<T>...> * const x)  {
 }  // namespace Python
 
 )--";
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in groups: {}", e.what());
+  throw;
 }
 
-void groupdocs(const std::string& fname) {
+void groupdocs(const std::string& fname) try {
   const auto& wsgs = internal_workspace_groups();
 
   std::ofstream osh(fname + ".h");
@@ -340,9 +361,12 @@ struct PythonWorkspaceGroupInfo<{0}> {{
                  group,
                  info);
   }
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in groupdocs: {}", e.what());
+  throw;
 }
 
-void agenda_operators() {
+void agenda_operators() try {
   const auto& wsv = internal_workspace_variables();
 
   std::ofstream cpp("py_auto_agenda_operators.cpp");
@@ -465,11 +489,16 @@ Failure to follow these rules will result in a runtime error.
   }
 
   cpp << "}}\n";
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in agenda_operators: {}", e.what());
 }
 }  // namespace
 
-int main() {
+int main() try {
   groups("py_auto_wsg");
   groupdocs("py_auto_wsgdocs");
   agenda_operators();
+} catch (const std::exception& e) {
+  std::println(stderr, "Error: {}", e.what());
+  return EXIT_FAILURE;
 }

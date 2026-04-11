@@ -31,6 +31,14 @@ using std::exp;
 using std::expm1;
 
 namespace lbl {
+Numeric einstein_a(
+    Numeric s, Numeric gu, Numeric e0, Numeric f0, Numeric T, Numeric Q) {
+  //! Note negative value because expm1 is used as a more accurate form of (1 - exp(x)) for exp(x) close to 1.
+
+  return -8.0 * pi * Q * s /
+         (gu * exp(-e0 / (k * T)) * expm1(-(h * f0) / (k * T)) * pow2(c / f0));
+}
+
 void band_data::sort(LineByLineVariable v) {
   using enum LineByLineVariable;
   switch (v) {
@@ -150,10 +158,7 @@ const Numeric& line_key::get_value(const AbsorptionBands& b) const {
                                       const Numeric T0) const {
   const Numeric Q0 = PartitionFunctions::Q(T0, isot);
 
-  //! Note negative value because expm1 is used as a more accurate form of (1 - exp(x)) for exp(x) close to 1.
-  return -8.0 * pi * Q0 * s /
-         (gu * exp(-e0 / (k * T0)) * expm1(-(h * f0) / (k * T0)) *
-          pow2(c / f0));
+  return einstein_a(s, gu, e0, f0, T0, Q0);
 }
 
 Numeric line::hitran_a(const Numeric hitran_s,

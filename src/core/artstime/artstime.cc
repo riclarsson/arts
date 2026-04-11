@@ -9,7 +9,7 @@
 #include "artstime.h"
 
 #include <debug.h>
-#include <enumsTimeStepType.h>
+#include <enums.h>
 #include <fast_float/fast_float.h>
 
 #include <charconv>

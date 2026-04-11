@@ -1,5 +1,6 @@
 #include "arts_options.h"
 
+#include <auto_species_enum_info.h>
 #include <mystring.h>
 
 #include <algorithm>
@@ -287,9 +288,44 @@ values in relevant calculations.  Or it might simply disable a functionality.
       .name = "PartitionFunctionsType",
       .desc =
           R"(Type of partition function data.
+
+This is only used by the partition functions setup during compilation.
+Each type represent a different way to store and compute the partition function of
+an isotopologue in the :class:`~pyarts3.arts.PartitionFunctionsData` type.
+
+The types, how they compute, and how they store date are as follows:
+
+.. rubric:: Interp
+
+The data contains the temperature grid and the corresponding partition function values.  The first
+column is the temperature grid.  It must be in increasing order.
+The second column is the partition function values.  The partition function is simply computed
+by linear interpolation between the grid points.
+
+.. rubric:: Constant
+
+The data contains a single value, which is the constant partition function value for all temperatures.
+
+.. rubric:: Coeff
+
+The data contains the coefficients of a polynomial expansion
+of the partition function as a function of temperature.
+The partition function is computed by evaluating the polynomial at the given temperature.
+The order of the polynomial is that the first coefficient is the constant term,
+the second coefficient is the linear term, etc.
+
+.. rubric:: StaticInterp
+
+This is very similar to the interp-type, but the grid-values are assumed to be separated
+by a constant value.  This constant value allows for a more efficient lookup and interpolation
+of the partition function values.  The layout of the data is otherwise the same as the interp-type,
+with the first column being the temperature grid and the second column being
+the partition function values.  The first column must be in increasing order,
+and the difference between consecutive values must be constant.
 )",
       .values_and_desc =
           {Value{"Interp", "Interpolate the data"},
+           Value{"Constant", "Use constant value"},
            Value{"Coeff", "Use as polynomial coefficients"},
            Value{
                "StaticInterp",
@@ -317,132 +353,24 @@ This includes *AbsorptionLookupTables*, *CIARecord*, *XsecRecord*, and *Absorpti
 Specifically for the latter, the inner *AbsorptionLine* type has line shape
 parameters that are mapped to the species identifier.
 )",
-      .values_and_desc =
-          {Value{"Bath", "AIR", "Any non-descript species"},
-           Value{"Water", "H2O", "Water"},
-           Value{"CarbonDioxide", "CO2", "Carbon Dioxide"},
-           Value{"Ozone", "O3", "Ozone"},
-           Value{"NitrogenOxide", "N2O", "Nitrogen Oxide"},
-           Value{"CarbonMonoxide", "CO", "Carbon Monoxide"},
-           Value{"Methane", "CH4", "Methane"},
-           Value{"Oxygen", "O2", "Oxygen"},
-           Value{"NitricOxide", "NO", "Nitric Oxide"},
-           Value{"SulfurDioxide", "SO2", "Sulfur Dioxide"},
-           Value{"NitrogenDioxide", "NO2", "Nitrogen Dioxide"},
-           Value{"Ammonia", "NH3", "Ammonia"},
-           Value{"NitricAcid", "HNO3", "Nitric Acid"},
-           Value{"Hydroxyl", "OH", "Hydroxyl"},
-           Value{"HydrogenFluoride", "HF", "Hydrogen Fluoride"},
-           Value{"HydrogenChloride", "HCl", "Hydrogen Chloride"},
-           Value{"HydrogenBromide", "HBr", "Hydrogen Bromide"},
-           Value{"HydrogenIodide", "HI", "Hydrogen Iodide"},
-           Value{"ChlorineMonoxide", "ClO", "Chlorine Monoxide"},
-           Value{"CarbonylSulfide", "OCS", "Carbonyl Sulfide"},
-           Value{"Formaldehyde", "H2CO", "Formaldehyde"},
-           Value{"HeavyFormaldehyde", "HDCO", "Heavy Formaldehyde"},
-           Value{"VeryHeavyFormaldehyde", "D2CO", "Very Heavy Formaldehyde"},
-           Value{"HypochlorousAcid", "HOCl", "Hypochlorous Acid"},
-           Value{"Nitrogen", "N2", "Nitrogen"},
-           Value{"HydrogenCyanide", "HCN", "Hydrogen Cyanide"},
-           Value{"Chloromethane", "CH3Cl", "Chloromethane"},
-           Value{"HydrogenPeroxide", "H2O2", "Hydrogen Peroxide"},
-           Value{"Acetylene", "C2H2", "Acetylene"},
-           Value{"Ethane", "C2H6", "Ethane"},
-           Value{"Phosphine", "PH3", "Phosphine"},
-           Value{"CarbonylFluoride", "COF2", "Carbonyl Fluoride"},
-           Value{"SulfurHexafluoride", "SF6", "Sulfur Hexafluoride"},
-           Value{"HydrogenSulfide", "H2S", "Hydrogen Sulfide"},
-           Value{"FormicAcid", "HCOOH", "Formic Acid"},
-           Value{"LeftHeavyFormicAcid", "DCOOH", "Left Heavy Formic Acid"},
-           Value{"RightHeavyFormicAcid", "HCOOD", "Right Heavy Formic Acid"},
-           Value{"Hydroperoxyl", "HO2", "Hydroperoxyl"},
-           Value{"OxygenAtom", "O", "Oxygen atom"},
-           Value{"ChlorineNitrate", "ClONO2", "Chlorine Nitrate"},
-           Value{"NitricOxideCation", "NO+", "Nitric Oxide Cation"},
-           Value{"HypobromousAcid", "HOBr", "Hypobromous Acid"},
-           Value{"Ethylene", "C2H4", "Ethylene"},
-           Value{"Methanol", "CH3OH", "Methanol"},
-           Value{"Bromomethane", "CH3Br", "Bromomethane"},
-           Value{"Acetonitrile", "CH3CN", "Acetonitrile"},
-           Value{"HeavyAcetonitrile", "CH2DCN", "Heavy Acetonitrile"},
-           Value{"CarbonTetrafluoride", "CF4", "Carbon Tetrafluoride"},
-           Value{"Diacetylene", "C4H2", "Diacetylene"},
-           Value{"Cyanoacetylene", "HC3N", "Cyanoacetylene"},
-           Value{"Hydrogen", "H2", "Hydrogen"},
-           Value{"CarbonMonosulfide", "CS", "Carbon Monosulfide"},
-           Value{"SulfurTrioxide", "SO3", "Sulfur Trioxide"},
-           Value{"Cyanogen", "C2N2", "Cyanogen"},
-           Value{"Phosgene", "COCl2", "Phosgene"},
-           Value{"SulfurMonoxide", "SO", "Sulfur Monoxide"},
-           Value{"CarbonDisulfide", "CS2", "Carbon Disulfide"},
-           Value{"Methyl", "CH3", "Methyl"},
-           Value{"Cyclopropene", "C3H4", "Cyclopropene"},
-           Value{"SulfuricAcid", "H2SO4", "Sulfuric Acid"},
-           Value{"HydrogenIsocyanide", "HNC", "Hydrogen Isocyanide"},
-           Value{"BromineMonoxide", "BrO", "Bromine Monoxide"},
-           Value{"ChlorineDioxide", "OClO", "Chlorine Dioxide"},
-           Value{"Propane", "C3H8", "Propane"},
-           Value{"Helium", "He", "Helium atom"},
-           Value{"ChlorineMonoxideDimer", "Cl2O2", "Chlorine Monoxide Dimer"},
-           Value{"HydrogenAtom", "H", "Hydrogen atom"},
-           Value{"Argon", "Ar", "Argon atom"},
-           Value{"Hexafluoroethane", "C2F6", "Hexafluoroethane"},
-           Value{"Perfluoropropane", "C3F8", "Perfluoropropane"},
-           Value{"Perfluorobutane", "C4F10", "Perfluorobutane"},
-           Value{"Perfluoropentane", "C5F12", "Perfluoropentane"},
-           Value{"Perfluorohexane", "C6F14", "Perfluorohexane"},
-           Value{"Perfluorooctane", "C8F18", "Perfluorooctane"},
-           Value{"Perfluorocyclobutane", "cC4F8", "Perfluorocyclobutane"},
-           Value{"CarbonTetrachloride", "CCl4", "Carbon Tetrachloride"},
-           Value{"CFC11", "CFC11", "CFC11"},
-           Value{"CFC113", "CFC113", "CFC113"},
-           Value{"CFC114", "CFC114", "CFC114"},
-           Value{"CFC115", "CFC115", "CFC115"},
-           Value{"CFC12", "CFC12", "CFC12"},
-           Value{"Dichloromethane", "CH2Cl2", "Dichloromethane"},
-           Value{"Trichloroethane", "CH3CCl3", "Trichloroethane"},
-           Value{"Trichloromethane", "CHCl3", "Trichloromethane"},
-           Value{"Bromochlorodifluoromethane",
-                 "Halon1211",
-                 "Bromochlorodifluoromethane"},
-           Value{"Bromotrifluoromethane", "Halon1301", "Bromotrifluoromethane"},
-           Value{"Dibromotetrafluoroethane",
-                 "Halon2402",
-                 "Dibromotetrafluoroethane"},
-           Value{"HCFC141b", "HCFC141b", "HCFC141b"},
-           Value{"HCFC142b", "HCFC142b", "HCFC142b"},
-           Value{"HCFC22", "HCFC22", "HCFC22"},
-           Value{"HFC125", "HFC125", "HFC125"},
-           Value{"HFC134a", "HFC134a", "HFC134a"},
-           Value{"HFC143a", "HFC143a", "HFC143a"},
-           Value{"HFC152a", "HFC152a", "HFC152a"},
-           Value{"HFC227ea", "HFC227ea", "HFC227ea"},
-           Value{"HFC23", "HFC23", "HFC23"},
-           Value{"HFC236fa", "HFC236fa", "HFC236fa"},
-           Value{"HFC245fa", "HFC245fa", "HFC245fa"},
-           Value{"HFC32", "HFC32", "HFC32"},
-           Value{"HFC365mfc", "HFC365mfc", "HFC365mfc"},
-           Value{"NitrogenTrifluoride", "NF3", "Nitrogen Trifluoride"},
-           Value{"TrihydrogenCation", "H3+", "Trihydrogen Cation"},
-           Value{"SulfurDimer", "S2", "Sulfur Dimer"},
-           Value{"CarbonylChlorofluoride", "COFCl", "Carbonyl Chlorofluoride"},
-           Value{"NitrousAcid", "HONO", "Nitrous Acid"},
-           Value{"NitrylChloride", "ClNO2", "Nitryl Chloride"},
-           Value{"SulfurylFluoride", "SO2F2", "Sulfuryl Fluoride"},
-           Value{"HFC4310mee", "HFC4310mee", "HFC4310mee"},
-           Value{"Germane", "GeH4", "Germane"},
-           Value{"Iodomethane", "CH3I", "Iodomethane"},
-           Value{"Fluoromethane", "CH3F", "Fluoromethane"},
-           Value{"Arsine", "AsH3", "Arsine"},
-           Value{"Benzene", "C6H6", "Benzene"},
-           Value{"liquidcloud", "liquidcloud", "liquidcloud tag"},
-           Value{"icecloud", "icecloud", "icecloud tag"},
-           Value{"rain", "rain", "rain tag"},
-           Value{"free_electrons", "free_electrons", "free electrons tag"},
-           Value{"particles", "particles", "particles tag"},
-           Value{"unused", "unused", "unused tag (used internally)"}},
+      .values_and_desc = {Value{
+          "Bath",
+          "AIR",
+          "An all encompassing species for the rest of the atmosphere"}},
       .preferred_print = 1,
   });
+
+  const auto& species = get_species_enum_info();
+  for (const auto& info : species) {
+    opts.back().values_and_desc.emplace_back(
+        Value{info.longname,
+              info.shortname,
+              std::format("A species short-named {}", info.shortname)});
+  }
+  opts.back().values_and_desc.emplace_back(Value{
+      "unused",
+      "unused",
+      "This indicates that the concept of a species is not used in the context of the relevant option"});
 
   opts.emplace_back(EnumeratedOption{
       .name = "QuantumNumberType",
@@ -824,14 +752,15 @@ Lastly, the unit option of course just retains the current state [W / m :math:`^
                  "Unit spectral radiance [W / m :math:`^{2}` Hz sr]"}},
   });
 
-  opts.emplace_back(EnumeratedOption{
-      .name = "FileType",
-      .desc = "A choice of file format types.\n",
-      .values_and_desc =
-          {Value{"ascii", "ASCII", "Ascii", "text", "Save as ASCII"},
-           Value{"zascii", "ZASCII", "Zip", "zip", "Save as zipped ASCII"},
-           Value{"binary", "BINARY", "Binary", "bin", "Save as binary data"}},
-  });
+  //  Manually defined to decouple file IO from this code (to help species generation)
+  //   opts.emplace_back(EnumeratedOption{
+  //       .name = "FileType",
+  //       .desc = "A choice of file format types.\n",
+  //       .values_and_desc =
+  //           {Value{"ascii", "ASCII", "Ascii", "text", "Save as ASCII"},
+  //            Value{"zascii", "ZASCII", "Zip", "zip", "Save as zipped ASCII"},
+  //            Value{"binary", "BINARY", "Binary", "bin", "Save as binary data"}},
+  //   });
 
   opts.emplace_back(EnumeratedOption{
       .name = "EarthEllipsoid",

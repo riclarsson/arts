@@ -27,10 +27,14 @@ std::optional<std::string> to_helper_string(const T&) {
 struct format_tags;
 template <typename T>
 concept arts_inner_fmt =
-    requires(std::formatter<T> x) { x.inner_fmt().tags; } and
+    requires(std::formatter<std::remove_cvref_t<T>> x) {
+      x.inner_fmt().tags;
+    } and
     std::same_as<
         format_tags,
-        std::remove_cvref_t<decltype(std::formatter<T>{}.inner_fmt().tags)>>;
+        std::remove_cvref_t<decltype(std::formatter<std::remove_cvref_t<T>>{}
+                                         .inner_fmt()
+                                         .tags)>>;
 
 template <typename T>
 concept arts_formattable =
@@ -364,6 +368,7 @@ struct std::formatter<std::map<Key, Value>> {
     tags.add_if_bracket(ctx, '{');
     format_map_iterable(ctx, inner_fmt().tags, v);
     tags.add_if_bracket(ctx, '}');
+
     return ctx.out();
   }
 };
@@ -419,9 +424,9 @@ struct std::formatter<std::set<T>> {
         return inner_fmt().tags.format(ctx, *x);
     }
 
-    inner_fmt().tags.add_if_bracket(ctx, '[');
+    inner_fmt().tags.add_if_bracket(ctx, '{');
     format_value_iterable(ctx, inner_fmt().tags, v);
-    inner_fmt().tags.add_if_bracket(ctx, ']');
+    inner_fmt().tags.add_if_bracket(ctx, '}');
     return ctx.out();
   }
 };
@@ -449,9 +454,9 @@ struct std::formatter<std::unordered_set<T>> {
         return inner_fmt().tags.format(ctx, *x);
     }
 
-    inner_fmt().tags.add_if_bracket(ctx, '[');
+    inner_fmt().tags.add_if_bracket(ctx, '{');
     format_value_iterable(ctx, inner_fmt().tags, v);
-    inner_fmt().tags.add_if_bracket(ctx, ']');
+    inner_fmt().tags.add_if_bracket(ctx, '}');
     return ctx.out();
   }
 };
