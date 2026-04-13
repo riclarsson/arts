@@ -412,15 +412,18 @@ Numeric, Vector, or Matrix
 
   py::class_<SensorMetaInfo> smi(m, "SensorMetaInfo");
   generic_interface(smi);
-  smi.def_rw("data", &SensorMetaInfo::data, "The variant gridded field data")
+  smi.def_rw(
+         "data",
+         &SensorMetaInfo::data,
+         "The variant gridded field data\n\n.. :class:`~pyarts3.arts.GriddedField1` or :class:`~pyarts3.arts.CameraGriddedField`")
       .def_prop_ro(
           "count",
           &SensorMetaInfo::count,
-          "Total number of scalar elements (product of all grid sizes)");
+          "Total number of scalar elements (product of all grid sizes)\n\n.. :class:`int`");
 
-  auto a2 = py::bind_vector<ArrayOfSensorMetaInfo,
-                            py::rv_policy::reference_internal>(
-      m, "ArrayOfSensorMetaInfo");
+  auto a2 =
+      py::bind_vector<ArrayOfSensorMetaInfo, py::rv_policy::reference_internal>(
+          m, "ArrayOfSensorMetaInfo");
   a2.doc() = "Array of SensorMetaInfo";
   generic_interface(a2);
   vector_interface(a2);

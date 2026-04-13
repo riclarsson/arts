@@ -412,7 +412,7 @@ void high_performance(
 
       ArrayOfPropagationPathPoint ray_path;
       auto &[spectral_rad, spectral_rad_jac] =
-          cache[&freq_grid][&poslos_vec][ip];
+          cache.at(&freq_grid).at(&poslos_vec).at(ip);
 
       spectral_rad_observer_agendaExecute(ws,
                                           spectral_rad,
@@ -445,13 +445,14 @@ void high_performance(
   for (Size iv = 0; iv < M; ++iv) {
     const SensorObsel &obsel = measurement_sensor[iv];
 
-    auto &data = cache[obsel.f_grid_ptr().get()][obsel.poslos_grid_ptr().get()];
+    auto &data =
+        cache.at(obsel.f_grid_ptr().get()).at(obsel.poslos_grid_ptr().get());
 
     for (auto &sparse_weights : obsel.weight_matrix()) {
       const Size ip    = sparse_weights.irow;
       const Size ifreq = sparse_weights.icol;
 
-      const auto &[spectral_rad, spectral_rad_jac] = data[ip];
+      const auto &[spectral_rad, spectral_rad_jac] = data.at(ip);
 
       measurement_vec[iv] += dot(sparse_weights.data, spectral_rad[ifreq]);
 

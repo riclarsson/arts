@@ -51,7 +51,6 @@ ws.abs_speciesSet(
 )
 
 # Download and read spectral line data
-pa.data.download()
 ws.ReadCatalogData()
 
 # Apply frequency cutoff to speed up calculations

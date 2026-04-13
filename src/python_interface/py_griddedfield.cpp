@@ -110,6 +110,7 @@ void py_griddedfield(py::module_& m) try {
   implicit_convert_gf<GriddedField3>(sgf3num);
 
   py::class_<sensor::CameraGriddedField> cgf(m, "CameraGriddedField");
+  cgf.doc() = "A gridded field for camera sensors";
   gridded_data_interface(cgf);
   generic_interface(cgf);
 
