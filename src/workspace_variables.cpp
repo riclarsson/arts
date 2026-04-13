@@ -995,6 +995,19 @@ Size is number of elements of the sensor.
       .type = "ArrayOfSensorObsel",
   };
 
+  wsv_data["measurement_sensor_meta"] = {
+      .desc = R"(Metadata describing each sensor's block in *measurement_vec*.
+
+Each element corresponds to one ``measurement_sensorAdd*`` call and
+describes how its contiguous block of *measurement_sensor* /
+*measurement_vec* entries maps to a structured gridded field.
+
+The start index of each block is not stored explicitly; it is the
+cumulative sum of ``count()`` from preceding elements.
+)",
+      .type = "ArrayOfSensorMetaInfo",
+  };
+
   //! Solar input
 
   wsv_data["sun"] = {

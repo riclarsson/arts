@@ -7,6 +7,7 @@
 #include <nanobind/stl/vector.h>
 #include <obsel.h>
 #include <python_interface.h>
+#include <sensor_meta_info.h>
 
 #include <algorithm>
 #include <memory>
@@ -65,11 +66,21 @@ void py_sensor(py::module_& m) try {
         using enum SensorKeyType;
 
         switch (x) {
-          case alt:  stdr::sort(v, {}, &SensorPosLos::alt); break;
-          case lat:  stdr::sort(v, {}, &SensorPosLos::lat); break;
-          case lon:  stdr::sort(v, {}, &SensorPosLos::lon); break;
-          case zen:  stdr::sort(v, {}, &SensorPosLos::zen); break;
-          case azi:  stdr::sort(v, {}, &SensorPosLos::azi); break;
+          case alt:
+            stdr::sort(v, {}, [](const SensorPosLos& a) { return a.alt(); });
+            break;
+          case lat:
+            stdr::sort(v, {}, [](const SensorPosLos& a) { return a.lat(); });
+            break;
+          case lon:
+            stdr::sort(v, {}, [](const SensorPosLos& a) { return a.lon(); });
+            break;
+          case zen:
+            stdr::sort(v, {}, [](const SensorPosLos& a) { return a.zen(); });
+            break;
+          case azi:
+            stdr::sort(v, {}, [](const SensorPosLos& a) { return a.azi(); });
+            break;
           case freq: break;
         }
 
@@ -398,6 +409,22 @@ Numeric, Vector, or Matrix
       as part of the same "physical" sensor, i.e., a correction in position or line-of-sight
       of one channel will affect all channels.
 )");
+
+  py::class_<SensorMetaInfo> smi(m, "SensorMetaInfo");
+  generic_interface(smi);
+  smi.def_rw("data", &SensorMetaInfo::data, "The variant gridded field data")
+      .def_prop_ro(
+          "count",
+          &SensorMetaInfo::count,
+          "Total number of scalar elements (product of all grid sizes)");
+
+  auto a2 = py::bind_vector<ArrayOfSensorMetaInfo,
+                            py::rv_policy::reference_internal>(
+      m, "ArrayOfSensorMetaInfo");
+  a2.doc() = "Array of SensorMetaInfo";
+  generic_interface(a2);
+  vector_interface(a2);
+
 } catch (std::exception& e) {
   throw std::runtime_error(
       std::format("DEV ERROR:\nCannot initialize sensors\n{}", e.what()));

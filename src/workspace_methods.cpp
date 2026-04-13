@@ -1457,13 +1457,14 @@ This is based on the works cited here: https://hitran.org/mtckd/
                     std::nullopt,
                     std::nullopt,
                     std::nullopt},
-      .gin_desc  = {R"--(Reference temperature)--",
-                    R"--(Reference pressure)--",
-                    R"--(Self absorption [1/(cm-1 molecules/cm^2])--",
-                    R"--(Foreign absorption [1/(cm-1 molecules/cm^2)])--",
-                    R"--(Foreign closure absorption [1/(cm-1 molecules/cm^2)])--",
-                    R"--(Wavenumbers [cm-1])--",
-                    R"--(Self temperature exponent [-])--"},
+      .gin_desc =
+          {R"--(Reference temperature)--",
+           R"--(Reference pressure)--",
+           R"--(Self absorption [1/(cm-1 molecules/cm^2])--",
+           R"--(Foreign absorption [1/(cm-1 molecules/cm^2)])--",
+           R"--(Foreign closure absorption [1/(cm-1 molecules/cm^2)])--",
+           R"--(Wavenumbers [cm-1])--",
+           R"--(Self temperature exponent [-])--"},
   };
 
   wsm_data["abs_predef_dataInit"] = {
@@ -4461,16 +4462,26 @@ The core calculations happens inside the *spectral_rad_operator*.
           R"--(Sets measurement vector by looping over all sensor elements
 
 The core calculations happens inside the *spectral_rad_observer_agenda*.
+
+.. tip::
+
+   There is a low-memory alternative to the ``kernel`` option.  The default
+   is recommended if you have memory, however.
 )--",
-      .author         = {"Richard Larsson"},
-      .out            = {"measurement_vec", "measurement_jac"},
-      .in             = {"measurement_sensor",
-                         "jac_targets",
-                         "atm_field",
-                         "surf_field",
-                         "subsurf_field",
-                         "spectral_rad_transform_operator",
-                         "spectral_rad_observer_agenda"},
+      .author    = {"Richard Larsson"},
+      .out       = {"measurement_vec", "measurement_jac"},
+      .in        = {"measurement_sensor",
+                    "jac_targets",
+                    "atm_field",
+                    "surf_field",
+                    "subsurf_field",
+                    "spectral_rad_transform_operator",
+                    "spectral_rad_observer_agenda"},
+      .gin       = {"kernel"},
+      .gin_type  = {"String"},
+      .gin_value = {String{"High Performance"}},
+      .gin_desc =
+          {"The kernel to use for the spectral radiance calculations.  See type information for options."},
       .pass_workspace = true,
   };
 
@@ -4527,10 +4538,10 @@ The core calculations happens inside the *spectral_rad_observer_agenda*.
 
   wsm_data["measurement_sensorInit"] = {
       .desc =
-          R"--(Initialize *measurement_sensor* to empty.
+          R"--(Initialize *measurement_sensor* and *measurement_sensor_meta* to empty.
 )--",
       .author = {"Richard Larsson"},
-      .out    = {"measurement_sensor"},
+      .out    = {"measurement_sensor", "measurement_sensor_meta"},
   };
 
   wsm_data["measurement_sensorAddSimple"] = {
@@ -4539,10 +4550,10 @@ The core calculations happens inside the *spectral_rad_observer_agenda*.
 
 All elements share position, line-of-sight, and frequency grid.
 )--",
-      .author    = {"Richard Larsson"},
-      .out       = {"measurement_sensor"},
-      .in        = {"measurement_sensor", "freq_grid"},
-      .gin       = {"pos", "los", "pol"},
+      .author = {"Richard Larsson"},
+      .out    = {"measurement_sensor", "measurement_sensor_meta"},
+      .in     = {"measurement_sensor", "measurement_sensor_meta", "freq_grid"},
+      .gin    = {"pos", "los", "pol"},
       .gin_type  = {"Vector3", "Vector2", "Stokvec"},
       .gin_value = {std::nullopt,
                     std::nullopt,
@@ -4557,10 +4568,10 @@ All elements share position, line-of-sight, and frequency grid.
       .desc =
           R"--(Add a sensor to *measurement_sensor* that has a Gaussian zenith response.
 )--",
-      .author   = {"Richard Larsson"},
-      .out      = {"measurement_sensor"},
-      .in       = {"measurement_sensor", "freq_grid"},
-      .gin      = {"pos", "los", "pol", "dzen_grid", "std_zen"},
+      .author = {"Richard Larsson"},
+      .out    = {"measurement_sensor", "measurement_sensor_meta"},
+      .in     = {"measurement_sensor", "measurement_sensor_meta", "freq_grid"},
+      .gin    = {"pos", "los", "pol", "dzen_grid", "std_zen"},
       .gin_type = {"Vector3", "Vector2", "Stokvec", "AscendingGrid", "Numeric"},
       .gin_value = {std::nullopt,
                     std::nullopt,
@@ -4586,10 +4597,10 @@ Note that this means you only get "half" a Gaussian channel for the outermost ch
 The I component's distribution is normalized to 1 or 0 by itself, while
 the Q, U, and V components' hypotenuse are normalized to 1 or 0 together.
 )--",
-      .author    = {"Richard Larsson"},
-      .out       = {"measurement_sensor"},
-      .in        = {"measurement_sensor", "freq_grid"},
-      .gin       = {"std", "pos", "los", "pol"},
+      .author = {"Richard Larsson"},
+      .out    = {"measurement_sensor", "measurement_sensor_meta"},
+      .in     = {"measurement_sensor", "measurement_sensor_meta", "freq_grid"},
+      .gin    = {"std", "pos", "los", "pol"},
       .gin_type  = {"Numeric", "Vector3", "Vector2", "Stokvec"},
       .gin_value = {std::nullopt,
                     std::nullopt,
@@ -4635,8 +4646,8 @@ The quoted strings must be used as the grid names of the gridded field.
     is that the order of the dimensions do not change from the one above.
 )--",
       .author = {"Richard Larsson"},
-      .out    = {"measurement_sensor"},
-      .in     = {"measurement_sensor", "freq_grid"},
+      .out    = {"measurement_sensor", "measurement_sensor_meta"},
+      .in     = {"measurement_sensor", "measurement_sensor_meta", "freq_grid"},
       .gin    = {"pos", "los", "raw_sensor_perturbation", "normalize"},
       .gin_type =
           {"Vector3",
@@ -4652,6 +4663,99 @@ The quoted strings must be used as the grid names of the gridded field.
            "A line of sight [zenith, azimuth]",
            "The sensor perturbation grid",
            "Whether or not to normalize the perturbation to 1.0 for each element"},
+  };
+
+  wsm_data["measurement_sensorAddCamera"] = {
+      .desc =
+          R"--(Adds a simple thin-lens camera model to the measurement sensor.
+
+The camera is described by a CCD array of ``n_h`` x ``n_w`` pixels with physical
+dimensions ``ccd_h`` x ``ccd_w`` (in meters), a lens with the given ``focal_length``
+and ``aperture_diameter``, and a ``focus_distance`` that determines the in-focus
+plane distance from the lens.
+
+Each pixel maps to a unique line-of-sight direction computed via the thin-lens
+equation.  The image distance (lens-to-CCD) is derived from the thin-lens
+formula:
+
+.. math::
+
+    d_i = \frac{f \cdot d_o}{d_o - f}
+
+where ``f`` is the focal length and ``d_o`` is the focus distance.
+
+The angular offset of pixel ``(ih, iw)`` from the CCD center is:
+
+.. math::
+
+    \Delta\theta_{zen} = -\arctan\!\left(\frac{\Delta y}{d_i}\right),\quad
+    \Delta\theta_{azi} = -\arctan\!\left(\frac{\Delta x}{d_i}\right)
+
+(negated because the CCD image is inverted by the lens).
+
+A Dirac weight is assigned per pixel per frequency channel, yielding
+``n_h x n_w x nfreq`` observation elements.  All observation elements share
+the same frequency grid and the same PosLos grid (one entry per pixel).
+)--",
+      .author = {"Richard Larsson"},
+      .out    = {"measurement_sensor", "measurement_sensor_meta"},
+      .in     = {"measurement_sensor", "measurement_sensor_meta", "freq_grid"},
+      .gin    = {"pos",
+                 "los",
+                 "pol",
+                 "n_h",
+                 "n_w",
+                 "ccd_h",
+                 "ccd_w",
+                 "focal_length",
+                 "aperture_diameter",
+                 "focus_distance"},
+      .gin_type  = {"Vector3",
+                    "Vector2",
+                    "Stokvec",
+                    "Index",
+                    "Index",
+                    "Numeric",
+                    "Numeric",
+                    "Numeric",
+                    "Numeric",
+                    "Numeric"},
+      .gin_value = {std::nullopt,
+                    std::nullopt,
+                    rtepack::to_stokvec(PolarizationChoice::I),
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt,
+                    std::nullopt},
+      .gin_desc =
+          {"Observer position [alt, lat, lon]",
+           "Central pixel line of sight [zenith, azimuth]",
+           "Polarization Stokes weight per pixel",
+           "Number of pixels along the CCD height (rows)",
+           "Number of pixels along the CCD width (columns)",
+           "Physical height of the CCD in meters",
+           "Physical width of the CCD in meters",
+           "Focal length of the lens in meters",
+           "Diameter of the lens aperture in meters",
+           "Distance to the in-focus plane in meters (must be > focal_length)"},
+  };
+
+  wsm_data["measurement_sensor_metaFromMeasurementVec"] = {
+      .desc =
+          R"--(Fill *measurement_sensor_meta* gridded field data from *measurement_vec*.
+
+Each element in *measurement_sensor_meta* describes a contiguous block of
+*measurement_vec*.  This method copies those slices into the data tensor
+of each gridded field, making the structured per-sensor data directly
+accessible.  The start index of each block is derived from the cumulative
+``count()`` of preceding elements.
+)--",
+      .author = {"Richard Larsson"},
+      .out    = {"measurement_sensor_meta"},
+      .in     = {"measurement_sensor_meta", "measurement_vec"},
   };
 
   wsm_data["sun_pathFromObserverAgenda"] = {
@@ -4796,25 +4900,25 @@ Hence, a temperature of 0 means 0s the edges of the *freq_grid*.
   };
 
   wsm_data["spectral_rad_scat_pathSunsFirstOrderRayleigh"] = {
-      .desc           = R"--(Add *suns* to *spectral_rad_srcvec_path*.
+      .desc      = R"--(Add *suns* to *spectral_rad_srcvec_path*.
 )--",
-      .author         = {"Richard Larsson"},
-      .out            = {"spectral_rad_scat_path"},
-      .in             = {"spectral_propmat_scat_path",
-                         "ray_path",
-                         "ray_path_suns_path",
-                         "suns",
-                         "jac_targets",
-                         "freq_grid",
-                         "atm_field",
-                         "surf_field",
-                         "spectral_propmat_agenda",
-                         "rte_option"},
-      .gin            = {"depolarization_factor", "hse_derivative"},
-      .gin_type       = {"Numeric", "Index"},
-      .gin_value      = {Numeric{0.0}, Index{0}},
-      .gin_desc       = {R"--(The depolarization factor to use.)--",
-                         "Flag to compute the hypsometric distance derivatives"},
+      .author    = {"Richard Larsson"},
+      .out       = {"spectral_rad_scat_path"},
+      .in        = {"spectral_propmat_scat_path",
+                    "ray_path",
+                    "ray_path_suns_path",
+                    "suns",
+                    "jac_targets",
+                    "freq_grid",
+                    "atm_field",
+                    "surf_field",
+                    "spectral_propmat_agenda",
+                    "rte_option"},
+      .gin       = {"depolarization_factor", "hse_derivative"},
+      .gin_type  = {"Numeric", "Index"},
+      .gin_value = {Numeric{0.0}, Index{0}},
+      .gin_desc  = {R"--(The depolarization factor to use.)--",
+                    "Flag to compute the hypsometric distance derivatives"},
       .pass_workspace = true,
   };
 

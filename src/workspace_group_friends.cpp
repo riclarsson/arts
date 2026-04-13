@@ -521,6 +521,23 @@ well as the sampling device's polarization response.
 )",
   };
 
+  wsg_data["SensorMetaInfo"] = {
+      .file = "sensor_meta_info.h",
+      .desc = R"(Metadata describing a sensor's mapping from measurement_vec to a gridded field.
+
+Wraps a variant of gridded field types, one per sensor kind:
+
+- Passive FFTS: *SortedGriddedField1* — 1D grid of frequencies.
+- Camera: ``CameraGriddedField`` — 2D pixel grid (angular offsets from boresight)
+  plus a color/frequency axis.
+
+Grids are set at sensor construction time.  Data is zeroed and later filled
+from *measurement_vec* by *measurement_sensor_metaFromMeasurementVec*.
+The start index into *measurement_vec* is not stored; it is derived from
+the cumulative ``count()`` of preceding elements in the array.
+)",
+  };
+
   wsg_data["NamedGriddedField2"] = {
       .file = "matpack.h",
       .desc =

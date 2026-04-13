@@ -1,6 +1,8 @@
 #include <arts_omp.h>
 #include <atm.h>
+#include <enums.h>
 #include <jacobian.h>
+#include <obsel.h>
 #include <path_point.h>
 #include <physics_funcs.h>
 #include <rtepack.h>
@@ -9,6 +11,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <unordered_map>
 
 void spectral_rad_jacEmpty(StokvecMatrix &spectral_rad_jac,
                            const AscendingGrid &freq_grid,
@@ -295,7 +298,8 @@ location and the sensor element will not be found.
 }
 ARTS_METHOD_ERROR_CATCH
 
-void measurement_vecFromSensor(
+namespace {
+void low_memory(
     const Workspace &ws,
     Vector &measurement_vec,
     Matrix &measurement_jac,
@@ -305,22 +309,11 @@ void measurement_vecFromSensor(
     const SurfaceField &surf_field,
     const SubsurfaceField &subsurf_field,
     const SpectralRadianceTransformOperator &spectral_rad_transform_operator,
-    const Agenda &spectral_rad_observer_agenda) try {
+    const Agenda &spectral_rad_observer_agenda,
+    const SensorSimulations &simulations) {
   ARTS_TIME_REPORT
 
-  measurement_vec.resize(measurement_sensor.size());
-  measurement_vec = 0.0;
-
-  measurement_jac.resize(measurement_sensor.size(), jac_targets.x_size());
-  measurement_jac = 0.0;
-
-  if (measurement_sensor.empty()) return;
-
-  //! Check the observational elements that their dimensions are correct
-  for (auto &obsel : measurement_sensor) obsel.check();
-
-  const SensorSimulations simulations = collect_simulations(measurement_sensor);
-  const Size N                        = simulations.size();
+  const Size N = simulations.size();
 
   std::string error{};
 
@@ -372,5 +365,159 @@ void measurement_vecFromSensor(
   }
 
   ARTS_USER_ERROR_IF(not error.empty(), "Errors occurred:\n{:}", error);
+}
+
+void high_performance(
+    const Workspace &ws,
+    Vector &measurement_vec,
+    Matrix &measurement_jac,
+    const ArrayOfSensorObsel &measurement_sensor,
+    const JacobianTargets &jac_targets,
+    const AtmField &atm_field,
+    const SurfaceField &surf_field,
+    const SubsurfaceField &subsurf_field,
+    const SpectralRadianceTransformOperator &spectral_rad_transform_operator,
+    const Agenda &spectral_rad_observer_agenda,
+    const SensorSimulations &simulations) {
+  ARTS_TIME_REPORT
+
+  const Size N = simulations.size();
+  const Size M = measurement_vec.size();
+  const Size J = jac_targets.x_size();
+
+  std::unordered_map<
+      const AscendingGrid *,
+      std::unordered_map<const SensorPosLosVector *,
+                         std::vector<std::pair<StokvecVector, StokvecMatrix>>>>
+      cache;
+
+  for (Size i = 0; i < N; i++) {
+    const Size ip = simulations[i].iposlos;
+
+    if (ip == 0) {
+      cache[&simulations[i].freq_grid][&simulations[i].poslos_grid].resize(
+          simulations[i].poslos_grid.size());
+    }
+  }
+
+  std::string error{};
+
+  //! Dynamic scheduling as some simulations may take much longer time than others
+#pragma omp parallel for schedule(dynamic)
+  for (Size i = 0; i < N; i++) {
+    try {
+      const Size ip          = simulations[i].iposlos;
+      const auto &freq_grid  = simulations[i].freq_grid;
+      const auto &poslos_vec = simulations[i].poslos_grid;
+
+      ArrayOfPropagationPathPoint ray_path;
+      auto &[spectral_rad, spectral_rad_jac] =
+          cache[&freq_grid][&poslos_vec][ip];
+
+      spectral_rad_observer_agendaExecute(ws,
+                                          spectral_rad,
+                                          spectral_rad_jac,
+                                          ray_path,
+                                          freq_grid,
+                                          jac_targets,
+                                          poslos_vec[ip].pos,
+                                          poslos_vec[ip].los,
+                                          atm_field,
+                                          surf_field,
+                                          subsurf_field,
+                                          spectral_rad_observer_agenda);
+
+      ARTS_USER_ERROR_IF(ray_path.empty(), "No ray path found");
+      spectral_rad_transform_operator(
+          spectral_rad, spectral_rad_jac, freq_grid, ray_path.front());
+    } catch (const std::exception &e) {
+#pragma omp critical
+      if (error.empty()) {
+        error = std::format(
+            "Error in unflattening data for index {}: {}\n", i, e.what());
+      }
+    }
+  }
+
+  ARTS_USER_ERROR_IF(not error.empty(), "Errors occurred:\n{:}", error);
+
+#pragma omp parallel for schedule(dynamic)
+  for (Size iv = 0; iv < M; ++iv) {
+    const SensorObsel &obsel = measurement_sensor[iv];
+
+    auto &data = cache[obsel.f_grid_ptr().get()][obsel.poslos_grid_ptr().get()];
+
+    for (auto &sparse_weights : obsel.weight_matrix()) {
+      const Size ip    = sparse_weights.irow;
+      const Size ifreq = sparse_weights.icol;
+
+      const auto &[spectral_rad, spectral_rad_jac] = data[ip];
+
+      measurement_vec[iv] += dot(sparse_weights.data, spectral_rad[ifreq]);
+
+      auto jac   = measurement_jac[iv];
+      auto srjac = spectral_rad_jac[joker, ifreq];
+      for (Size ij = 0; ij < J; ij++) {
+        jac[ij] += dot(sparse_weights.data, srjac[ij]);
+      }
+    }
+  }
+}
+}  // namespace
+
+void measurement_vecFromSensor(
+    const Workspace &ws,
+    Vector &measurement_vec,
+    Matrix &measurement_jac,
+    const ArrayOfSensorObsel &measurement_sensor,
+    const JacobianTargets &jac_targets,
+    const AtmField &atm_field,
+    const SurfaceField &surf_field,
+    const SubsurfaceField &subsurf_field,
+    const SpectralRadianceTransformOperator &spectral_rad_transform_operator,
+    const Agenda &spectral_rad_observer_agenda,
+    const String &kernel) try {
+  ARTS_TIME_REPORT
+
+  measurement_vec.resize(measurement_sensor.size());
+  measurement_vec = 0.0;
+
+  measurement_jac.resize(measurement_sensor.size(), jac_targets.x_size());
+  measurement_jac = 0.0;
+
+  if (measurement_sensor.empty()) return;
+
+  //! Check the observational elements that their dimensions are correct
+  for (auto &obsel : measurement_sensor) obsel.check();
+
+  const SensorSimulations simulations = collect_simulations(measurement_sensor);
+
+  switch (to<MeasurementVectorSumupKernel>(kernel)) {
+    using enum MeasurementVectorSumupKernel;
+    case LowMem:
+      return low_memory(ws,
+                        measurement_vec,
+                        measurement_jac,
+                        measurement_sensor,
+                        jac_targets,
+                        atm_field,
+                        surf_field,
+                        subsurf_field,
+                        spectral_rad_transform_operator,
+                        spectral_rad_observer_agenda,
+                        simulations);
+    case HighPerf:
+      return high_performance(ws,
+                              measurement_vec,
+                              measurement_jac,
+                              measurement_sensor,
+                              jac_targets,
+                              atm_field,
+                              surf_field,
+                              subsurf_field,
+                              spectral_rad_transform_operator,
+                              spectral_rad_observer_agenda,
+                              simulations);
+  }
 }
 ARTS_METHOD_ERROR_CATCH

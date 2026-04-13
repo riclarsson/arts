@@ -44,6 +44,8 @@ def time_report(*, mode="plot", clear=True, scale=1.0, fig=None, mintime=None):
         If mode is "table", returns a string containing the time report in Markdown table format.
     """
 
+    assert mode in ["plot", "table"], f"Unknown mode {mode}, see method description for valid modes."
+
     r = pyarts.arts.globals.time_report(clear)
 
     m = None
