@@ -47,7 +47,7 @@ ws.freq_grid = np.array([freq_hz])
 
 # Select absorption species
 ws.abs_speciesSet(
-    species=["O2-PWR98", "H2O-PWR98", "H2O-ForeignContCKDMT400", "H2O-SelfContCKDMT400"]
+    species=["O2-PWR98", "H2O-PWR98"]
 )
 
 # Download and read spectral line data
