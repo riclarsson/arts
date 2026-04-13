@@ -100,7 +100,7 @@ ws.ray_path_observer_agendaSetGeometric()
 n_total = len(ws.measurement_sensor)
 print(f"Running forward model for {n_total} sensor elements ({n_h}x{n_w} pixels x {len(ws.freq_grid)} freq)...")
 
-ws.measurement_vecFromSensor()
+ws.measurement_vecFromSensor(kernel="High Performance")
 
 # 5. Fill meta from measurement_vec and extract the camera image
 ws.measurement_sensor_metaFromMeasurementVec()

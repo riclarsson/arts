@@ -495,29 +495,31 @@ void measurement_vecFromSensor(
   switch (to<MeasurementVectorSumupKernel>(kernel)) {
     using enum MeasurementVectorSumupKernel;
     case LowMem:
-      return low_memory(ws,
-                        measurement_vec,
-                        measurement_jac,
-                        measurement_sensor,
-                        jac_targets,
-                        atm_field,
-                        surf_field,
-                        subsurf_field,
-                        spectral_rad_transform_operator,
-                        spectral_rad_observer_agenda,
-                        simulations);
+      low_memory(ws,
+                 measurement_vec,
+                 measurement_jac,
+                 measurement_sensor,
+                 jac_targets,
+                 atm_field,
+                 surf_field,
+                 subsurf_field,
+                 spectral_rad_transform_operator,
+                 spectral_rad_observer_agenda,
+                 simulations);
+      break;
     case HighPerf:
-      return high_performance(ws,
-                              measurement_vec,
-                              measurement_jac,
-                              measurement_sensor,
-                              jac_targets,
-                              atm_field,
-                              surf_field,
-                              subsurf_field,
-                              spectral_rad_transform_operator,
-                              spectral_rad_observer_agenda,
-                              simulations);
+      high_performance(ws,
+                       measurement_vec,
+                       measurement_jac,
+                       measurement_sensor,
+                       jac_targets,
+                       atm_field,
+                       surf_field,
+                       subsurf_field,
+                       spectral_rad_transform_operator,
+                       spectral_rad_observer_agenda,
+                       simulations);
+      break;
   }
 }
 ARTS_METHOD_ERROR_CATCH

@@ -4495,8 +4495,11 @@ The core calculations happens inside the *spectral_rad_observer_agenda*.
 
 .. tip::
 
-   There is a low-memory alternative to the ``kernel`` option.  The default
-   is recommended if you have memory, however.
+   The default kernel is a low memory option.  It also has the lowest
+   startup cost.  If your calculations are slow and requires multiple
+   calls to the *spectral_rad_observer_agenda*, consider switching to
+   the "High Performance" kernel, which is :math:`O(N+M)` compared to
+   the low-memory option :math:`O(N \times M)`.
 )--",
       .author    = {"Richard Larsson"},
       .out       = {"measurement_vec", "measurement_jac"},
@@ -4509,7 +4512,7 @@ The core calculations happens inside the *spectral_rad_observer_agenda*.
                     "spectral_rad_observer_agenda"},
       .gin       = {"kernel"},
       .gin_type  = {"String"},
-      .gin_value = {String{"High Performance"}},
+      .gin_value = {String{"Low Memory"}},
       .gin_desc =
           {"The kernel to use for the spectral radiance calculations.  See type information for options."},
       .pass_workspace = true,
