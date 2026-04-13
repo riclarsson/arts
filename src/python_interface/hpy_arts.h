@@ -10,6 +10,7 @@
 #include <concepts>
 #include <format>
 
+#include "hpy_opaque.h"
 #include "python_interface_value_type.h"
 
 namespace Python {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "hpy_numpy_impl.h"
+#include "hpy_opaque.h"
 
 namespace Python {
 template <typename FUNC, typename... in>

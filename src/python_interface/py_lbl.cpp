@@ -25,9 +25,6 @@
 #include <stdexcept>
 #include <unordered_map>
 
-NB_MAKE_OPAQUE(lbl::line_shape::species_model::map_t)
-NB_MAKE_OPAQUE(lbl::line_shape::model::map_t)
-
 namespace Python {
 void py_lbl(py::module_& m) try {
   auto lbl = m.def_submodule("lbl", "Line-by-line helper functions");

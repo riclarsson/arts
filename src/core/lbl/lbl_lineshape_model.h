@@ -300,3 +300,27 @@ struct std::formatter<lbl::line_shape::model> {
 template <>
 std::optional<std::string> to_helper_string<LineShapeSpeciesModel::map_t>(
     const LineShapeSpeciesModel::map_t&);
+
+template <>
+struct xml_io_stream<lbl::line_shape::model> {
+  static constexpr std::string_view type_name = "LineShapeModel"sv;
+
+  static void write(std::ostream& os,
+                    const lbl::line_shape::model& x,
+                    bofstream* pbofs      = nullptr,
+                    std::string_view name = ""sv);
+
+  static void read(std::istream& is, lbl::line_shape::model& x, bifstream* pbifs = nullptr);
+};
+
+template <>
+struct xml_io_stream<lbl::line_shape::species_model> {
+  static constexpr std::string_view type_name = "LineShapeSpeciesModel"sv;
+
+  static void write(std::ostream& os,
+                    const lbl::line_shape::species_model& x,
+                    bofstream* pbofs      = nullptr,
+                    std::string_view name = ""sv);
+
+  static void read(std::istream& is, lbl::line_shape::species_model& x, bifstream* pbifs = nullptr);
+};

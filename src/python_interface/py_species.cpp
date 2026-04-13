@@ -1,25 +1,28 @@
+#include <hitran_species_info.h>
+#include <jpl_species_info.h>
 #include <nanobind/nanobind.h>
+#include <nanobind/operators.h>
 #include <nanobind/stl/array.h>
 #include <nanobind/stl/bind_map.h>
 #include <nanobind/stl/bind_vector.h>
+#include <nanobind/stl/filesystem.h>
+#include <nanobind/stl/map.h>
+#include <nanobind/stl/set.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/vector.h>
 #include <partfun.h>
 #include <python_interface.h>
+#include <species_enum_info.h>
+#include <species_info.h>
 
 #include <algorithm>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include "debug.h"
 #include "hpy_arts.h"
 #include "hpy_vector.h"
-#include "isotopologues.h"
-#include "nanobind/operators.h"
-#include "species.h"
-#include "species_tags.h"
 
 std::string docs_isotopes() {
   std::ostringstream os;
@@ -112,7 +115,19 @@ void py_species(py::module_& m) try {
           },
           "isot"_a = 0,
           "From position")
-      .def(py::init_implicit<const std::string_view>())
+      .def(
+          "__init__",
+          [](SpeciesIsotope* self, const std::string& name) {
+            try {
+              auto x =
+                  SpeciesIsotope::from_name(Species::update_isot_name(name));
+              new (self) SpeciesIsotope(x);
+            } catch (std::exception& e) {
+              throw std::runtime_error(std::format(
+                  "No species with name {}. Error:\n{}", name, e.what()));
+            }
+          },
+          "name"_a)
       .def(
           "Q",
           [](const SpeciesIsotope& self, Numeric T) {
@@ -123,6 +138,12 @@ void py_species(py::module_& m) try {
       .def_ro("spec",
               &SpeciesIsotope::spec,
               "The species\n\n.. :class:`~pyarts3.arts.SpeciesEnum`")
+      .def_prop_ro(
+          "index",
+          [](const SpeciesIsotope& self) {
+            return Species::find_species_index(self);
+          },
+          "The index of the species in the isotopologue list\n\n.. :class:`int`")
       .def_ro(
           "isotname",
           &SpeciesIsotope::isotname,
@@ -151,6 +172,7 @@ void py_species(py::module_& m) try {
   siso.def("__hash__", [](const SpeciesIsotope& self) {
     return std::hash<SpeciesIsotope>{}(self);
   });
+  py::implicitly_convertible<std::string, SpeciesIsotope>();
 
   auto a1 =
       py::bind_vector<ArrayOfSpeciesIsotope, py::rv_policy::reference_internal>(
@@ -207,6 +229,97 @@ Returns
 
   auto sev = py::bind_map<SpeciesEnumVectors>(m, "SpeciesEnumVectors");
   generic_interface(sev);
+
+  py::class_<SpeciesIsotopologueInfo> isinfo(m, "SpeciesIsotopologueInfo");
+  isinfo.doc() = "Information about an isotopologue";
+  generic_interface(isinfo);
+  isinfo
+      .def_rw(
+          "species",
+          &SpeciesIsotopologueInfo::species,
+          "The Species key of the isotopologue (e.g., in H2O-161, this is 'H2O')\n\n.. :class:`str`")
+      .def_rw(
+          "code",
+          &SpeciesIsotopologueInfo::code,
+          "The key of the isotopologue (e.g., in H2O-161, this is '161')\n\n.. :class:`str`")
+      .def_rw("mass",
+              &SpeciesIsotopologueInfo::mass,
+              "The mass of the species in atomic units\n\n.. :class:`float`")
+      .def_rw("default_ratio",
+              &SpeciesIsotopologueInfo::default_ratio,
+              "The built-in isotopologue ratio\n\n.. :class:`float`")
+      .def_rw("degeneracy",
+              &SpeciesIsotopologueInfo::degeneracy,
+              "The degeneracy of the isotopologue models\n\n.. :class:`int`");
+  isinfo.def(py::self == py::self);
+  isinfo.def(py::self != py::self);
+  isinfo.def(py::self <= py::self);
+  isinfo.def(py::self >= py::self);
+  isinfo.def(py::self < py::self);
+  isinfo.def(py::self > py::self);
+  isinfo.def("__hash__", [](const SpeciesIsotopologueInfo& self) {
+    return std::hash<SpeciesIsotopologueInfo>{}(self);
+  });
+
+  py::class_<SpeciesEnumInfo> seinfo(m, "SpeciesEnumInfo");
+  seinfo.doc() = "Information about a species enum";
+  generic_interface(seinfo);
+  seinfo
+      .def_rw("enum_value",
+              &SpeciesEnumInfo::enum_value,
+              "The species enum value\n\n.. :class:`int`")
+      .def_rw("shortname",
+              &SpeciesEnumInfo::shortname,
+              "The short name of the species\n\n.. :class:`str`")
+      .def_rw("longname",
+              &SpeciesEnumInfo::longname,
+              "The long name of the species\n\n.. :class:`str`");
+  seinfo.def(py::self == py::self);
+  seinfo.def(py::self != py::self);
+  seinfo.def(py::self <= py::self);
+  seinfo.def(py::self >= py::self);
+  seinfo.def(py::self < py::self);
+  seinfo.def(py::self > py::self);
+  seinfo.def("__hash__", [](const SpeciesEnumInfo& self) {
+    return std::hash<SpeciesEnumInfo>{}(self);
+  });
+
+  py::class_<HitranSpeciesInfo> hsinfo(m, "HitranSpeciesInfo");
+  hsinfo.doc() = "Information about a HITRAN species";
+  generic_interface(hsinfo);
+  hsinfo
+      .def_rw("spec",
+              &HitranSpeciesInfo::spec,
+              "The species\n\n.. :class:`~pyarts3.arts.SpeciesIsotope`")
+      .def_rw("hitind",
+              &HitranSpeciesInfo::hitind,
+              "The HITRAN species index\n\n.. :class:`int`")
+      .def_rw("hitchar",
+              &HitranSpeciesInfo::hitchar,
+              "The HITRAN isotopologue char\n\n.. :class:`str`")
+      .def_rw("ratio",
+              &HitranSpeciesInfo::ratio,
+              "The isotopologue ratio\n\n.. :class:`float`");
+
+  py::class_<JplSpeciesInfo> jsinfo(m, "JplSpeciesInfo");
+  jsinfo.doc() = "Information about a JPL species";
+  generic_interface(jsinfo);
+  jsinfo
+      .def_rw(
+          "id", &JplSpeciesInfo::id, "The JPL species ID\n\n.. :class:`int`")
+      .def_rw("spec",
+              &JplSpeciesInfo::spec,
+              "The species\n\n.. :class:`~pyarts3.arts.SpeciesIsotope")
+      .def_rw("has_qn",
+              &JplSpeciesInfo::has_qn,
+              "The JPL species index\n\n.. :class:`bool`")
+      .def_rw(
+          "QT0",
+          &JplSpeciesInfo::QT0,
+          "The partition function at the reference temperature\n\n.. :class:`float`")
+      .def_rw("T0",
+              &JplSpeciesInfo::T0,
+              "The reference temperature\n\n.. :class:`float`");
 } catch (std::exception& e) {
   throw std::runtime_error(
       std::format("DEV ERROR:\nCannot initialize species\n{}", e.what()));

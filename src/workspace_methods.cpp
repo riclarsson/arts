@@ -3286,6 +3286,36 @@ be computed from the line strength, or simply read from the Hitran data.
            "Compute the Zeeman parameters from the HITRAN data (will not activate Zeeman calculations, this must be done manually afterwards)"},
   };
 
+  wsm_data["abs_bandsReadJPL"] = {
+      .desc =
+          R"--(Reads JPL data from a file.
+
+The JPL file is assumed to have each line record
+filling up one line of text.
+
+The builtin JPL map is used to find species.  This set of species can
+be extended during compilation only.
+
+This is still a WIP and most species are missing.  They will be added
+as we need them.
+
+Note also that quantum numbers are not yet supported in the JPL data,
+and thus all lines and bands will be unable to use features that 
+relies on quantum numbers, such as line mixing, Zeeman parameters, etc.
+
+As JPL provides no pressure broadening data, a default 25 kHz/Pa
+Voigt air broadening profile is used for all lines, with a temperature
+exponent of 0.75.
+)--",
+      .author    = {"Richard Larsson"},
+      .out       = {"abs_bands"},
+      .in        = {},
+      .gin       = {"file"},
+      .gin_type  = {"String"},
+      .gin_value = {std::nullopt},
+      .gin_desc  = {"Filename"},
+  };
+
   wsm_data["abs_bandsLineMixingAdaptation"] = {
       .desc =
           R"--(Adapts select band to use ordered Line mixing coefficients.

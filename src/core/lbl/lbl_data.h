@@ -25,6 +25,9 @@
 #include "lbl_zeeman.h"
 
 namespace lbl {
+Numeric einstein_a(
+    Numeric s, Numeric gu, Numeric e0, Numeric f0, Numeric T, Numeric Q);
+
 struct line {
   //! Einstein A coefficient
   Numeric a{};
