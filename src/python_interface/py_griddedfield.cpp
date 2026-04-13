@@ -1,13 +1,13 @@
 #include <debug.h>
 #include <nanobind/stl/bind_vector.h>
 #include <rtepack.h>
+#include <sensor_meta_info.h>
 
 #include <stdexcept>
 
 #include "hpy_arts.h"
 #include "hpy_matpack.h"
 #include "hpy_vector.h"
-#include "matpack_mdspan_helpers_gridded_data_t.h"
 #include "python_interface.h"
 
 static_assert(std::is_nothrow_move_constructible_v<GriddedField3>,
@@ -108,6 +108,11 @@ void py_griddedfield(py::module_& m) try {
   gridded_data_interface(sgf3num);
   generic_interface(sgf3num);
   implicit_convert_gf<GriddedField3>(sgf3num);
+
+  py::class_<sensor::CameraGriddedField> cgf(m, "CameraGriddedField");
+  cgf.doc() = "A gridded field for camera sensors";
+  gridded_data_interface(cgf);
+  generic_interface(cgf);
 
   py::class_<GeodeticField3> geo3(m, "GeodeticField3");
   gridded_data_interface(geo3);

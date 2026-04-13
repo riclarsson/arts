@@ -898,6 +898,7 @@ of this term multiplied by a negative distance.
                 {
                     "AtmPoint",
                     "SensorObsel",
+                    "SensorMetaInfo",
                     "SpeciesTag",
                     "SpeciesEnum",
                     "QuantumLevelIdentifier",
@@ -921,9 +922,7 @@ of this term multiplied by a negative distance.
                     "Vector3",
                     "AscendingGrid",
                 },
-                {
-                    "optproperties.h",
-                });
+                {"optproperties.h", "sensor_meta_info.h"});
 
   return wsg_data;
 }

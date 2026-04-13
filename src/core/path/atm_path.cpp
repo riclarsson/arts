@@ -19,11 +19,12 @@ ArrayOfAtmPoint &atm_path_resize(ArrayOfAtmPoint &atm_path,
 void forward_atm_path(ArrayOfAtmPoint &atm_path,
                       const ArrayOfPropagationPathPoint &rad_path,
                       const AtmField &atm) {
-  stdr::transform(
-      rad_path,
-      atm_path.begin(),
-      [&atm](const auto &p) { return atm.at(p); },
-      &PropagationPathPoint::pos);
+  stdr::transform(rad_path,
+                  atm_path.begin(),
+                  [&atm](const PropagationPathPoint &pp) -> AtmPoint {
+                    if (pp.has(PathPositionType::atm)) return atm.at(pp.pos);
+                    return atm.at(atm.top_of_atmosphere, pp.pos[1], pp.pos[2]);
+                  });
 }
 
 ArrayOfAtmPoint forward_atm_path(const ArrayOfPropagationPathPoint &rad_path,

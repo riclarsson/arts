@@ -22,11 +22,30 @@ struct PosLos {
 
   friend std::ostream& operator<<(std::ostream& os, const PosLos& poslos);
 
-  [[nodiscard]] constexpr Numeric alt() const { return pos[0]; }
-  [[nodiscard]] constexpr Numeric lat() const { return pos[1]; }
-  [[nodiscard]] constexpr Numeric lon() const { return pos[2]; }
-  [[nodiscard]] constexpr Numeric zen() const { return los[0]; }
-  [[nodiscard]] constexpr Numeric azi() const { return los[1]; }
+  template <typename Self>
+  [[nodiscard]] constexpr decltype(auto) alt(this Self&& self) {
+    return std::forward<Self>(self).pos[0];
+  }
+
+  template <typename Self>
+  [[nodiscard]] constexpr decltype(auto) lat(this Self&& self) {
+    return std::forward<Self>(self).pos[1];
+  }
+
+  template <typename Self>
+  [[nodiscard]] constexpr decltype(auto) lon(this Self&& self) {
+    return std::forward<Self>(self).pos[2];
+  }
+
+  template <typename Self>
+  [[nodiscard]] constexpr decltype(auto) zen(this Self&& self) {
+    return std::forward<Self>(self).los[0];
+  }
+
+  template <typename Self>
+  [[nodiscard]] constexpr decltype(auto) azi(this Self&& self) {
+    return std::forward<Self>(self).los[1];
+  }
 };
 
 using PosLosVector = matpack::data_t<PosLos, 1>;

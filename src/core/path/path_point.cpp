@@ -876,7 +876,7 @@ Numeric total_geometric_path_length(const ArrayOfPropagationPathPoint& path,
   const auto first = stdr::find_if(path, in_atm);
   const auto last  = stdr::find_if_not(first, path.end(), in_atm) - 1;
 
-  ARTS_USER_ERROR_IF(first == path.end(), "No path points in atmosphere")
+  if (first == path.end()) return 0.0;
 
   return ecef_distance(geodetic2ecef(first->pos, surf_field.ellipsoid),
                        geodetic2ecef(last->pos, surf_field.ellipsoid));
@@ -884,11 +884,18 @@ Numeric total_geometric_path_length(const ArrayOfPropagationPathPoint& path,
 
 ArrayOfPropagationPathPoint& keep_only_atm(ArrayOfPropagationPathPoint& path) {
   using enum PathPositionType;
-  path.erase(std::remove_if(
-                 path.begin(),
-                 path.end(),
-                 [](const PropagationPathPoint& p) { return not p.has(atm); }),
-             path.end());
+  auto new_end = std::remove_if(
+      path.begin(), path.end(), [](const PropagationPathPoint& p) {
+        return not p.has(atm);
+      });
+  if (new_end == path.begin() and not path.empty()) {
+    // No atmospheric points found; keep only the last point as a
+    // background marker so that the path is never truly empty.
+    path.front() = path.back();
+    path.resize(1);
+  } else {
+    path.erase(new_end, path.end());
+  }
   return path;
 }
 

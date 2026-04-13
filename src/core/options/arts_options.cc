@@ -272,6 +272,36 @@ values in relevant calculations.  Or it might simply disable a functionality.
   });
 
   opts.emplace_back(EnumeratedOption{
+      .name = "MeasurementVectorSumupKernel",
+      .desc =
+          R"(The kernel to use for summing up the measurement vectors.
+
+This is used when summing up *measurement_vec* and *measurement_jac*.
+
+Tthe observation elements in *measurement_sensor*.  The kernel choice is
+just a trade-off between memory and performance.  The "low memory" option will
+never allocate more than one *StokvecVector* and *StokvecMatrix* per core.
+The "high performance" option will allocate as many *StokvecVector* and
+*StokvecMatrix* as needed for the full observation geometry.
+
+The low memory computation time is :math:`O(MN)`, where :math:`M` is the number
+of frequency grids times the number of observation geometries, and :math:`N` is
+the number of observation elements in *measurement_sensor*.  It will only ever
+allocate memory proportional to :math:`N`.
+
+The high performance computation time is :math:`O(M+N)`.  It will allocate
+memory proportional to :math:`MN`.  You should generally use this option
+unless you run into memory constraints.
+)",
+      .values_and_desc = {Value{"LowMem",
+                                "Low Memory",
+                                "Use the low memory kernel"},
+                          Value{"HighPerf",
+                                "High Performance",
+                                "Use the high performance kernel"}},
+  });
+
+  opts.emplace_back(EnumeratedOption{
       .name = "InterpolationExtrapolation",
       .desc =
           R"(Instructions about how to handle extrapolation of interpolated data.

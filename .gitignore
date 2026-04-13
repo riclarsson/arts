@@ -38,3 +38,6 @@
 Testing/
 __pycache__/
 heaptrack.*.gz
+qdrant_storage/
+.roo/
+tests/core/sensor/sensor_count.xml
