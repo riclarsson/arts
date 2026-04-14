@@ -55,7 +55,7 @@ The only two functions that are actually needed for the class to be
 formattable are ``format`` and ``parse``.  The rest are helper functions and data that
 allow us to make the format across multiple ARTS classes compatible.
 The implementation of ``format`` is also specific to the class in question,
-so its potential implementations will not be discussed here in details,
+so its potential implementations will not be discussed here in detail,
 but examples and best-practices will be given.
 
 The ``MetaData`` is a placeholder for additional data that the class needs to store

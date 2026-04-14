@@ -3,7 +3,7 @@ Absorption
 
 Absorption is the physical process that reduces 
 the spectral radiance of a beam of light as it passes through a medium.
-It can be described be Beer's law:
+It can be described by Beer's law:
 
 .. math::
 

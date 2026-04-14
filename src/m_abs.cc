@@ -114,19 +114,19 @@ void spectral_propmatInit(  //WS Output
 
   ARTS_USER_ERROR_IF(not nf, "No frequencies");
 
-  // Set size of spectral_propmat and reset it's values
+  // Set size of spectral_propmat and reset its values
   spectral_propmat.resize(nf);
   spectral_propmat = 0.0;
 
-  // Set size of source_vector_nonlte and reset it's values
+  // Set size of source_vector_nonlte and reset its values
   source_vector_nonlte.resize(nf);
   source_vector_nonlte = 0.0;
 
-  // Set size of spectral_propmat_jac and reset it's values
+  // Set size of spectral_propmat_jac and reset its values
   spectral_propmat_jac.resize(nq, nf);
   spectral_propmat_jac = 0.0;
 
-  // Set size of source_vector_nonlte_jacobian and reset it's values
+  // Set size of source_vector_nonlte_jacobian and reset its values
   source_vector_nonlte_jacobian.resize(nq, nf);
   source_vector_nonlte_jacobian = 0.0;
 }

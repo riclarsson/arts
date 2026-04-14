@@ -28,7 +28,7 @@ All of these use the `std::format` library to format the error message.
 Do not use these macros inside header files as they will cause
 compilation times to increase significantly.
 
-All of these adds relevant line numbers and file names to the error message.
+All of these add relevant line numbers and file names to the error message.
 If the compiler was modern enough, even the function signature is added.
 
 ARTS_USER_ERROR

@@ -9,7 +9,7 @@ The key variables to look out for are :attr:`~pyarts3.workspace.Workspace.spectr
 A single step
 *************
 
-A single step of the radiative transfer calculation in ARTS solvers assume to follow from
+A single step of the radiative transfer calculation in ARTS solvers is assumed to follow from
 
 .. math::
 
