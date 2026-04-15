@@ -128,7 +128,7 @@ See also :doc:`concept.absorption.xsec` for more information on these calculatio
   };
 
   wsv_data["abs_ecs_data"] = {
-      .desc          = R"--(Error corrected sudden data
+      .desc          = R"--(Error-corrected sudden data
 
 Dimensions: [num Isotopologues] [num Species]
 
@@ -343,7 +343,7 @@ The order is
 
 This is closely related to *spectral_propmat*.
 
-Gven the level source term:
+Given the level source term:
 
 .. math:: \vec{J} = \mathbf{K}^{-1} \left(\vec{\alpha}B + \vec{J}_n + \cdots\right),
 

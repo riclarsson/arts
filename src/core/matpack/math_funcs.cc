@@ -377,7 +377,7 @@ Numeric AngIntegrate_trapezoid_opti(ConstMatrixView Integrand,
 /*! 
     Performs an integration of a matrix over all directions defined in angular
     grids using the trapezoidal integration method.
-    The integrand is independant of the azimuth angle. The integration over
+    The integrand is independent of the azimuth angle. The integration over
     the azimuth angle gives a 2*PI
 
     \param Integrand Input : The vector to be integrated

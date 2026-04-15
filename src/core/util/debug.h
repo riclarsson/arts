@@ -48,7 +48,7 @@ std::runtime_error user_error(const std::string_view msg,
 
 #endif /* NDEBUG */
 
-/*! An error has occured, will throw the error */
+/*! An error has occurred, will throw the error */
 #define ARTS_USER_ERROR(fmt, ...)                                    \
   {                                                                  \
     throw arts::user_error(std::string_view{__VA_OPT__(std::format)( \

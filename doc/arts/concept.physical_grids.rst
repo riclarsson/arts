@@ -23,7 +23,7 @@ in the calculations.
 - Latitude grid.
 
   The latitude grid is a vector of latitudes, in degrees,
-  that defines a horizontal coordinate upon a ellipsoid.
+  that defines a horizontal coordinate upon an ellipsoid.
   It is always in ascending order, and its range is [-90, 90].
 
   Use these methods to check the latitude grid for correctness:
@@ -38,7 +38,7 @@ in the calculations.
 - Longitude grid.
 
   The longitude grid is a vector of longitudes, in degrees,
-  that defines a horizontal coordinate upon a ellipsoid.
+  that defines a horizontal coordinate upon an ellipsoid.
   It is always in ascending order, and its range is [-180, 180).
 
   Use these methods to check the longitudes grid for correctness:

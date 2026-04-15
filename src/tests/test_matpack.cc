@@ -718,7 +718,7 @@ void test46() {
   \param[in] bool If verbose  is true the results of each test are printed to
   standard out.
 
-  \return The maximum element-wise, relative error that occured in the tests.
+  \return The maximum element-wise, relative error that occurred in the tests.
 */
 Numeric matrix_mult(
     Index k, Index m, Index n, Index ntests, Index nsubtests, bool verbose) {

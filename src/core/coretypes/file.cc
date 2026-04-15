@@ -151,7 +151,7 @@ std::ifstream open_input_file(const std::string_view name) {
 
    @param text Output. The contents fo the file
    @param is Stream from which to read
-   @exception IOError Some error occured during the read
+   @exception IOError Some error occurred during the read
    @version   1
    @author Stefan Buehler */
 ArrayOfString read_text_from_stream(std::istream& is) {

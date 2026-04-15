@@ -102,7 +102,7 @@ and from this, the full matrix contribution is
 where the somewhat weird :math:`\pm`-sum is over the sigma components.
 Here the angles :math:`\theta_m` and :math:`\eta_m` are the angles with regards to the magnetic field.
 
-Given a spherical coordinate observation system with zenith angle :math:`\theta_z` and aziumuth angle :math:`\eta_a` and a
+Given a spherical coordinate observation system with zenith angle :math:`\theta_z` and azimuth angle :math:`\eta_a` and a
 local magnetic field with upwards facing strength :math:`B_w`, eastward facing strength :math:`B_u` and northward facing strength :math:`B_v`,
 these angles are given by
 

@@ -418,32 +418,6 @@ extension.
            R"--(Equalize the widths of all numbers by padding with zeros as necessary. 0 means no padding (default).)--"},
   };
 
-  wsm_data["abs_xfit_dataReadSpeciesSplitCatalog"] = {
-      .desc      = R"--(Reads HITRAN Crosssection coefficients
-
-Reads coefficient files for HITRAN Xsec species defined
-in *abs_species*.
-
-.. tip::
-    A common and perhaps more convenient alternative to this method
-    is *ReadCatalogData*.
-
-    If you have downloaded
-    the ARTS catalog data - ``arts-cat-data`` - and set the environment
-    variable ``ARTS_DATA_PATH`` to point to the location of this data,
-    you can use that method to automagically read the data more easily
-    than calling this method directly.
-)--",
-      .author    = {"Oliver Lemke"},
-      .out       = {"abs_xfit_data"},
-      .in        = {"abs_species"},
-      .gin       = {"basename", "ignore_missing"},
-      .gin_type  = {"String", "Index"},
-      .gin_value = {std::nullopt, Index{0}},
-      .gin_desc  = {R"--(Basepath to the files)--",
-                    R"--(Ignore missing files (0: no, 1: yes))--"},
-  };
-
   wsm_data["Touch"] = {
       .desc      = R"--(As *Ignore* but for agenda output.
 
@@ -585,6 +559,32 @@ See *FileType* for valid ``output_file_format``.
            R"--(Workspace variable to be saved.)--",
            R"--(File name. See above.)--",
            R"--(Equalize the widths of all numbers by padding with zeros as necessary. 0 means no padding (default).)--"},
+  };
+
+  wsm_data["abs_xfit_dataReadSpeciesSplitCatalog"] = {
+      .desc      = R"--(Reads HITRAN Crosssection coefficients
+
+Reads coefficient files for HITRAN Xsec species defined
+in *abs_species*.
+
+.. tip::
+    A common and perhaps more convenient alternative to this method
+    is *ReadCatalogData*.
+
+    If you have downloaded
+    the ARTS catalog data - ``arts-cat-data`` - and set the environment
+    variable ``ARTS_DATA_PATH`` to point to the location of this data,
+    you can use that method to automagically read the data more easily
+    than calling this method directly.
+)--",
+      .author    = {"Oliver Lemke"},
+      .out       = {"abs_xfit_data"},
+      .in        = {"abs_species"},
+      .gin       = {"basename", "ignore_missing"},
+      .gin_type  = {"String", "Index"},
+      .gin_value = {std::nullopt, Index{0}},
+      .gin_desc  = {R"--(Basepath to the files)--",
+                    R"--(Ignore missing files (0: no, 1: yes))--"},
   };
 
   wsm_data["abs_cia_dataReadFromCIA"] = {
@@ -1032,9 +1032,8 @@ This is based on the work of :cite:t:`Makarov2020`.
   };
 
   wsm_data["abs_ecs_dataAddTran2011"] = {
-      .desc   = R"--(Sets the CO2-626, CO2-628, and CO2-636 band data for ECS.
-
-Sets CO2 species.
+      .desc =
+          R"--(Sets ECS broadening parameters for CO2 collision partner for CO2 isotopologues CO2-626, CO2-628, and CO2-636.
 
 This is based on the work of :cite:t:`Tran2011`.
 )--",
@@ -1044,9 +1043,8 @@ This is based on the work of :cite:t:`Tran2011`.
   };
 
   wsm_data["abs_ecs_dataAddRodrigues1997"] = {
-      .desc   = R"--(Sets the CO2-626, CO2-628, and CO2-636 band data for ECS.
-
-Sets N2 and O2 species.
+      .desc =
+          R"--(Sets ECS broadening parameters for N2 and O2 collision partners for CO2 isotopologues CO2-626, CO2-628, and CO2-636.
 
 This is based on the work of :cite:t:`Rodrigues1997`.
 )--",
@@ -1093,7 +1091,8 @@ This is based on the work of :cite:t:`Rodrigues1997`.
   };
 
   wsm_data["abs_ecs_dataAddMeanAir"] = {
-      .desc      = R"--(Sets ECS data for air from other data if available.
+      .desc =
+          R"--(Combines ECS data from specified species using VMR weights to create air (bath gas) broadening parameters.
 )--",
       .author    = {"Richard Larsson"},
       .out       = {"abs_ecs_data"},
@@ -1279,7 +1278,7 @@ The calculations are in parallel if the program is not in parallel already.
 
   wsm_data["spectral_rad_srcvec_pathAddScattering"] = {
       .desc =
-          R"--(Adds the scattering part of the propagation matrix to the rest along the path.
+          R"--(Adds the scattering part of the source vector to the rest along the path.
 
 The calculations are in parallel if the program is not in parallel already.
 )--",

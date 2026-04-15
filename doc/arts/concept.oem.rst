@@ -44,7 +44,7 @@ where
 :math:`m` is the number of measurements,
 :math:`\vec{x}_a` is an a priori of :math:`\vec{x}`,
 :math:`\mathbf{S}_\epsilon` is the covariance of the measurement noise, and
-:math:`\mathbf{S}_a` is the covariance of the model state apriori.
+:math:`\mathbf{S}_a` is the covariance of the model state a priori.
 
 Linearization
 =============
