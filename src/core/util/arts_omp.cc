@@ -14,6 +14,7 @@
 */
 
 #include "arts_omp.h"
+#include <limits>
 
 //! Wrapper for omp_get_max_threads.
 /*! 
@@ -126,7 +127,8 @@ bool arts_omp_parallel(unsigned long long n [[maybe_unused]],
 #ifdef _OPENMP
   return additional_condition and not arts_omp_in_parallel() and
          arts_omp_get_max_threads() > 1 and
-         arts_omp_get_max_threads() < static_cast<int>(n);
+         (n == std::numeric_limits<unsigned long long>::max() or
+          arts_omp_get_max_threads() < static_cast<int>(n));
 #else
   return false;
 #endif
