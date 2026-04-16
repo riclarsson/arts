@@ -20,11 +20,9 @@ std::unordered_map<std::string, Wsv> from_global_defaults() {
 }
 }  // namespace
 
-Workspace::Workspace(WorkspaceInitialization how_to_initialize) : wsv{} {
-  if (WorkspaceInitialization::FromGlobalDefaults == how_to_initialize) {
-    static const auto global_defaults = from_global_defaults();
-    wsv = global_defaults;
-  }
+const std::unordered_map<std::string, Wsv>& global_wsv_defaults() {
+  static const auto& wsv = from_global_defaults();
+  return wsv;
 }
 
 const Wsv& Workspace::share(const std::string& name) const try {
