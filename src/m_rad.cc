@@ -403,7 +403,7 @@ void high_performance(
   std::string error{};
 
   //! Dynamic scheduling as some simulations may take much longer time than others
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) if (arts_omp_parallel(-1, N > 1))
   for (Size i = 0; i < N; i++) {
     try {
       const Size ip          = simulations[i].iposlos;
@@ -441,7 +441,7 @@ void high_performance(
 
   ARTS_USER_ERROR_IF(not error.empty(), "Errors occurred:\n{:}", error);
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) if (arts_omp_parallel(-1, M > 1))
   for (Size iv = 0; iv < M; ++iv) {
     const SensorObsel &obsel = measurement_sensor[iv];
 
