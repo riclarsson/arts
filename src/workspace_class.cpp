@@ -21,7 +21,7 @@ std::unordered_map<std::string, Wsv> from_global_defaults() {
 }  // namespace
 
 const std::unordered_map<std::string, Wsv>& global_wsv_defaults() {
-  static const auto& wsv = from_global_defaults();
+  static const auto wsv = from_global_defaults();
   return wsv;
 }
 
