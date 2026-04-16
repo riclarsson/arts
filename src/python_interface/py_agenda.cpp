@@ -262,6 +262,11 @@ so Copy(a, out=b) will not even see the b variable.
           "ws"_a,
           "Executes the agenda on the provided workspace")
       .def(
+          "par_tasks",
+          [](Agenda& a, Workspace& ws) { return a.par_tasks(ws); },
+          "ws"_a,
+          "Returns a list of agendas to show their potential for parallel execution (used by par_execute)")
+      .def(
           "par_execute",
           [](Agenda& a, Workspace& ws) { a.par_execute(ws); },
           "ws"_a,
@@ -285,6 +290,13 @@ so Copy(a, out=b) will not even see the b variable.
           "methods",
           [](const Agenda& agenda) { return agenda.get_methods(); },
           "The methods of the agenda.\n\n.. :class:`list[~pyarts3.arts.Method]`");
+
+  auto va =
+      py::bind_vector<std::vector<Agenda>, py::rv_policy::reference_internal>(
+          m, "ArrayOfAgenda");
+  va.doc() = "A list of :class:`~pyarts3.arts.Agenda`";
+  generic_interface(va);
+  vector_interface(va);
 } catch (std::exception& e) {
   throw std::runtime_error(
       std::format("DEV ERROR:\nCannot initialize agendas\n{}", e.what()));

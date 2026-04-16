@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "enumsWorkspaceInitialization.h"
@@ -259,7 +260,7 @@ void Agenda::execute(Workspace& ws) const try {
                                        e.what()));
 }
 
-void Agenda::par_execute(Workspace& ws) const try {
+std::vector<Agenda> Agenda::par_tasks(Workspace& ws) const try {
   ARTS_TIME_REPORT
 
   auto filter = stdv::filter([](const std::string& s) {
@@ -268,63 +269,113 @@ void Agenda::par_execute(Workspace& ws) const try {
   });
   auto concat = stdv::join | filter;
 
-  // All output sorted and unique
-  std::vector<std::string> all_outs{
-      std::from_range, methods | stdv::transform(&Method::get_outs) | concat};
-  stdr::sort(all_outs);
-  if (auto [ret, last] = stdr::unique(all_outs); ret != all_outs.end()) {
-    throw std::runtime_error(std::format(
-        R"(Can only execute in parallel if all outputs are unique.  Output "{}" is duplicated.
+  stdr::for_each(methods | stdv::transform(&Method::get_outs) | concat,
+                 [&ws](const std::string& o) { ws.init_if_new(o); });
 
-All outputs: {:B,})",
-        *ret,
-        all_outs));
-  }
+  std::unordered_set<std::string> all_outputs{};
 
-  for (const auto& m : methods) {
-    for (const auto& in : m.get_ins()) {
-      if (stdr::binary_search(all_outs, in) and
-          stdr::none_of(m.get_outs(), Cmp::eq(in))) {
-        throw std::runtime_error(std::format(
-            R"(Cannot execute in parallel because input "{}" of method "{}" is also an output.
-
-All outputs:   {:B,}
-Method inputs: {:B,})",
-            in,
-            m.get_name(),
-            all_outs,
-            m.get_ins()));
-      }
-    }
-  }
-
-  for (const auto& out : all_outs) ws.init_if_new(out);
-
-  std::vector<Method> newmethods{};
-  std::vector<std::string> newshare{};
   std::vector<Agenda> tasks{};
-  auto inserter = [&](const Method& method) {
-    newmethods.push_back(method);
-    newshare.insert_range(newshare.end(), method.get_ins() | filter);
-    newshare.insert_range(newshare.end(), method.get_outs() | filter);
-    tasks.emplace_back(method.get_name(),
-                       newmethods,
-                       newshare,
+  std::vector<Method> task_methods{};
+  std::string task_name{};
+  std::unordered_set<std::string> task_output{};
+  std::unordered_set<std::string> task_share{};
+  std::vector<Method> possible_task_methods{};
+
+  auto flush_batch = [&]() {
+    if (task_methods.empty()) return;
+    tasks.emplace_back(task_name,
+                       task_methods,
+                       std::vector<std::string>(std::from_range, task_share),
                        std::vector<std::string>{},
-                       bool{});
-    newmethods.resize(0);
-    newshare.resize(0);
+                       false);
+    task_methods.clear();
+    task_share.clear();
+    task_name = {};
+
+    all_outputs.insert(task_output.begin(), task_output.end());
+    task_output.clear();
+  };
+
+  const auto insert_share = [&](const Method& method) {
+    for (const auto& in : method.get_ins() | filter) task_share.insert(in);
+    for (const auto& out : method.get_outs() | filter) task_share.insert(out);
+  };
+
+  const auto insert_out = [&](const Method& method) {
+    for (const auto& out : method.get_outs() | filter) task_output.insert(out);
   };
 
   for (auto& method : methods) {
-    if (method.get_setval().has_value() and
-        (method.get_name().starts_with(internal_prefix) or
-         method.get_name().starts_with(named_input_prefix))) {
-      newmethods.push_back(method);
-    } else {
-      inserter(method);
+    if (method.get_setval().has_value()) {
+      if (method.is_callback()) {
+        task_name = method.get_name();
+        task_methods.insert_range(task_methods.end(), possible_task_methods);
+        task_methods.push_back(method);
+        insert_share(method);
+        insert_out(method);
+        flush_batch();
+      } else {
+        possible_task_methods.push_back(method);
+      }
+
+      continue;
     }
+
+    if (stdr::any_of(method.get_ins() | filter,
+                     [&all_outputs](const std::string& s) {
+                       return all_outputs.contains(s);
+                     })) {
+      throw std::runtime_error(std::format(
+          R"(Cannot execute in parallel: method "{}" has a dependency (input) on the output of a previously defined parallel task.)",
+          method.get_name()));
+    }
+
+    if (stdr::any_of(method.get_outs() | filter,
+                     [&all_outputs](const std::string& s) {
+                       return all_outputs.contains(s);
+                     })) {
+      throw std::runtime_error(std::format(
+          R"(Cannot execute in parallel: method "{}" has a dependency (output) on the output of a previously defined parallel task.)",
+          method.get_name()));
+    }
+
+    const bool overlap_current =
+        stdr::any_of(method.get_ins() | filter,
+                     [&task_output](const std::string& s) {
+                       return task_output.contains(s);
+                     }) or
+        stdr::any_of(method.get_outs() | filter,
+                     [&task_output](const std::string& s) {
+                       return task_output.contains(s);
+                     });
+
+    if (not overlap_current) flush_batch();
+
+    task_methods.insert_range(task_methods.end(), possible_task_methods);
+    possible_task_methods.clear();
+    task_methods.push_back(method);
+    insert_share(method);
+    insert_out(method);
+    task_name += std::format(
+        "{}{}", task_name.empty() ? ""sv : "\n"sv, method.get_name());
   }
+  flush_batch();
+
+  return tasks;
+} catch (std::exception& e) {
+  throw std::runtime_error(std::format(R"(Cannot perform parallelization:
+
+{}
+
+{})",
+                                       name,
+                                       e.what()));
+}
+
+void Agenda::par_execute(Workspace& ws) const try {
+  ARTS_TIME_REPORT
+
+  const auto tasks = par_tasks(ws);
 
   std::string error_message;
 
