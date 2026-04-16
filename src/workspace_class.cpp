@@ -95,6 +95,10 @@ void Workspace::init(const std::string& name) try {
       std::format("Error setting '{}'\n{}", name, e.what()));
 }
 
+void Workspace::init_if_new(const std::string& name) {
+  if (not contains(name)) init(name);
+}
+
 Workspace Workspace::deepcopy() const {
   Workspace ws = *this;
   for (auto& [_, value] : ws.wsv) {

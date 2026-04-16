@@ -136,7 +136,7 @@ Method::Method(const std::string& n,
   throw std::runtime_error(std::format("No method named \"{}\"", n));
 } catch (std::exception& e) {
   throw std::runtime_error(
-      std::format("Error in method construction for \"{}\"\n{}",
+      std::format("Cannot construct method \"{}\"\n{}",
                   n,
                   std::string_view(e.what())));
 }
@@ -157,6 +157,10 @@ Method::Method(std::string n, const Wsv& wsv, bool overwrite)
   }
 }
 
+bool Method::is_callback() const {
+  return setval.has_value() and setval->holds<CallbackOperator>();
+}
+
 void Method::operator()(Workspace& ws) const try {
   if (setval) {
     if (const Wsv& wsv = setval.value(); wsv.holds<CallbackOperator>()) {
@@ -174,8 +178,17 @@ void Method::operator()(Workspace& ws) const try {
 } catch (std::out_of_range&) {
   throw std::runtime_error(std::format("No method named \"{}\"", name));
 } catch (std::exception& e) {
-  throw std::runtime_error(
-      std::format("Error in method {}\n{}", *this, std::string_view(e.what())));
+  throw std::runtime_error(std::format(R"(Cannot execute method {}
+        
+Method outputs: {:B,}
+Method inputs:  {:B,}
+(NOTE: "_" and "@" prefixes are used for default and user inputs, respectively)
+
+{})",
+                                       name,
+                                       inargs,
+                                       outargs,
+                                       std::string_view(e.what())));
 }
 
 void Method::add_defaults_to_agenda(Agenda& agenda) const {

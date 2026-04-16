@@ -51,6 +51,6 @@ struct xml_io_stream<T> {
     tag.check_end_name(type_name);
   } catch (const std::exception& e) {
     throw std::runtime_error(
-        std::format("Error reading enum {}:\n{}", type_name, e.what()));
+        std::format("Cannot read enum {}:\n{}", type_name, e.what()));
   }
 };

@@ -654,8 +654,9 @@ std::string method_argument_documentation(
 
 std::string method(const std::string& name,
                    const WorkspaceMethodInternalRecord& wsm) {
-  return std::format(
-      R"-x-(  ws.def("{0}",[]({1}) -> {7} {{
+  if (not count_any(wsm)) {
+    return std::format(
+        R"-x-(  ws.def("{0}",[]({1}) -> {7} {{
     try {{
 {2}{3}
     }} catch (std::exception& e) {{
@@ -666,14 +667,29 @@ std::string method(const std::string& name,
     py::call_guard<py::gil_scoped_release>());
 
 )-x-",
+        name,
+        method_arguments(wsm),
+        method_argument_selection(name, wsm),
+        method_resolution(name, wsm),
+        method_error(name, wsm),
+        method_argument_documentation(wsm),
+        method_docs(name),
+        wsm.return_type);
+  }
+
+  return std::format(
+      R"-x-(  ws.def("{0}",[](Workspace& _ws [[maybe_unused]], const py::args&, const py::kwargs&) -> void {{
+    throw std::runtime_error("Generic methods only available inside Agendas.  Please use python equivalents for manual execution.");
+  }},
+{2}
+"\n"
+".. rubric:: Agenda-only method\n\n"
+"This method is only available inside Agendas.  Please use the python equivalents for manual execution.");
+
+)-x-",
       name,
-      method_arguments(wsm),
-      method_argument_selection(name, wsm),
-      method_resolution(name, wsm),
       method_error(name, wsm),
-      method_argument_documentation(wsm),
-      method_docs(name),
-      wsm.return_type);
+      method_docs(name));
 }
 
 void methods(int nfiles) {

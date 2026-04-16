@@ -45,6 +45,7 @@ class Method {
   void add_defaults_to_agenda(Agenda& agenda) const;
 
   [[nodiscard]] std::string sphinx_list_item() const;
+  [[nodiscard]] bool is_callback() const;
 };
 
 template <>

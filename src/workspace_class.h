@@ -93,6 +93,7 @@ struct Workspace {
   [[nodiscard]] auto size() const { return wsv.size(); }
 
   void init(const std::string& name);
+  void init_if_new(const std::string& name);
 
   [[nodiscard]] Workspace deepcopy() const;
 };

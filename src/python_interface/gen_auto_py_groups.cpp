@@ -60,9 +60,10 @@ bool convert_ref(Wsv& wsv, const py::object * const x) {{
     }
   }
 
-  os << "  return false;}\n\n";
   std::println(os,
-               R"--(bool convert_cast(Wsv& wsv, const py::object * const x) {{
+               R"--(  return false;}}
+
+bool convert_cast(Wsv& wsv, const py::object * const x) {{
   py::gil_scoped_acquire gil{{}};
   if (not x or x -> is_none()) throw std::runtime_error("Cannot convert None to workspace variable.");
 )--");
@@ -89,7 +90,7 @@ bool convert_ref(Wsv& wsv, const py::object * const x) {{
     }
   }
 
-  os << "\n  return false;\n}\n}\n";
+  std::print(os, "\n  return false;\n}}\n}}\n");
 } catch (const std::exception& e) {
   std::println(
       stderr, "Error in implement_convert_const_py_object: {}", e.what());
@@ -124,39 +125,39 @@ void implement_from_py_object() try {
   const auto& wsgs = internal_workspace_groups();
 
   std::ofstream os("py_auto_wsg_from_py_object.cpp");
-  os << R"--(#include <py_auto_wsg.h>
+  std::println(os, R"--(#include <py_auto_wsg.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/nanobind.h>
 
 #include "py_auto_options.h"
 
-namespace Python {
-)--";
-  os << R"--(
+namespace Python {{
 
-Wsv from(py::object * const x) {
-  py::gil_scoped_acquire gil{};
+Wsv from(py::object * const x) {{
+  py::gil_scoped_acquire gil{{}};
   if (not x or x -> is_none()) throw std::runtime_error("Cannot have None as workspace variable.");
-)--";
+)--");
 
   for (auto& [group, wsg] : wsgs) {
     if (wsg.value_type) {
-      os << "  if (py::isinstance<ValueHolder<" << group
-         << ">>(*x)) return py::cast<ValueHolder<" << group
-         << ">>(py::object(x->attr(\"value\")), false).val;\n";
+      std::println(os,
+                   R"(  if (py::isinstance<ValueHolder<{0}>>(*x))
+    return py::cast<ValueHolder<{0}>>(py::object(x->attr("value")), false).val;)",
+                   group);
     } else {
-      os << "  if (py::isinstance<" << group
-         << ">(*x)) return py::cast<std::shared_ptr<" << group
-         << ">>(*x, false);\n";
+      std::println(os,
+                   R"(  if (py::isinstance<{0}>(*x))
+    return py::cast<std::shared_ptr<{0}>>(*x, false);)",
+                   group);
     }
   }
 
-  os << R"--(
+  std::println(os, R"--(
   
   throw std::runtime_error("Cannot convert pure python object to workspace variable.");
-}
-}  // namespace Python
-)--";
+}}
+}}  // namespace Python
+)--");
 } catch (const std::exception& e) {
   std::println(stderr, "Error in implement_from_py_object: {}", e.what());
   throw;
@@ -164,21 +165,21 @@ Wsv from(py::object * const x) {
 
 void implement_string_type() try {
   std::ofstream os("py_auto_wsg_string_type.cpp");
-  os << R"--(#include <py_auto_wsg.h>
+  std::println(os, R"--(#include <py_auto_wsg.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/nanobind.h>
 
 #include "py_auto_options.h"
 
-namespace Python {
-std::string type(const py::object * const x) {
-  py::gil_scoped_acquire gil{};
+namespace Python {{
+std::string type(const py::object * const x) {{
+  py::gil_scoped_acquire gil{{}};
   if (not x or x -> is_none()) return "NoneType";
 
   return py::cast<std::string>(py::str(py::type_name(*x)));
-}
-}  // namespace Python
-)--";
+}}
+}}  // namespace Python
+)--");
 } catch (const std::exception& e) {
   std::println(stderr, "Error in implement_string_type: {}", e.what());
   throw;
@@ -213,11 +214,11 @@ py::object to_py(const Wsv& wsv) {{
     }
   }
 
-  os << R"--(  }
+  std::println(os, R"--(  }}
   return py::none();
-}
-}  // namespace Python
-)--";
+}}
+}}  // namespace Python
+)--");
 } catch (const std::exception& e) {
   std::println(stderr, "Error in implement_to_py_wsv: {}", e.what());
   throw;
@@ -234,7 +235,7 @@ void groups(const std::string& fname) try {
 
   std::ofstream hos(fname + ".h");
 
-  hos << R"--(#pragma once
+  std::println(hos, R"--(#pragma once
 
 #include <auto_wsg.h>
 #include <python_interface_value_type.h>
@@ -242,17 +243,16 @@ void groups(const std::string& fname) try {
 #include <nanobind/nanobind.h>
 
 #include <hpy_vector.h>
-
-)--";
+)--");
 
   for (auto& [group, wsg] :
        std::array{wsgs, workspace_group_friends()} | stdv::join) {
-    hos << "NB_MAKE_OPAQUE(Array<" << group << ">);\n";
-    if (wsg.map_type) hos << "NB_MAKE_OPAQUE(" << group << ");\n";
+    std::println(hos, "NB_MAKE_OPAQUE(Array<{}>);\n", group);
+    if (wsg.map_type) std::println(hos, "NB_MAKE_OPAQUE({});\n", group);
   }
 
-  hos << R"--(
-namespace Python {
+  std::println(hos, R"--(
+namespace Python {{
 namespace py = nanobind;
 
 bool convert_ref(Wsv& wsv, const py::object * const x);
@@ -263,56 +263,55 @@ Wsv from(const py::object* const x);
 std::string type(const py::object * const x);
 
 template <WorkspaceGroup T>
-std::string type(const T* const) {
-  return std::string{WorkspaceGroupInfo<T>::name};
-}
+std::string type(const T* const) {{
+  return std::string{{WorkspaceGroupInfo<T>::name}};
+}}
 
 template <WorkspaceGroup T>
-std::string type(const ValueHolder<T>* const) {
-  return std::string{WorkspaceGroupInfo<T>::name};
-}
+std::string type(const ValueHolder<T>* const) {{
+  return std::string{{WorkspaceGroupInfo<T>::name}};
+}}
 
 template <WorkspaceGroup T>
-Wsv from_py(std::shared_ptr<T> wsv) {
+Wsv from_py(std::shared_ptr<T> wsv) {{
   return wsv;
-}
+}}
 
 template <WorkspaceGroup T>
-Wsv from_py(ValueHolder<T> wsv) {
+Wsv from_py(ValueHolder<T> wsv) {{
   std::shared_ptr<T> copy = wsv.val;
   return copy;
-}
+}}
 
 py::object to_py(const Wsv& wsv);
 
 template <typename T>
-concept SharedFromPyable = requires(const std::shared_ptr<T>& x) {
-  { from_py(x) } -> std::same_as<Wsv>;
-} or requires(const std::shared_ptr<T>& x) {
-  { from_py(*x) } -> std::same_as<Wsv>;
-};
+concept SharedFromPyable = requires(const std::shared_ptr<T>& x) {{
+  {{ from_py(x) }} -> std::same_as<Wsv>;
+}} or requires(const std::shared_ptr<T>& x) {{
+  {{ from_py(*x) }} -> std::same_as<Wsv>;
+}};
 
 template <SharedFromPyable ... T>
-Wsv from(const std::variant<std::shared_ptr<T>...> * const x)  {
+Wsv from(const std::variant<std::shared_ptr<T>...> * const x)  {{
   if (not x) throw std::runtime_error("Cannot convert None to workspace variable.");
 
-  return std::visit([]<typename U>(const std::shared_ptr<U>& y) -> Wsv {
+  return std::visit([]<typename U>(const std::shared_ptr<U>& y) -> Wsv {{
     if constexpr (WorkspaceGroup<U>) return from_py(y);
     else return from_py(*y);
-  }, *x);
-}
+  }}, *x);
+}}
 
 template <SharedFromPyable ... T>
-std::string type(const std::variant<std::shared_ptr<T>...> * const x)  {
+std::string type(const std::variant<std::shared_ptr<T>...> * const x)  {{
   if (not x) throw std::runtime_error("Cannot convert None to workspace variable.");
 
-  return std::visit([]<typename U>(const std::shared_ptr<U>& y) -> std::string {
+  return std::visit([]<typename U>(const std::shared_ptr<U>& y) -> std::string {{
     return type(y.get());
-  }, *x);
-}
-}  // namespace Python
-
-)--";
+  }}, *x);
+}}
+}}  // namespace Python
+)--");
 } catch (const std::exception& e) {
   std::println(stderr, "Error in groups: {}", e.what());
   throw;
@@ -371,15 +370,15 @@ void agenda_operators() try {
 
   std::ofstream cpp("py_auto_agenda_operators.cpp");
 
-  cpp << R"(#include <python_interface.h>
+  std::println(cpp, R"(#include <python_interface.h>
 
 #include <hpy_arts.h>
 #include <nanobind/stl/function.h>
 
-namespace Python {
+namespace Python {{
 
-void py_auto_agenda_operators(py::module_& m) {
-)";
+void py_auto_agenda_operators(py::module_& m) {{
+)");
 
   for (auto& [name, ag] : internal_workspace_agendas()) {
     std::vector<std::string> input;
@@ -488,7 +487,7 @@ Failure to follow these rules will result in a runtime error.
                ag.output);
   }
 
-  cpp << "}}\n";
+  std::println(cpp, "}}}}\n");
 } catch (const std::exception& e) {
   std::println(stderr, "Error in agenda_operators: {}", e.what());
 }

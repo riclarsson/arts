@@ -158,7 +158,7 @@ void py_workspace(py::class_<Workspace>& ws) try {
             swap(w1, w2);
           },
           "other"_a,
-          "Swap the workspace for andother.");
+          "Swap the workspace for another.");
 
   ws.def(
       "__iter__",

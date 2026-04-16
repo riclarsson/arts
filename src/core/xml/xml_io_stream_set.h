@@ -59,7 +59,7 @@ struct xml_io_stream<std::set<T>> {
     tag.read_from_stream(is);
     tag.check_end_name(type_name);
   } catch (const std::exception& e) {
-    throw std::runtime_error(std::format("Error extending {}<{}>:\n{}",
+    throw std::runtime_error(std::format("Cannot extend {}<{}>:\n{}",
                                          type_name,
                                          xml_io_stream<T>::type_name,
                                          e.what()));
@@ -71,7 +71,7 @@ struct xml_io_stream<std::set<T>> {
     n.clear();
     extend(is, n, pbifs);
   } catch (const std::exception& e) {
-    throw std::runtime_error(std::format("Error reading {}<{}>:\n{}",
+    throw std::runtime_error(std::format("Cannot read {}<{}>:\n{}",
                                          type_name,
                                          xml_io_stream<T>::type_name,
                                          e.what()));

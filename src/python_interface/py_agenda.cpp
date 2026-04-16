@@ -120,6 +120,10 @@ void py_agenda(py::module_& m) try {
           "name",
           [](const Method& method) { return method.get_name(); },
           "The name of the method.\n\n.. :class:`str`")
+      .def_prop_ro(
+          "output",
+          [](const Method& method) { return method.get_outs(); },
+          "The output variables of the method.\n\n.. :class:`list` of :class:`str`")
       .doc() = "The method class of ARTS";
 
   auto wsvmap = py::bind_map<std::unordered_map<std::string, Wsv>>(m, "WsvMap");
@@ -258,6 +262,11 @@ so Copy(a, out=b) will not even see the b variable.
           "ws"_a,
           "Executes the agenda on the provided workspace")
       .def(
+          "par_execute",
+          [](Agenda& a, Workspace& ws) { a.par_execute(ws); },
+          "ws"_a,
+          "Executes the agenda on the provided workspace in parallel")
+      .def(
           "finalize",
           [](Agenda& a, bool fix) { a.finalize(fix); },
           "fix"_a = false,
@@ -265,6 +274,12 @@ so Copy(a, out=b) will not even see the b variable.
       .def_prop_ro(
           "name",
           [](const Agenda& agenda) { return agenda.get_name(); },
+          "The name of the agenda.\n\n.. :class:`str`")
+      .def(
+          "_set_name",
+          [](Agenda& agenda, const std::string& name) {
+            agenda.set_name(name);
+          },
           "The name of the agenda.\n\n.. :class:`str`")
       .def_prop_ro(
           "methods",

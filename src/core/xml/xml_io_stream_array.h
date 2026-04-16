@@ -81,7 +81,7 @@ struct xml_io_stream<Array<T>> {
     tag.check_end_name(type_name);
   } catch (const std::exception& e) {
     throw std::runtime_error(std::format(
-        "Error extending {}<{}>:\n{}", type_name, inner::type_name, e.what()));
+        "Cannot extend {}<{}>:\n{}", type_name, inner::type_name, e.what()));
   }
 
   static void append(std::istream& is,
@@ -92,7 +92,7 @@ struct xml_io_stream<Array<T>> {
     n.emplace_back(std::move(x));
   } catch (const std::exception& e) {
     throw std::runtime_error(std::format(
-        "Error appending {}<{}>:\n{}", type_name, inner::type_name, e.what()));
+        "Cannot append {}<{}>:\n{}", type_name, inner::type_name, e.what()));
   }
 
   static void read(std::istream& is,
@@ -102,7 +102,7 @@ struct xml_io_stream<Array<T>> {
     extend(is, n, pbifs);
   } catch (const std::exception& e) {
     throw std::runtime_error(std::format(
-        "Error reading {}<{}>:\n{}", type_name, inner::type_name, e.what()));
+        "Cannot read {}<{}>:\n{}", type_name, inner::type_name, e.what()));
   }
 };
 

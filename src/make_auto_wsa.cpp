@@ -70,7 +70,7 @@ std::map<std::string, auto_ag> auto_ags(std::ostream& os) {
 void header_docstring(std::ostream& os,
                       const auto_ag& ag,
                       const std::string& agname) {
-  os << "/** " << ag.desc << "\n  @param[in] ws The workspace";
+  std::println(os, "/** {}\n  @param[in] ws The workspace", ag.desc);
 
   const auto is_input = [&ag](auto& v) {
     return std::find_if(ag.i.begin(), ag.i.end(), [v](auto& i) {
@@ -84,20 +84,22 @@ void header_docstring(std::ostream& os,
   };
 
   for (auto& [type, name] : ag.o) {
-    if (not is_input(name))
-      os << "\n  @param[out] " << name << " As WSV";
-    else
-      os << "\n  @param[inout] " << name << " As WSV";
+    std::println(os,
+                 "  @param[{}] {} As WSV",
+                 is_input(name) ? "inout"sv : "out"sv,
+                 name);
   }
 
   for (auto& [type, name] : ag.i) {
-    if (not is_output(name)) os << "\n  @param[in] " << name << " As WSV";
+    if (not is_output(name)) std::println(os, "  @param[in] {} As WSV", name);
   }
 
-  os << "\n  @param[in] " << agname << " As WSV";
-  os << "\n  @param[in] local_workspace_pointer - will be moved from if given";
-  os << "\n  @return Workspace - the shared and copied values of all the work the agenda performed"
-     << "\n*/\n";
+  std::println(os,
+               R"(  @param[in] {} As WSV
+  @param[in] local_workspace_pointer - will be moved from if given
+  @return Workspace - the shared and copied values of all the work the agenda performed
+*/)",
+               agname);
 }
 
 void call_operator(std::ostream& os,
@@ -133,7 +135,7 @@ void call_operator(std::ostream& os,
 void header(std::ostream& os) {
   const auto agmap = auto_ags(os);
 
-  os << R"--(#pragma once
+  std::println(os, R"--(#pragma once
 
 #include <string>
 #include <unordered_map>
@@ -143,11 +145,11 @@ void header(std::ostream& os) {
 
 struct Workspace;
 
-struct WorkspaceAgendaRecord {
+struct WorkspaceAgendaRecord {{
   std::string desc;
   std::vector <std::string> output;
   std::vector <std::string> input;
-};
+  }};
 
 const std::unordered_map<std::string, WorkspaceAgendaRecord>& workspace_agendas();
 
@@ -155,25 +157,24 @@ const std::unordered_map<std::string, WorkspaceAgendaRecord>& workspace_agendas(
 [[nodiscard]]
 std::unordered_map<std::string, std::vector<std::pair<std::string, std::string>>> get_agenda_enum_documentation();
 
-struct WorkspaceAgendaBoolHandler {
-)--";
+struct WorkspaceAgendaBoolHandler {{
+)--");
 
   for (auto& ag : agmap) {
-    os << "  bool has_" << ag.first << " : 1 {false};\n";
+    std::println(os, "  bool has_{} : 1 {{false}};", ag.first);
   }
 
-  os << R"--(
+  std::println(os, R"--(
   [[nodiscard]] bool has(const std::string&) const;
   void set(const std::string&);
   friend std::ostream& operator<<(std::ostream& os, const WorkspaceAgendaBoolHandler& wab);
-};
-
-)--";
+}};
+)--");
 
   for (auto& ag : agmap) {
     header_docstring(os, ag.second, ag.first);
     call_operator(os, ag.second, ag.first, true);
-    os << ";\n\n";
+    std::println(os, ";\n");
   }
 
   for (auto& [name, ag] : wsa) {
@@ -189,14 +190,20 @@ Agenda get_{0}(const std::string_view);
 }
 
 void agenda_checker(std::ostream& os, const std::string& name) {
-  os << "  if (not " << name;
-  os << ".is_checked()) {\n"
-        "    throw std::runtime_error(R\"--(\nYou have somehow created the agenda without checking it.\n\nPlease manually call finalize() on the agenda)--\");\n  }\n\n";
+  std::println(os,
+               R"xx(  if (not {0}.is_checked()) {{
+    throw std::runtime_error(R"--(
+You have somehow created the agenda without checking it.
 
-  os << "  if (const auto& n = " << name;
-  os << ".get_name(); n != \"" << name
-     << "\") {\n"
-        "    throw std::runtime_error(std::format(\"Mismatch with name: {}\", n));\n  }\n";
+Please manually call finalize() on the agenda
+)--");
+  }}
+
+  if (const auto& n = {0}.get_name(); n != "{0}") {{
+    throw std::runtime_error(std::format("Mismatch with name: {{}}", n));
+  }}
+)xx",
+               name);
 }
 
 std::string double_curly(std::string s) {
@@ -268,32 +275,30 @@ void workspace_setup_and_exec(std::ostream& os,
                  o.second);
   }
 
-  os << "\n  // Run all the methods\n  " << name;
-  os << ".execute(_lws);\n";
+  std::println(
+      os, "\n  // Run all the methods\n  {}.execute(_lws);", name);
 
   for (auto& constraint : ag.output_constraints) {
-    std::print(os,
-               R"--(
+    std::println(os,
+                 R"--(
   if(not ({}))
-    throw std::runtime_error(std::format(R"ERR({}
-)--",
-               constraint.test,
-               double_curly(constraint.constraint));
+    throw std::runtime_error(std::format(R"ERR({})--",
+                 constraint.test,
+                 double_curly(constraint.constraint));
 
     const Size N = max(constraint.printables,
                        [](const std::string& x) -> Size { return x.size(); });
     for (auto& p : constraint.printables) {
-      std::print(os,
-                 R"--(
+      std::println(os,
+                   R"--(
 {}:{} {{}})--",
-                 double_curly(p),
-                 std::string(N - p.size(), ' '));
+                   double_curly(p),
+                   std::string(N - p.size(), ' '));
     }
     if (not constraint.printables.empty()) {
       std::print(os,
                  R"--(
-)ERR", {:,}));
-)--",
+)ERR", {:,}));)--",
                  constraint.printables);
     }
   }
@@ -317,7 +322,8 @@ void workspace_setup_and_exec(std::ostream& os,
 void implementation(std::ostream& os) {
   const auto agmap = auto_ags(os);
 
-  os << R"--(#include "auto_wsa.h"
+  std::println(os,
+               R"--(#include "auto_wsa.h"
 
 #include <workspace_agenda_class.h>
 #include <workspace_method_class.h>
@@ -325,78 +331,99 @@ void implementation(std::ostream& os) {
 #include <workspace_class.h>
 #include <time_report.h>
 
-std::unordered_map<std::string, WorkspaceAgendaRecord> get_workspace_agendas() {
+std::unordered_map<std::string, WorkspaceAgendaRecord> get_workspace_agendas() {{
   std::unordered_map<std::string, WorkspaceAgendaRecord> ags;
-  ags.reserve()--"
-     << wsa.size() << ");\n\n";
+  ags.reserve({});
+)--",
+               wsa.size());
+
+  auto quoted =
+      std::views::transform([](const std::string& s) { return '"' + s + '"'; });
 
   for (const auto& [name, ag] : agmap) {
-    os << "ags[\"" << name << '"'
-       << "] = WorkspaceAgendaRecord{\n    .desc=R\"--(" << ag.desc << ")--\","
-       << "\n    .output={";
-    for (const auto& o : ag.o) {
-      os << std::format(R"("{}")", o.second) << ", ";
-    }
-    os << "},\n    .input={";
-    for (const auto& i : ag.i) {
-      os << std::format(R"("{}")", i.second) << ", ";
-    }
-    os << "}\n  };\n\n";
+    std::println(
+        os,
+        R"-x-(ags["{}"] = WorkspaceAgendaRecord{{
+    .desc=R"--({})--",
+    .output={{{:,}}},
+    .input={{{:,}}},
+}};
+)-x-",
+        name,
+        ag.desc,
+        ag.o | stdv::values | quoted | stdr::to<std::vector<std::string>>(),
+        ag.i | stdv::values | quoted | stdr::to<std::vector<std::string>>());
   }
 
-  os << R"--(  return ags;
-}
+  std::println(os, R"--(  return ags;
+}}
 
-const std::unordered_map<std::string, WorkspaceAgendaRecord>& workspace_agendas() {
+const std::unordered_map<std::string, WorkspaceAgendaRecord>& workspace_agendas() {{
   const static auto ags = get_workspace_agendas();
   return ags;
-}
+}}
 
-bool WorkspaceAgendaBoolHandler::has(const std::string& ag) const {
-)--";
+bool WorkspaceAgendaBoolHandler::has(const std::string& ag) const {{)--");
+
   for (auto& ag : agmap) {
-    os << "  if (ag == \"" << ag.first << "\") return has_" << ag.first
-       << ";\n";
+    std::println(os, R"(  if (ag == "{0}") return has_{0};)", ag.first);
   }
   for (auto& ag : internal_workspace_agenda_names()) {
-    os << "  if (ag == \"" << ag.first << "\") return has_" << ag.second
-       << ";\n";
+    std::println(
+        os, R"(  if (ag == "{0}") return has_{1};)", ag.first, ag.second);
   }
-  os << R"--(
-  throw std::runtime_error(std::format("Not a predefined agenda: \"{}\"", ag));
-}
+  std::println(os, R"--(
+  throw std::runtime_error(std::format("Not a predefined agenda: \"{{}}\"", ag));
+}}
 
-void WorkspaceAgendaBoolHandler::set(const std::string& ag) {
-)--";
+void WorkspaceAgendaBoolHandler::set(const std::string& ag) {{
+)--");
   for (auto& ag : agmap) {
-    os << "  if (ag == \"" << ag.first << "\") {has_" << ag.first
-       << " = true; return;}\n";
+    std::println(os,
+                 R"(  if (ag == "{0}") {{has_{0} = true; return;}})",
+                 ag.first,
+                 ag.first);
   }
   for (auto& ag : internal_workspace_agenda_names()) {
-    os << "  if (ag == \"" << ag.first << "\") {has_" << ag.second
-       << " = true; return;}\n";
+    std::println(os,
+                 R"(  if (ag == "{0}") {{has_{1} = true; return;}})",
+                 ag.first,
+                 ag.second);
   }
-  os << R"--(
-  throw std::runtime_error(std::format("Not a predefined agenda: \"{}\"", ag));
-}
-std::ostream& operator<<(std::ostream& os, const WorkspaceAgendaBoolHandler& wab) {
-)--";
+  std::println(os, R"--(
+  throw std::runtime_error(std::format("Not a predefined agenda: \"{{}}\"", ag));
+}}
+std::ostream& operator<<(std::ostream& os, const WorkspaceAgendaBoolHandler& wab) {{
+)--");
+
+  const Size n =
+      stdr::max_element(
+          agmap | stdv::keys, {}, [](const std::string& s) { return s.size(); })
+          .base()
+          ->first.size();
   for (auto& ag : agmap) {
-    os << "  os << \"" << ag.first << ": \" << wab.has_" << ag.first
-       << " << '\\n';\n";
+    std::println(os,
+                 R"(  os << "{0}: {2}" << wab.has_{0} << '\n';)",
+                 ag.first,
+                 ag.first,
+                 std::string(n - ag.first.size(), ' '));
   }
-  os << R"--(
+  std::println(os, R"--(
   return os;
-}
-
-)--";
+}}
+)--");
   for (const auto& [name, ag] : agmap) {
     call_operator(os, ag, name, false);
-    os << " try {\n  ARTS_TIME_REPORT\n\n";
+    std::println(os, " try {{\n  ARTS_TIME_REPORT\n");
     agenda_checker(os, name);
     workspace_setup_and_exec(os, name, ag);
-    os << "} catch(std::exception& e) {\n  throw std::runtime_error(std::format(R\"--(Error executing agenda "
-       << '"' << name << '"' << ":\n{})--\", e.what()));\n}\n\n";
+    std::println(os,
+                 R"(}} catch(std::exception& e) {{
+  throw std::runtime_error(std::format(R"--(Error executing agenda "{}":
+{{}})--", e.what()));
+}}
+)",
+                 name);
   }
 
   for (auto& [name, ag] : wsa) {
@@ -434,11 +461,9 @@ std::unordered_map<std::string, std::vector<std::pair<std::string, std::string>>
                  opt,
                  name);
     }
-
-    os << '\n';
   }
 
-  os << "  return out;\n}\n";
+  std::println(os, "  return out;\n}}");
 }
 
 void options(std::ostream& os) {
@@ -496,7 +521,8 @@ int main() try {
   implementation(impl);
   options(optshh);
 } catch (std::exception& e) {
-  std::cerr << "Cannot create the automatic agendas with error:\n\n"
-            << e.what() << '\n';
+  std::println(stderr,
+               "Cannot create the automatic agendas with error:\n\n{}",
+               e.what());
   return 1;
 }
