@@ -6,13 +6,24 @@
 #include <ranges>
 #include <stdexcept>
 
+#include "enumsWorkspaceInitialization.h"
+
+namespace {
+std::unordered_map<std::string, Wsv> from_global_defaults() {
+  std::unordered_map<std::string, Wsv> wsv{};
+  for (const auto& [name, record] : workspace_variables()) {
+    if (record.default_value.has_value()) {
+      wsv[name] = Wsv{record.default_value.value()};
+    }
+  }
+  return wsv;
+}
+}  // namespace
+
 Workspace::Workspace(WorkspaceInitialization how_to_initialize) : wsv{} {
   if (WorkspaceInitialization::FromGlobalDefaults == how_to_initialize) {
-    for (const auto& [name, record] : workspace_variables()) {
-      if (record.default_value.has_value()) {
-        wsv[name] = Wsv{record.default_value.value()};
-      }
-    }
+    static const auto global_defaults = from_global_defaults();
+    wsv = global_defaults;
   }
 }
 
