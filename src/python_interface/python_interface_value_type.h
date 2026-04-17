@@ -34,6 +34,11 @@ struct ValueHolder {
   operator type&() noexcept { return *val; }
   operator const type&() const noexcept { return *val; }
 
+  operator Wsv() const {
+    std::shared_ptr<type> v = val;
+    return std::move(v);
+  }
+
   friend std::ostream& operator<<(std::ostream& os, const ValueHolder& a) {
     return os << *a.val;
   }

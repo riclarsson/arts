@@ -32,7 +32,7 @@ std::string using_pygroup() {
     if (wsg.value_type) {
       os << "ValueHolder<" << name << ">";
     } else if (name == "Any") {
-      os << "py::object";
+      os << "Wsv";
     } else {
       os << name;
     }
@@ -128,10 +128,6 @@ std::string method_gout_selection(const WorkspaceMethodInternalRecord& wsm) {
 
   for (std::size_t i = 0; i < wsm.gout.size(); i++) {
     if (wsm.gout_type[i] == "Any") {
-      std::println(
-          os,
-          R"-x-(        Wsv {0} = _{0} ? from(_{0}) : throw std::runtime_error(R"(Unknown output: "{0}")");)-x-",
-          wsm.gout[i]);
     } else if (uses_variadic(wsm.gout_type[i])) {
       std::println(
           os,
@@ -157,10 +153,6 @@ std::string method_gin_selection(const std::string& name,
     const bool has_default = wsm.gin_value[i].has_value();
 
     if (wsm.gin_type[i] == "Any") {
-      std::println(
-          os,
-          R"-x-(        const Wsv {0} = _{0} ? from(_{0}) : throw std::runtime_error(R"(Unknown input: "{0}")");)-x-",
-          wsm.gin[i]);
     } else if (uses_variadic(wsm.gin_type[i])) {
       std::println(
           os,
@@ -232,13 +224,13 @@ std::string method_resolution_any(const std::string& name,
   std::size_t i_any = 0;
   for (std::size_t i = 0; i < wsm.gout.size(); i++) {
     if (wsm.gout_type[i] == "Any") {
-      std::println(os, "        auto& _any{} = {};", ++i_any, wsm.gout[i]);
+      std::println(os, "        auto& _any{} = *_{};", ++i_any, wsm.gout[i]);
     }
   }
 
   for (std::size_t i = 0; i < wsm.gin.size(); i++) {
     if (wsm.gin_type[i] == "Any") {
-      std::println(os, "        auto& _any{} = {};", ++i_any, wsm.gin[i]);
+      std::println(os, "        auto& _any{} = *_{};", ++i_any, wsm.gin[i]);
     }
   }
 
@@ -573,7 +565,7 @@ std::string method_error(const std::string& name,
         os, R"({1} {0}: {{}})", std::string(largest_var - t.size(), ' '), t);
     if (tt == "Any") {
       arg.push_back(std::format(
-          R"(_{0} ? std::format("User-provided {{}}", type(_{0})) : std::string("None"))",
+          R"(_{0} ? std::format("User-provided {{}}", _{0} -> type_name()) : std::string("None"))",
           t));
     } else if (uses_variadic(tt)) {
       arg.push_back(std::format(
@@ -597,16 +589,25 @@ std::string method_error(const std::string& name,
   }
 
   for (std::size_t i = 0; i < wsm.gin.size(); i++) {
-    auto& t = wsm.gin[i];
-    auto& v = wsm.gin_value[i];
+    auto& t  = wsm.gin[i];
+    auto& v  = wsm.gin_value[i];
+    auto& tt = wsm.gin_type[i];
     if (not first) os << ",\n" << spaces;
     first = false;
     std::print(
         os, R"({1} {0}: {{}})", std::string(largest_var - t.size(), ' '), t);
-    arg.push_back(std::format(
-        R"(_{0} ? std::format("User-provided {{}}", type(_{0})) : std::string(R"-WSMVAR-({1})-WSMVAR-"))",
-        t,
-        v ? std::format("{}", to_defval_str(*v, ""sv)) : "None"));
+
+    if (tt == "Any") {
+      arg.push_back(std::format(
+          R"(_{0} ? std::format("User-provided {{}}", _{0} -> type_name()) : std::string(R"-WSMVAR-({1})-WSMVAR-"))",
+          t,
+          v ? std::format("{}", to_defval_str(*v, ""sv)) : "None"));
+    } else {
+      arg.push_back(std::format(
+          R"(_{0} ? std::format("User-provided {{}}", type(_{0})) : std::string(R"-WSMVAR-({1})-WSMVAR-"))",
+          t,
+          v ? std::format("{}", to_defval_str(*v, ""sv)) : "None"));
+    }
   }
 
   os << ")\n\nMethod reports the following error(s):\n{})-WSM-\", ";
@@ -629,10 +630,15 @@ std::string method_argument_documentation(
     os << "\"" << t << "\"_a.noconvert().none() = py::none()";
   }
 
-  for (const auto& t : wsm.gout) {
+  for (Size i = 0; i < wsm.gout.size(); i++) {
+    auto& t   = wsm.gout[i];
+    auto&& tt = wsm.gout_type[i];
     if (not first) os << ",\n    ";
     first = false;
-    os << "\"" << t << "\"_a.noconvert().none() = py::none()";
+    std::print(os,
+               R"(" {} "_a{}.none() = py::none())",
+               t,
+               tt == "Any" ? ""sv : ".noconvert()"sv);
   }
 
   for (const auto& t : wsm.in) {

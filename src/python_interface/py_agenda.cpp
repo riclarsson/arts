@@ -9,6 +9,7 @@
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/vector.h>
 #include <parameters.h>
+#include <xpy_auto_wsg_wsv_implicit.h>
 #include <workspace.h>
 #include <workspace_groups.h>
 
@@ -84,6 +85,7 @@ void py_agenda(py::module_& m) try {
          [](Wsv& v) { return to_py(v); },
          "A workspace variable.\n\n.. :class:`~pyarts3.arts.Any`")
       .doc() = "A workspace variable wrapper - no manual use required";
+  wsv_implicit(wsv);
 
   py::class_<Method> methods(m, "Method");
   generic_interface(methods);

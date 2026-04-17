@@ -7,6 +7,7 @@
 #include <string>
 
 #include "pydocs.h"
+#include "workspace_groups.h"
 
 namespace {
 void implement_convert_const_py_object() try {
@@ -492,12 +493,50 @@ Failure to follow these rules will result in a runtime error.
 } catch (const std::exception& e) {
   std::println(stderr, "Error in agenda_operators: {}", e.what());
 }
+
+void wsv_implicit() try {
+  std::ofstream cpp("py_auto_wsg_wsv_implicit.cpp");
+  std::ofstream hpp("py_auto_wsg_wsv_implicit.h");
+
+  std::println(hpp, R"(#pragma once
+
+#include <python_interface.h>
+
+namespace Python {{
+void wsv_implicit(py::class_<Wsv>& wsv);
+}}  // namespace Python
+)");
+
+  std::println(cpp, R"(#include <python_interface.h>
+#include <nanobind/stl/shared_ptr.h>
+
+namespace Python {{
+void wsv_implicit(py::class_<Wsv>& wsv) {{)");
+
+  for (auto& group : internal_workspace_groups()) {
+    std::println(
+        cpp,
+        R"(wsv.def( "__init__", [] (Wsv* v, {0}<{1}> a) {{ new (v) Wsv{{ std::move(a) }}; }}, "a"_a);)",
+        group.second.value_type ? "ValueHolder"sv : "std::shared_ptr"sv,
+        group.first);
+    std::println(
+        cpp,
+        R"(py::implicitly_convertible<{0}<{1}>, Wsv>();)",
+        group.second.value_type ? "ValueHolder"sv : "std::shared_ptr"sv,
+        group.first);
+  }
+
+  cpp << "}\n}  // namespace Python\n";
+} catch (const std::exception& e) {
+  std::println(stderr, "Error in wsv_implicit: {}", e.what());
+}
 }  // namespace
 
 int main() try {
   groups("py_auto_wsg");
   groupdocs("py_auto_wsgdocs");
   agenda_operators();
+  wsv_implicit();
 } catch (const std::exception& e) {
   std::println(stderr, "Error: {}", e.what());
   return EXIT_FAILURE;
