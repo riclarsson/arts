@@ -343,7 +343,7 @@ The order is
 
 This is closely related to *spectral_propmat*.
 
-Gven the level source term:
+Given the level source term:
 
 .. math:: \vec{J} = \mathbf{K}^{-1} \left(\vec{\alpha}B + \vec{J}_n + \cdots\right),
 
@@ -799,7 +799,7 @@ This is otherwise the same as *measurement_jac*.  See it for more details.
   };
 
   wsv_data["measurement_vec"] = {
-      .desc = R"(The measurment vector for, e.g., a sensor.
+      .desc = R"(The measurement vector for, e.g., a sensor.
 
 This must often be the same size as *measurement_sensor*.
 
@@ -825,7 +825,7 @@ These are:
   };
 
   wsv_data["measurement_vec_error"] = {
-      .desc = R"(The model measurment vector error for, e.g., a sensor.
+      .desc = R"(The model measurement vector error for, e.g., a sensor.
 
 This must often be the same size as *measurement_sensor*.
 

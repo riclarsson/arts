@@ -473,7 +473,7 @@ It holds essentially two things:
 
     #. *GeodeticField3* - The grids are altitude, latitude, longitude.
        Will consider the extrapolation rules but otherwise performs linear interpolation between all points.
-       With the additional rule that longitude is considerd cyclic around [-180, 180).
+       With the additional rule that longitude is considered cyclic around [-180, 180).
 
     #. *NumericTernaryOperator* - The data field has functional form.
        Cannot consider the extrapolation rules as there is no grid.

@@ -136,9 +136,7 @@ Method::Method(const std::string& n,
   throw std::runtime_error(std::format("No method named \"{}\"", n));
 } catch (std::exception& e) {
   throw std::runtime_error(
-      std::format("Cannot construct method \"{}\"\n{}",
-                  n,
-                  std::string_view(e.what())));
+      std::format("Cannot construct method \"{}\"\n{}", n, e.what()));
 }
 
 Method::Method(std::string n, const Wsv& wsv, bool overwrite)
@@ -268,12 +266,12 @@ std::string Method::sphinx_list_item() const {
     const bool has_str  = setval->holds<String>();
     const bool is_basic = setval->holds<Numeric>() or setval->holds<Index>();
 
-    const std::string fmtated =
+    const std::string formatted =
         has_str    ? std::format("\"{}\"", setval->get<String>())
         : is_basic ? setval->vformat("{}"sv)
                    : setval->vformat("{:sqNB,}"sv);
 
-    return std::format("{} = {}", wsv_format(std::string{name}), fmtated);
+    return std::format("{} = {}", wsv_format(std::string{name}), formatted);
   }
 
   std::vector<SetvalHelper> setvals;

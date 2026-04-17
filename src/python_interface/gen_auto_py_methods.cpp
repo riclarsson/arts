@@ -571,7 +571,11 @@ std::string method_error(const std::string& name,
     first = false;
     std::print(
         os, R"({1} {0}: {{}})", std::string(largest_var - t.size(), ' '), t);
-    if (uses_variadic(tt) or tt == "Any") {
+    if (tt == "Any") {
+      arg.push_back(std::format(
+          R"(_{0} ? std::format("User-provided {{}}", type(_{0})) : std::string("None"))",
+          t));
+    } else if (uses_variadic(tt)) {
       arg.push_back(std::format(
           R"(_{0} ? std::format("User-provided {{}}", type(_{0})) : std::string("None"))",
           t));
@@ -654,9 +658,8 @@ std::string method_argument_documentation(
 
 std::string method(const std::string& name,
                    const WorkspaceMethodInternalRecord& wsm) {
-  if (not count_any(wsm)) {
-    return std::format(
-        R"-x-(  ws.def("{0}",[]({1}) -> {7} {{
+  return std::format(
+      R"-x-(  ws.def("{0}",[]({1}) -> {7} {{
     try {{
 {2}{3}
     }} catch (std::exception& e) {{
@@ -667,29 +670,14 @@ std::string method(const std::string& name,
     py::call_guard<py::gil_scoped_release>());
 
 )-x-",
-        name,
-        method_arguments(wsm),
-        method_argument_selection(name, wsm),
-        method_resolution(name, wsm),
-        method_error(name, wsm),
-        method_argument_documentation(wsm),
-        method_docs(name),
-        wsm.return_type);
-  }
-
-  return std::format(
-      R"-x-(  ws.def("{0}",[](Workspace& _ws [[maybe_unused]], const py::args&, const py::kwargs&) -> void {{
-    throw std::runtime_error("Generic methods only available inside Agendas.  Please use python equivalents for manual execution.");
-  }},
-{2}
-"\n"
-".. rubric:: Agenda-only method\n\n"
-"This method is only available inside Agendas.  Please use the python equivalents for manual execution.");
-
-)-x-",
       name,
+      method_arguments(wsm),
+      method_argument_selection(name, wsm),
+      method_resolution(name, wsm),
       method_error(name, wsm),
-      method_docs(name));
+      method_argument_documentation(wsm),
+      method_docs(name),
+      wsm.return_type);
 }
 
 void methods(int nfiles) {

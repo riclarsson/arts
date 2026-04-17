@@ -1516,7 +1516,7 @@ where :math:`\Delta T_e` is the extrapolation factor given by
 use the computations anyways, set ``T_extrapolfac`` to a very large
 or infinite value.
 
-The frequnecy grid interpolation is limited to within the range
+The frequency grid interpolation is limited to within the range
 of the available data. Any point in *freq_grid* outside this
 range will simply be ignored.  The frequency interpolation can
 thus not fail.
@@ -2088,7 +2088,7 @@ outside of this range simply uses the formalism of  the select ``hydrostatic_opt
       .gin_desc =
           {"Lowest altitude pressure field.  :math:`P_0` above.",
            "Specific gas constant if larger than 0",
-           "Constant atmospheric temprature if larger than 0",
+           "Constant atmospheric temperature if larger than 0",
            "Computational option for levels.  See *HydrostaticPressureOption* for valid options."},
   };
 
@@ -3114,7 +3114,7 @@ derivative, and then you call this method to add the second and third component.
   wsm_data["jac_targetsAddWindField"] = {
       .desc      = R"--(Set wind field derivative.
 
-Note that the derivatives from methods that takes the freqeuncy will return
+Note that the derivatives from methods that takes the frequency will return
 their derivatives as if these were frequency derivatives.
 
 See *FieldComponent* for valid ``component``
@@ -3282,7 +3282,7 @@ be computed from the line strength, or simply read from the Hitran data.
           {"Filename",
            "Frequency range selection",
            "The order of file format types.  See *HitranFileFormatType* for valid options",
-           "Whether the Hitran line strenght or the Hitran Einstein coefficient is used, the latter has historically been less reliable",
+           "Whether the Hitran line strength or the Hitran Einstein coefficient is used, the latter has historically been less reliable",
            "Compute the Zeeman parameters from the HITRAN data (will not activate Zeeman calculations, this must be done manually afterwards)"},
   };
 
@@ -3808,7 +3808,7 @@ Options:
       .gin_desc =
           {"Option for max stepping.  See *ray_path_observer_agendaSetGeometricMaxStep*",
            "The accuracy to search for surface intersections",
-           "The minimum distance between points, ignroed if 0 or less",
+           "The minimum distance between points, ignored if 0 or less",
            "The atmospheric field key for which the grid is expected if adding grid crossings is desired",
            "Whether or not to search for the surface intersection in a safer but slower manner",
            "Which point (first or second) to remove if they are too close",
@@ -3901,8 +3901,8 @@ bad angles if this is turned off.
            "The line of sight of the radiation path",
            "The accuracy within which the surface intersection is counted as a hit",
            "Whether or not the path is as seen by the sensor or by the radiation (see text)",
-           "Wheter or not to add the limb point",
-           "Wheter or not to keep only atmospheric points",
+           "Whether or not to add the limb point",
+           "Whether or not to keep only atmospheric points",
            "Whether or not to attempt fix a potential issue with the path azimuthal angle",
            "Whether or not to search for the surface intersection in a safer but slower manner"},
   };
@@ -4594,7 +4594,7 @@ All elements share position, line-of-sight, and frequency grid.
       .gin_desc =
           {"A position [alt, lat, lon]",
            "A line of sight [zenith, azimuth]",
-           "The polarization whos dot-product with the spectral radiance becomes the measurement"},
+           "The polarization whose dot-product with the spectral radiance becomes the measurement"},
   };
 
   wsm_data["measurement_sensorAddGaussianZenith"] = {
@@ -4614,7 +4614,7 @@ All elements share position, line-of-sight, and frequency grid.
       .gin_desc =
           {"A position [alt, lat, lon]",
            "A line of sight [zenith, azimuth]",
-           "The polarization whos dot-product with the spectral radiance becomes the measurement",
+           "The polarization whose dot-product with the spectral radiance becomes the measurement",
            "The delta zenith grid for the Gaussian response",
            "The standard deviation for the Gaussian response"},
   };
@@ -4643,7 +4643,7 @@ the Q, U, and V components' hypotenuse are normalized to 1 or 0 together.
           {"The standard deviations of the channels",
            "A position [alt, lat, lon]",
            "A line of sight [zenith, azimuth]",
-           "The polarization whos dot-product with the spectral radiance becomes the measurement"},
+           "The polarization whose dot-product with the spectral radiance becomes the measurement"},
   };
 
   {
@@ -4820,7 +4820,7 @@ that just returns the first time a path hits the sun.
       .gin_desc =
           {"An observer position [alt, lat, lon]",
            "The angle delta-cutoff in the iterative solver [0.0, ...]",
-           "The refinement of the search algorithm (twice the power of this is the resultion)",
+           "The refinement of the search algorithm (twice the power of this is the resolution)",
            "Whether or not it is enough to just hit the sun or if better accuracy is needed"},
       .pass_workspace = true,
   };
@@ -4837,7 +4837,7 @@ that just returns the first time a path hits the sun.
       .gin_value = {Numeric{0.0}, Index{1}, Index{0}},
       .gin_desc =
           {"The angle delta-cutoff in the iterative solver [0.0, ...]",
-           "The refinement of the search algorithm (twice the power of this is the resultion)",
+           "The refinement of the search algorithm (twice the power of this is the resolution)",
            "Whether or not it is enough to just hit the sun or if better accuracy is needed"},
       .pass_workspace = true,
   };
@@ -5155,7 +5155,7 @@ This makes the method more suitable for strongly non-linear problems.
 If the gamma-factor is 0, Levenberg-Marquardt and Gauss-Newton method
 are identical. Each minimization method (li,gn,lm) has an indirect
 variant (li_cg,gn_cg,lm_cg), which uses the conjugate gradient solver
-for the linear system that has to be solved in each minimzation step.
+for the linear system that has to be solved in each minimization step.
 This of advantage for very large problems, that would otherwise require
 the computation of expensive matrix products.
 
@@ -5182,7 +5182,7 @@ Description of the special input arguments:
 
       A normalisation vector for *model_state_vec*. A normalisation of *model_state_vec* can be needed
       due to limited numerical precision. If this vector is set to be empty
-      no normalisation is done (defualt case). Otherwise, this must be a
+      no normalisation is done (default case). Otherwise, this must be a
       vector with same length as *model_state_vec*, just having values above zero.
       Elementwise division between *model_state_vec* and ``x_norm`` (x./x_norm) shall give
       a vector where all values are in the order of unity. Maybe the best
@@ -5202,11 +5202,11 @@ Description of the special input arguments:
       This is a vector of length 6, having the elements (0-based index):
 
             0. Start value.
-            1. Fractional decrease after succesfull iteration.
+            1. Fractional decrease after successful iteration.
             2. Fractional increase after unsuccessful iteration.
             3. Maximum allowed value. If the value is passed, the inversion is halted.
-            4. Lower treshold. If the threshold is passed, gamma is set to zero. If gamma must be increased from zero, gamma is set to this value.
-            5. Gamma limit. This is an additional stop criterion. Convergence is not considered until there has been one succesful iteration having a gamma <= this value.
+            4. Lower threshold. If the threshold is passed, gamma is set to zero. If gamma must be increased from zero, gamma is set to this value.
+            5. Gamma limit. This is an additional stop criterion. Convergence is not considered until there has been one successful iteration having a gamma <= this value.
       
       The default setting triggers an error if "lm" is selected.
 
@@ -5275,7 +5275,7 @@ Description of the special input arguments:
       .gin_desc =
           {"Iteration method. For this and all options below, see further above",
            "Maximum allowed value of cost function at start",
-           "Normalisation of Sx",
+           "Normalization of Sx",
            "Maximum number of iterations",
            "Stop criterion for iterative inversions",
            "Settings associated with the ga factor of the LM method",

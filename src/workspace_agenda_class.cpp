@@ -100,11 +100,11 @@ void Agenda::finalize(bool fix) try {
     if (stdr::binary_search(ins_first, o) and
         not stdr::binary_search(in_then_out, o)) {
       throw std::runtime_error(std::format(
-          R"(Agenda "{}" uses "{}" only as an input but it is Agenda inoutput
+          R"(Agenda "{}" uses "{}" only as an input but it is Agenda in-out
 
 Agenda user input:      {:B,}
 Agenda user output:     {:B,}
-Agenda user inoutput:   {:B,}
+Agenda user in-out:     {:B,}
 
 Agenda required input:  {:B,}
 Agenda required output: {:B,}
