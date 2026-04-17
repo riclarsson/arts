@@ -227,8 +227,8 @@ void xml_read_from_file_base(const String& filename, T& type) try {
   xml_io_stream<T>::read(buffer, type, xsh);
   xml_read_footer_from_stream(buffer);
 } catch (const std::runtime_error& e) {
-  throw std::runtime_error(
-      std::format("Error reading file {}:\n{}", filename, e.what()));
+  throw std::runtime_error(std::format(
+      "Cannot read file with full filename: \"{}\":\n{}", filename, e.what()));
 }
 
 //! Extends data from XML file
@@ -249,8 +249,8 @@ void xml_extend_from_file_base(const String& filename, T& type) try {
   xml_io_stream<T>::extend(buffer, type, xsh);
   xml_read_footer_from_stream(buffer);
 } catch (const std::runtime_error& e) {
-  throw std::runtime_error(
-      std::format("Error reading file {}:\n{}", filename, e.what()));
+  throw std::runtime_error(std::format(
+      "Cannot extend file with full filename: \"{}\":\n{}", filename, e.what()));
 }
 
 //! Appends data from XML file
@@ -271,8 +271,8 @@ void xml_append_from_file_base(const String& filename, T& type) try {
   xml_io_stream<T>::append(buffer, type, xsh);
   xml_read_footer_from_stream(buffer);
 } catch (const std::runtime_error& e) {
-  throw std::runtime_error(
-      std::format("Error reading file {}:\n{}", filename, e.what()));
+  throw std::runtime_error(std::format(
+      "Cannot append file with full filename: \"{}\":\n{}", filename, e.what()));
 }
 
 //! Write data to XML file
@@ -321,9 +321,8 @@ void xml_write_to_file_base(const String& filename,
 
     xml_write_footer_to_stream(*ofs);
   } catch (const std::runtime_error& e) {
-    std::ostringstream os;
-    os << "Error writing file: " << filename << '\n' << e.what();
-    throw std::runtime_error(os.str());
+    throw std::runtime_error(std::format(
+        "Cannot write file with full filename: \"{}\":\n{}", filename, e.what()));
   }
 }
 
@@ -332,7 +331,7 @@ void xml_read_from_stream(std::istream& i, T& v, bifstream* b = nullptr) try {
   xml_io_stream<T>::read(i, v, b);
 } catch (const std::exception& e) {
   throw std::runtime_error(std::format(
-      "Error streaming {}:\n{}", xml_io_stream<T>::type_name, e.what()));
+      "Cannot stream {}:\n{}", xml_io_stream<T>::type_name, e.what()));
 }
 
 template <arts_xml_ioable T>

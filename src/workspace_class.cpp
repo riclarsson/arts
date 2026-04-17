@@ -6,14 +6,23 @@
 #include <ranges>
 #include <stdexcept>
 
-Workspace::Workspace(WorkspaceInitialization how_to_initialize) : wsv{} {
-  if (WorkspaceInitialization::FromGlobalDefaults == how_to_initialize) {
-    for (const auto& [name, record] : workspace_variables()) {
-      if (record.default_value.has_value()) {
-        wsv[name] = Wsv{record.default_value.value()};
-      }
+#include "enumsWorkspaceInitialization.h"
+
+namespace {
+std::unordered_map<std::string, Wsv> from_global_defaults() {
+  std::unordered_map<std::string, Wsv> wsv{};
+  for (const auto& [name, record] : workspace_variables()) {
+    if (record.default_value.has_value()) {
+      wsv[name] = Wsv{record.default_value.value()};
     }
   }
+  return wsv;
+}
+}  // namespace
+
+const std::unordered_map<std::string, Wsv>& global_wsv_defaults() {
+  static const auto wsv = from_global_defaults();
+  return wsv;
 }
 
 const Wsv& Workspace::share(const std::string& name) const try {
@@ -93,6 +102,10 @@ void Workspace::init(const std::string& name) try {
 } catch (std::exception& e) {
   throw std::runtime_error(
       std::format("Error setting '{}'\n{}", name, e.what()));
+}
+
+void Workspace::init_if_new(const std::string& name) {
+  if (not contains(name)) init(name);
 }
 
 Workspace Workspace::deepcopy() const {

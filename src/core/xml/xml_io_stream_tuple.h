@@ -102,7 +102,7 @@ struct xml_io_stream<std::tuple<Ts...>> {
     }
   } catch (const std::exception& e) {
     throw std::runtime_error(
-        std::format("Error reading {}<{:,}>:\n{}",
+        std::format("Cannot read {}<{:,}>:\n{}",
                     type_name,
                     std::array{xml_io_stream<Ts>::type_name...},
                     e.what()));

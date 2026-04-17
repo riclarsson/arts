@@ -263,6 +263,6 @@ struct xml_io_stream<T> {
     tag.check_end_name(type_name);
   } catch (const std::exception& e) {
     throw std::runtime_error(
-        std::format("Error reading {}:\n{}", type_name, e.what()));
+        std::format("Cannot read {}:\n{}", type_name, e.what()));
   }
 };

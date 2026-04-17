@@ -68,7 +68,7 @@ try {
   return xml_file;
 } catch (const std::exception& e) {
   throw std::runtime_error(
-      std::format("Error reading file {}:\n{}", filename, e.what()));
+      std::format("Cannot read file: \"{}\":\n{}", filename, e.what()));
 }
 
 //! Extends data from XML file
@@ -91,10 +91,7 @@ try {
   return xml_file;
 } catch (const std::exception& e) {
   throw std::runtime_error(
-      std::format("Error extending file {} containing {}:\n{}",
-                  filename,
-                  xml_io_stream_name_v<T>,
-                  e.what()));
+      std::format("Cannot extend file: \"{}\" containing {}:\n{}", filename, xml_io_stream_name_v<T>, e.what()));
 }
 
 //! Appends data from XML file
@@ -117,7 +114,7 @@ try {
   return xml_file;
 } catch (const std::exception& e) {
   throw std::runtime_error(
-      std::format("Error appending file {} containing {}:\n{}",
+      std::format("Cannot append file: \"{}\" containing {}:\n{}",
                   filename,
                   xml_io_stream_name_v<T>,
                   e.what()));

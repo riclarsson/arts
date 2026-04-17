@@ -7,11 +7,16 @@
 #include <memory>
 #include <unordered_map>
 
+const std::unordered_map<std::string, Wsv>& global_wsv_defaults();
+
 struct Workspace {
   std::unordered_map<std::string, Wsv> wsv;
 
   Workspace(WorkspaceInitialization how_to_initialize =
-                WorkspaceInitialization::FromGlobalDefaults);
+                WorkspaceInitialization::FromGlobalDefaults)
+      : wsv{WorkspaceInitialization::FromGlobalDefaults == how_to_initialize
+                ? global_wsv_defaults()
+                : std::unordered_map<std::string, Wsv>{}} {}
 
   //! Returns a shared pointer to the workspace variable with the given name.
   [[nodiscard]] const Wsv& share(const std::string& name) const;
@@ -93,6 +98,7 @@ struct Workspace {
   [[nodiscard]] auto size() const { return wsv.size(); }
 
   void init(const std::string& name);
+  void init_if_new(const std::string& name);
 
   [[nodiscard]] Workspace deepcopy() const;
 };

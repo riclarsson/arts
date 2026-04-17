@@ -199,22 +199,22 @@ void abs_cia_dataReadFromCIA(  // WS Output:
   // Loop species tag groups to find CIA tags.
   // Index sp loops through the tag groups, index iso through the tags within
   // each group. Despite the name, iso does not denote the isotope!
-  for (Size iso = 0; iso < abs_species.size(); iso++) {
-    if (abs_species[iso].Type() != SpeciesTagType::Cia) continue;
+  for (auto& abs_specie : abs_species) {
+    if (abs_specie.Type() != SpeciesTagType::Cia) continue;
 
     ArrayOfString cia_names;
 
-    SpeciesEnumPair species_key{.spec1 = abs_species[iso].Spec(),
-                                .spec2 = abs_species[iso].cia_2nd_species};
+    SpeciesEnumPair species_key{.spec1 = abs_specie.Spec(),
+                                .spec2 = abs_specie.cia_2nd_species};
 
     // If this species pair already exists in map, skip it
     if (abs_cia_data.contains(species_key)) continue;
 
-    cia_names.push_back(String(toString<1>(abs_species[iso].Spec())) + "-" +
-                        String(toString<1>(abs_species[iso].cia_2nd_species)));
+    cia_names.push_back(String(toString<1>(abs_specie.Spec())) + "-" +
+                        String(toString<1>(abs_specie.cia_2nd_species)));
 
-    cia_names.push_back(String(toString<1>(abs_species[iso].cia_2nd_species)) +
-                        "-" + String(toString<1>(abs_species[iso].Spec())));
+    cia_names.push_back(String(toString<1>(abs_specie.cia_2nd_species)) + "-" +
+                        String(toString<1>(abs_specie.Spec())));
 
     ArrayOfString checked_dirs;
 
@@ -252,9 +252,9 @@ void abs_cia_dataReadFromCIA(  // WS Output:
     }
 
     ARTS_USER_ERROR_IF(!found,
-                       "Error: No data file found for CIA species {}"
+                       "No data file found for CIA species {}"
                        "\n"
-                       "Looked in directories: {}",
+                       "Looked in directories: {:B,}",
                        cia_names[0],
                        checked_dirs)
   }
@@ -278,11 +278,11 @@ void abs_cia_dataReadFromXML(  // WS Output:
   // Loop species tag groups to find CIA tags.
   // Index sp loops through the tag groups, index iso through the tags within
   // each group. Despite the name, iso does not denote the isotope!
-  for (Size iso = 0; iso < abs_species.size(); iso++) {
-    if (abs_species[iso].Type() != SpeciesTagType::Cia) continue;
+  for (auto& abs_specie : abs_species) {
+    if (abs_specie.Type() != SpeciesTagType::Cia) continue;
 
-    SpeciesEnumPair species_key{.spec1 = abs_species[iso].Spec(),
-                                .spec2 = abs_species[iso].cia_2nd_species};
+    SpeciesEnumPair species_key{.spec1 = abs_specie.Spec(),
+                                .spec2 = abs_specie.cia_2nd_species};
 
     // If this species pair is not in the map, it was not present in the input file
     if (not abs_cia_data.contains(species_key)) {
@@ -290,20 +290,10 @@ void abs_cia_dataReadFromXML(  // WS Output:
     }
   }
 
-  if (missing_tags.size()) {
-    std::ostringstream os;
-    bool first = true;
-
-    os << "Error: The following CIA tag(s) are missing in input file: ";
-    for (Size i = 0; i < missing_tags.size(); i++) {
-      if (!first)
-        os << ", ";
-      else
-        first = false;
-      os << missing_tags[i];
-    }
-    ARTS_USER_ERROR("{}", os.str());
-  }
+  ARTS_USER_ERROR_IF(
+      missing_tags.size(),
+      "The following CIA tag(s) are missing in input file: {:B,}",
+      missing_tags);
 }
 
 void abs_cia_dataReadSpeciesSplitCatalog(CIARecords& abs_cia_data,

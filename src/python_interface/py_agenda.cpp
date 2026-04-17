@@ -9,6 +9,7 @@
 #include <nanobind/stl/variant.h>
 #include <nanobind/stl/vector.h>
 #include <parameters.h>
+#include <xpy_auto_wsg_wsv_implicit.h>
 #include <workspace.h>
 #include <workspace_groups.h>
 
@@ -84,6 +85,7 @@ void py_agenda(py::module_& m) try {
          [](Wsv& v) { return to_py(v); },
          "A workspace variable.\n\n.. :class:`~pyarts3.arts.Any`")
       .doc() = "A workspace variable wrapper - no manual use required";
+  wsv_implicit(wsv);
 
   py::class_<Method> methods(m, "Method");
   generic_interface(methods);
@@ -120,6 +122,10 @@ void py_agenda(py::module_& m) try {
           "name",
           [](const Method& method) { return method.get_name(); },
           "The name of the method.\n\n.. :class:`str`")
+      .def_prop_ro(
+          "output",
+          [](const Method& method) { return method.get_outs(); },
+          "The output variables of the method.\n\n.. :class:`list` of :class:`str`")
       .doc() = "The method class of ARTS";
 
   auto wsvmap = py::bind_map<std::unordered_map<std::string, Wsv>>(m, "WsvMap");
@@ -258,6 +264,16 @@ so Copy(a, out=b) will not even see the b variable.
           "ws"_a,
           "Executes the agenda on the provided workspace")
       .def(
+          "par_tasks",
+          [](Agenda& a, Workspace& ws) { return a.par_tasks(ws); },
+          "ws"_a,
+          "Returns a list of agendas to show their potential for parallel execution (used by par_execute)")
+      .def(
+          "par_execute",
+          [](Agenda& a, Workspace& ws) { a.par_execute(ws); },
+          "ws"_a,
+          "Executes the agenda on the provided workspace in parallel")
+      .def(
           "finalize",
           [](Agenda& a, bool fix) { a.finalize(fix); },
           "fix"_a = false,
@@ -266,10 +282,23 @@ so Copy(a, out=b) will not even see the b variable.
           "name",
           [](const Agenda& agenda) { return agenda.get_name(); },
           "The name of the agenda.\n\n.. :class:`str`")
+      .def(
+          "_set_name",
+          [](Agenda& agenda, const std::string& name) {
+            agenda.set_name(name);
+          },
+          "The name of the agenda.\n\n.. :class:`str`")
       .def_prop_ro(
           "methods",
           [](const Agenda& agenda) { return agenda.get_methods(); },
           "The methods of the agenda.\n\n.. :class:`list[~pyarts3.arts.Method]`");
+
+  auto va =
+      py::bind_vector<std::vector<Agenda>, py::rv_policy::reference_internal>(
+          m, "ArrayOfAgenda");
+  va.doc() = "A list of :class:`~pyarts3.arts.Agenda`";
+  generic_interface(va);
+  vector_interface(va);
 } catch (std::exception& e) {
   throw std::runtime_error(
       std::format("DEV ERROR:\nCannot initialize agendas\n{}", e.what()));

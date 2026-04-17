@@ -522,3 +522,21 @@ def arts_agenda(func=None, *, ws=None, fix=False):
         return parser
     else:
         return _arts_agenda(func, ws, fix)
+
+
+def in_parallel(func=None, *, ws=None):
+    """
+    Parses the decorated function into an Agenda and executes it immediately
+    using the provided workspace.
+    """
+    def execute(fn):
+        if ws is None:
+            raise ValueError("Workspace 'ws' must be provided to in_parallel")
+        agenda = _arts_agenda(fn, None, False)
+        agenda._set_name(getsource(fn))
+        agenda.par_execute(ws)
+        return agenda
+
+    if func is None:
+        return execute
+    return execute(func)

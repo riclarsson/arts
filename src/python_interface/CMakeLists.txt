@@ -86,6 +86,8 @@ set(PYARTS_WORKSPACE_GROUPS
     py_auto_wsg_string_type.cpp
     py_auto_wsg_convert.cpp
     py_auto_wsg_to_py_wsv.cpp
+    py_auto_wsg_wsv_implicit.cpp
+    py_auto_wsg_wsv_implicit.h
     py_auto_wsg.h
     py_auto_wsgdocs.h
     py_auto_wsgdocs.cpp

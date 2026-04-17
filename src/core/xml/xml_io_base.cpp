@@ -207,7 +207,7 @@ void XMLTag::get_attribute_value(const std::string_view& aname, Index& value) {
   strstr >> value;
   if (strstr.fail()) {
     xml_parse_error(std::format(
-        "Error while parsing value of {0} from <{1}>", aname, name));
+        "Cannot parse value of {0} from <{1}>", aname, name));
   }
 }
 
@@ -220,7 +220,7 @@ void XMLTag::get_attribute_value(const std::string_view& aname, Size& value) {
   strstr >> value;
   if (strstr.fail()) {
     xml_parse_error(std::format(
-        "Error while parsing value of {0} from <{1}>", aname, name));
+        "Cannot parse value of {0} from <{1}>", aname, name));
   }
 }
 
@@ -234,7 +234,7 @@ void XMLTag::get_attribute_value(const std::string_view& aname,
   strstr >> double_imanip() >> value;
   if (strstr.fail()) {
     xml_parse_error(std::format(
-        "Error while parsing value of {0} from <{1}>", aname, name));
+        "Cannot parse value of {0} from <{1}>", aname, name));
   }
 }
 
