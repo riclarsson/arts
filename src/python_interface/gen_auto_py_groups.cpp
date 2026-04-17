@@ -516,7 +516,7 @@ void wsv_implicit(py::class_<Wsv>& wsv) {{)");
   for (auto& group : internal_workspace_groups()) {
     std::println(
         cpp,
-        R"(wsv.def( "__init__", [] (Wsv* v, {0}<{1}> a) {{ new (v) Wsv{{ std::move(a) }}; }}, "a"_a);)",
+        R"(wsv.def( "__init__", [] (Wsv* v, {0}<{1}>& a) {{ new (v) Wsv{{ std::move(a) }}; }}, "a"_a.noconvert());)",
         group.second.value_type ? "ValueHolder"sv : "std::shared_ptr"sv,
         group.first);
     std::println(
