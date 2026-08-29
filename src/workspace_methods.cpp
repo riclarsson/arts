@@ -5988,6 +5988,25 @@ added without changing the interface.
       .pass_workspace = true,
   };
 
+  wsm_data["MCGeneral"] = {
+      .desc = R"--(Backward passive Monte Carlo radiative-transfer calculation.
+
+This ARTS3-native implementation samples antenna directions, extinction
+collisions, thermal absorption, repeated particle scattering, and space or
+surface background agendas.  The current transport kernel is scalar: Stokes I
+is calculated and Q, U, and V are zero.  Scattering directions use uniform
+solid-angle importance sampling and the supplied TRO phase function.
+)--",
+      .author = {"Cory Davis", "Patrick Eriksson", "OpenAI Codex"},
+      .out = {"mc_spectral_rad", "mc_error", "mc_iteration_count"},
+      .in = {"atm_field", "surf_field", "subsurf_field", "scat_species", "mc_antenna", "ray_path_observer_agenda", "spectral_propmat_agenda", "spectral_rad_space_agenda", "spectral_rad_surface_agenda"},
+      .gin = {"frequency", "sensor_pos", "sensor_los", "mc_seed", "mc_min_iter", "mc_max_iter", "mc_max_scatorder", "mc_std_err", "mc_max_time"},
+      .gin_type = {"Numeric", "Vector3", "Vector2", "Index", "Index", "Index", "Index", "Numeric", "Numeric"},
+      .gin_value = {std::nullopt, std::nullopt, std::nullopt, Index{0}, Index{100}, Index{10000}, Index{20}, Numeric{0.0}, Numeric{0.0}},
+      .gin_desc = {"Frequency [Hz].", "Sensor position [alt, lat, lon].", "Sensor boresight [zenith, azimuth].", "Random seed.", "Minimum histories.", "Maximum histories.", "Maximum scattering order.", "Absolute standard-error stopping threshold in spectral-radiance units; zero disables it.", "Wall-clock stopping time [s]; zero disables it."},
+      .pass_workspace = true,
+  };
+
   /* 
   MANUAL ENTRIES BELOW THIS POINT MESSES WITH THE LOGIC OF WSM_DATA
   */

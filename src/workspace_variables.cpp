@@ -192,6 +192,21 @@ When Bath is selected, all species are used.  Otherwise, this variable should co
       .type = "MCAntenna",
   };
 
+  wsv_data["mc_spectral_rad"] = {
+      .desc = R"(Passive Monte Carlo spectral radiance at one frequency.)",
+      .type = "Stokvec",
+  };
+
+  wsv_data["mc_error"] = {
+      .desc = R"(Standard error of *mc_spectral_rad*.)",
+      .type = "Stokvec",
+  };
+
+  wsv_data["mc_iteration_count"] = {
+      .desc = R"(Number of photon histories used by *MCGeneral*.)",
+      .type = "Index",
+  };
+
   wsv_data["radar_signal"] = {
       .desc = R"--(Monte Carlo radar return with dimensions range-bin by Stokes component.
 )--",
