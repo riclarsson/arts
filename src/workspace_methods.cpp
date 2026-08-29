@@ -5967,6 +5967,27 @@ Neither polarization nor wind calculations are possible with this method.
       .pass_workspace = true,
   };
 
+  wsm_data["MCRadar"] = {
+      .desc = R"--(Simulates active-radar returns using Monte Carlo antenna sampling.
+
+This ARTS3-native implementation uses *AtmField*, *SurfaceField*,
+*ArrayOfScatteringSpecies*, and *ray_path_observer_agenda*.  Range-bin edges
+are one-way geometric distances in metres.  The output matrices have shape
+``[range bin, Stokes]`` and the error is the standard error of the Monte Carlo
+mean.  The implementation currently supports single scattering
+(``mc_max_scatorder=1``); the argument is retained so higher orders can be
+added without changing the interface.
+)--",
+      .author         = {"Richard Larsson", "OpenAI Codex"},
+      .out            = {"radar_signal", "radar_error"},
+      .in             = {"atm_field", "surf_field", "scat_species", "mc_antenna", "ray_path_observer_agenda", "spectral_propmat_agenda"},
+      .gin            = {"frequency", "sensor_pos", "sensor_los", "mc_y_tx", "range_bins", "mc_seed", "mc_max_iter", "mc_max_scatorder", "k2", "unit"},
+      .gin_type       = {"Numeric", "Vector3", "Vector2", "Stokvec", "AscendingGrid", "Index", "Index", "Index", "Numeric", "String"},
+      .gin_value      = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, Index{0}, Index{1000}, Index{1}, Numeric{0.93}, String{"1"}},
+      .gin_desc       = {"Radar frequency [Hz].", "Sensor position [alt, lat, lon].", "Sensor boresight [zenith, azimuth].", "Transmitted Stokes vector.", "One-way range-bin edges [m].", "Random seed.", "Number of sampled antenna rays.", "Maximum scattering order (currently must be 1).", "Reference dielectric factor squared for Ze conversion.", "Output unit: '1' or 'Ze'."},
+      .pass_workspace = true,
+  };
+
   /* 
   MANUAL ENTRIES BELOW THIS POINT MESSES WITH THE LOGIC OF WSM_DATA
   */

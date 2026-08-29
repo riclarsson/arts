@@ -185,6 +185,7 @@ add_library(artsworkspace STATIC
   m_lookup.cc
   m_measurement_vector.cc
   m_model_state.cc
+  m_montecarlo_radar.cc
   m_nlte.cc
   m_obsel.cc
   m_oem.cc

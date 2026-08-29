@@ -263,6 +263,11 @@ The python mapping allows treating this as a same rank :class:`~numpy.ndarray` i
 )",
   };
 
+  wsg_data["MCAntenna"] = {
+      .file = "mc_antenna.h",
+      .desc = R"(Transmit/receive antenna pattern used by Monte Carlo radiative-transfer methods.)",
+  };
+
   wsg_data["Numeric"] = {
       .file       = "matpack.h",
       .desc       = "IEEE 754 binary64 floating point number\n",

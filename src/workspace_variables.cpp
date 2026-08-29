@@ -186,6 +186,24 @@ When Bath is selected, all species are used.  Otherwise, this variable should co
       .type = "ArrayOfScatteringSpecies",
   };
 
+  wsv_data["mc_antenna"] = {
+      .desc = R"--(Transmit and receive antenna pattern for Monte Carlo calculations.
+)--",
+      .type = "MCAntenna",
+  };
+
+  wsv_data["radar_signal"] = {
+      .desc = R"--(Monte Carlo radar return with dimensions range-bin by Stokes component.
+)--",
+      .type = "Matrix",
+  };
+
+  wsv_data["radar_error"] = {
+      .desc = R"--(Standard error of *radar_signal* with identical dimensions.
+)--",
+      .type = "Matrix",
+  };
+
   //! Atmosphere
 
   wsv_data["atm_field"] = {
