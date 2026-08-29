@@ -226,7 +226,8 @@ freq_grid.size()         = {}
   const auto *b = x.begin();
   const auto *e = x.end();
 
-  bool find_any = false;
+  bool find_any                   = false;
+  bool target_uses_frequency_grid = false;
   for (auto &target : jac_targets.sensor) {
     ARTS_USER_ERROR_IF(measurement_sensor.size() <= static_cast<Size>(target.type.measurement_elem),
                        "Sensor element out of bounds");
@@ -236,9 +237,10 @@ freq_grid.size()         = {}
     const Numeric d    = target.d;
 
     // Check that the Jacobian targets are represented by this frequency grid and this pos-los pair
-    const Index iposlos = elem.find(pos, los);
-    if (iposlos == SensorObsel::dont_have) continue;
     if (elem.find(freq_grid) == SensorObsel::dont_have) continue;
+    target_uses_frequency_grid = true;
+    const Index iposlos        = elem.find(pos, los);
+    if (iposlos == SensorObsel::dont_have) continue;
 
     find_any = true;
 
@@ -255,7 +257,7 @@ freq_grid.size()         = {}
     m += dsrad;
   }
 
-  ARTS_USER_ERROR_IF(not find_any,
+  ARTS_USER_ERROR_IF(target_uses_frequency_grid and not find_any,
                      R"(No sensor element found for pos-los/frequency grid pair
 
   freq_grid: {:Bs,}

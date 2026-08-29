@@ -82,6 +82,12 @@ void jac_targetsAddAtmosphere(JacobianTargets& jac_targets, const QuantumLevelId
   jac_targets.emplace_back(AtmKeyVal{key}, d);
 }
 
+void jac_targetsAddAtmosphere(JacobianTargets& jac_targets, const ScatteringSpeciesProperty& key, const Numeric& d) {
+  ARTS_TIME_REPORT
+
+  jac_targets.emplace_back(AtmKeyVal{key}, d);
+}
+
 void jac_targetsAddTemperature(JacobianTargets& jac_targets, const Numeric& d) {
   ARTS_TIME_REPORT
 

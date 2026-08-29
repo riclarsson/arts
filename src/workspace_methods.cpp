@@ -3083,7 +3083,7 @@ See *SpeciesEnum* for valid ``species``
       .out       = {"jac_targets"},
       .in        = {"jac_targets"},
       .gin       = {"target", "d"},
-      .gin_type  = {"AtmKey,SpeciesEnum,SpeciesIsotope,QuantumLevelIdentifier", "Numeric"},
+      .gin_type  = {"AtmKey,SpeciesEnum,SpeciesIsotope,QuantumLevelIdentifier,ScatteringSpeciesProperty", "Numeric"},
       .gin_value = {std::nullopt, Numeric{0.1}},
       .gin_desc  = {"The target of interest",
                     "The perturbation used in methods that cannot compute derivatives analytically"},
@@ -6153,7 +6153,11 @@ weighting are owned by *measurement_sensor*, so this method deliberately uses
 a pencil beam internally. One Monte Carlo calculation is performed for every
 frequency in *freq_grid*.
 
-Jacobian targets are not yet supported and must be empty.
+Atmospheric, surface, and subsurface Jacobians use common-random-number forward
+perturbations in model-state space. Sensor frequency and geometry Jacobians are
+added by the predefined observer agenda. Spectroscopic targets are perturbed
+inside the propagation-matrix call using the returned propagation and NLTE
+source derivatives, without modifying global catalogue state.
 )--",
       .author         = {"OpenAI Codex"},
       .out            = {"spectral_rad", "spectral_rad_jac", "ray_path"},

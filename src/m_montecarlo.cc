@@ -23,7 +23,10 @@ PolarizedOptics polarized_optics(const Workspace&                ws,
                                  const PropagationPathPoint&     point,
                                  const AtmPoint&                 atm,
                                  const ArrayOfScatteringSpecies& scattering_species,
-                                 const Agenda&                   spectral_propmat_agenda) {
+                                 const Agenda&                   spectral_propmat_agenda,
+                                 const JacobianTargets&          jac_targets,
+                                 Index                           local_jac_target,
+                                 Numeric                         local_jac_step) {
   const AscendingGrid freq_grid{frequency};
   PropmatVector       gas;
   StokvecVector       src;
@@ -36,11 +39,19 @@ PolarizedOptics polarized_optics(const Workspace&                ws,
                                  src_jac,
                                  freq_grid,
                                  Vector3{0.0, 0.0, 0.0},
-                                 JacobianTargets{},
+                                 jac_targets,
                                  {},
                                  point,
                                  atm,
                                  spectral_propmat_agenda);
+
+  if (local_jac_target >= 0) {
+    ARTS_USER_ERROR_IF(static_cast<Size>(local_jac_target) >= jac_targets.target_count(),
+                       "Local Monte Carlo Jacobian target {} is out of bounds",
+                       local_jac_target)
+    gas[0] += local_jac_step * gas_jac[local_jac_target, 0];
+    src[0] += local_jac_step * src_jac[local_jac_target, 0];
+  }
 
   Propmat particle_ext{};
   Stokvec particle_abs{};
@@ -120,7 +131,10 @@ Collision next_collision(const Workspace&                ws,
                          const SurfaceField&             surf_field,
                          const ArrayOfScatteringSpecies& scattering_species,
                          const Agenda&                   ray_path_observer_agenda,
-                         const Agenda&                   spectral_propmat_agenda) {
+                         const Agenda&                   spectral_propmat_agenda,
+                         const JacobianTargets&          jac_targets,
+                         Index                           local_jac_target,
+                         Numeric                         local_jac_step) {
   ArrayOfPropagationPathPoint path;
   ray_path_observer_agendaExecute(ws, path, pos, los, ray_path_observer_agenda);
   ARTS_USER_ERROR_IF(path.empty(), "The ray-path agenda returned an empty path")
@@ -132,17 +146,41 @@ Collision next_collision(const Workspace&                ws,
   const Numeric target      = -std::log(std::max(uniform(), std::numeric_limits<Numeric>::min()));
   Numeric       tau         = 0.0;
   Muelmat       conditional = Muelmat::id();
-  auto previous = polarized_optics(ws, frequency, path[0], atm[0], scattering_species, spectral_propmat_agenda);
+  auto          previous    = polarized_optics(ws,
+                                               frequency,
+                                               path[0],
+                                               atm[0],
+                                               scattering_species,
+                                               spectral_propmat_agenda,
+                                               jac_targets,
+                                               local_jac_target,
+                                               local_jac_step);
 
   for (Size i = 1; i < path.size(); ++i) {
-    const auto current = polarized_optics(ws, frequency, path[i], atm[i], scattering_species, spectral_propmat_agenda);
-    const Numeric dtau = 0.5 * (previous.extinction.A() + current.extinction.A()) * distances[i - 1];
+    const auto    current = polarized_optics(ws,
+                                             frequency,
+                                             path[i],
+                                             atm[i],
+                                             scattering_species,
+                                             spectral_propmat_agenda,
+                                             jac_targets,
+                                             local_jac_target,
+                                             local_jac_step);
+    const Numeric dtau    = 0.5 * (previous.extinction.A() + current.extinction.A()) * distances[i - 1];
     if (dtau > 0.0 and tau + dtau >= target) {
-      const Numeric x         = std::clamp((target - tau) / dtau, 0.0, 1.0);
-      auto          point     = interpolate(path[i - 1], path[i], x);
-      auto          atm_point = atm_field.at(point.pos);
-      auto optics      = polarized_optics(ws, frequency, point, atm_point, scattering_species, spectral_propmat_agenda);
-      const Numeric ds = x * distances[i - 1];
+      const Numeric x           = std::clamp((target - tau) / dtau, 0.0, 1.0);
+      auto          point       = interpolate(path[i - 1], path[i], x);
+      auto          atm_point   = atm_field.at(point.pos);
+      auto          optics      = polarized_optics(ws,
+                                                   frequency,
+                                                   point,
+                                                   atm_point,
+                                                   scattering_species,
+                                                   spectral_propmat_agenda,
+                                                   jac_targets,
+                                                   local_jac_target,
+                                                   local_jac_step);
+      const Numeric ds          = x * distances[i - 1];
       const Numeric partial_tau = 0.5 * (previous.extinction.A() + optics.extinction.A()) * ds;
       const Muelmat partial     = rtepack::tran(previous.extinction, optics.extinction, ds)();
       conditional               = conditional * (std::exp(partial_tau) * partial);
@@ -210,7 +248,10 @@ void MCGeneral(const Workspace&                ws,
                const Index&                    mc_max_iter,
                const Index&                    mc_max_scatorder,
                const Numeric&                  mc_std_err,
-               const Numeric&                  mc_max_time) try {
+               const Numeric&                  mc_max_time,
+               const JacobianTargets&          local_jac_targets,
+               const Index&                    local_jac_target,
+               const Numeric&                  local_jac_step) try {
   ARTS_TIME_REPORT
   ARTS_USER_ERROR_IF(frequency <= 0.0, "frequency must be positive")
   ARTS_USER_ERROR_IF(mc_min_iter < 1 or mc_max_iter < mc_min_iter, "Require 1 <= mc_min_iter <= mc_max_iter")
@@ -241,7 +282,10 @@ void MCGeneral(const Workspace&                ws,
                                             surf_field,
                                             scattering_species,
                                             ray_path_observer_agenda,
-                                            spectral_propmat_agenda);
+                                            spectral_propmat_agenda,
+                                            local_jac_targets,
+                                            local_jac_target,
+                                            local_jac_step);
       weight               = weight * collision.conditional_transport;
       if (not collision.happened) {
         sample = weight * boundary_radiance(ws,
@@ -299,6 +343,55 @@ void MCGeneral(const Workspace&                ws,
 }
 ARTS_METHOD_ERROR_CATCH
 
+void MCGeneral(const Workspace&                ws,
+               Stokvec&                        mc_spectral_rad,
+               Stokvec&                        mc_error,
+               Index&                          mc_iteration_count,
+               const AtmField&                 atm_field,
+               const SurfaceField&             surf_field,
+               const SubsurfaceField&          subsurf_field,
+               const ArrayOfScatteringSpecies& scattering_species,
+               const MCAntenna&                mc_antenna,
+               const Agenda&                   ray_path_observer_agenda,
+               const Agenda&                   spectral_propmat_agenda,
+               const Agenda&                   spectral_rad_space_agenda,
+               const Agenda&                   spectral_rad_surface_agenda,
+               const Numeric&                  frequency,
+               const Vector3&                  sensor_pos,
+               const Vector2&                  sensor_los,
+               const Index&                    mc_seed,
+               const Index&                    mc_min_iter,
+               const Index&                    mc_max_iter,
+               const Index&                    mc_max_scatorder,
+               const Numeric&                  mc_std_err,
+               const Numeric&                  mc_max_time) {
+  MCGeneral(ws,
+            mc_spectral_rad,
+            mc_error,
+            mc_iteration_count,
+            atm_field,
+            surf_field,
+            subsurf_field,
+            scattering_species,
+            mc_antenna,
+            ray_path_observer_agenda,
+            spectral_propmat_agenda,
+            spectral_rad_space_agenda,
+            spectral_rad_surface_agenda,
+            frequency,
+            sensor_pos,
+            sensor_los,
+            mc_seed,
+            mc_min_iter,
+            mc_max_iter,
+            mc_max_scatorder,
+            mc_std_err,
+            mc_max_time,
+            JacobianTargets{},
+            -1,
+            0.0);
+}
+
 void spectral_radMonteCarlo(const Workspace&                ws,
                             StokvecVector&                  spectral_rad,
                             StokvecMatrix&                  spectral_rad_jac,
@@ -323,42 +416,106 @@ void spectral_radMonteCarlo(const Workspace&                ws,
                             const Numeric&                  mc_max_time) try {
   ARTS_TIME_REPORT
 
-  ARTS_USER_ERROR_IF(not jac_targets.empty(), "spectral_radMonteCarlo does not yet support Jacobian targets")
-
   ray_path_observer_agendaExecute(ws, ray_path, obs_pos, obs_los, ray_path_observer_agenda);
   ARTS_USER_ERROR_IF(ray_path.empty(), "The ray-path agenda returned an empty path")
 
   spectral_rad.resize(freq_grid.size());
-  spectral_rad_jac.resize(0, freq_grid.size());
+  spectral_rad_jac.resize(jac_targets.x_size(), freq_grid.size());
+  spectral_rad_jac = 0.0;
 
   MCAntenna pencil;
   pencil.set_pencil_beam();
 
-  for (Size i = 0; i < freq_grid.size(); ++i) {
+  const auto run = [&](Stokvec&               out,
+                       const Numeric          frequency,
+                       const Index            seed,
+                       const AtmField&        atm,
+                       const SurfaceField&    surf,
+                       const SubsurfaceField& subsurf,
+                       const Index            local_target = -1,
+                       const Numeric          local_step   = 0.0) {
     Stokvec error;
     Index   iterations;
     MCGeneral(ws,
-              spectral_rad[i],
+              out,
               error,
               iterations,
-              atm_field,
-              surf_field,
-              subsurf_field,
+              atm,
+              surf,
+              subsurf,
               scat_species,
               pencil,
               ray_path_observer_agenda,
               spectral_propmat_agenda,
               spectral_rad_space_agenda,
               spectral_rad_surface_agenda,
-              freq_grid[i],
+              frequency,
               obs_pos,
               obs_los,
-              mc_seed + static_cast<Index>(i),
+              seed,
               mc_min_iter,
               mc_max_iter,
               mc_max_scatorder,
               mc_std_err,
-              mc_max_time);
+              mc_max_time,
+              jac_targets,
+              local_target,
+              local_step);
+  };
+
+  for (Size i = 0; i < freq_grid.size(); ++i) {
+    run(spectral_rad[i], freq_grid[i], mc_seed + static_cast<Index>(i), atm_field, surf_field, subsurf_field);
+  }
+
+  const auto finite_difference = [&]<typename Target, typename Field>(const Target& target, const Field& field) {
+    ARTS_USER_ERROR_IF(target.d == 0.0, "Monte Carlo Jacobian perturbation must be nonzero for target {}", target.type)
+
+    Vector state(jac_targets.x_size(), 0.0);
+    target.update_state(state, field);
+
+    for (Size j = 0; j < target.x_size; ++j) {
+      Field  perturbed = field;
+      Vector perturbed_state{state};
+      perturbed_state[target.x_start + j] += target.d;
+      target.update_model(perturbed, perturbed_state);
+
+      for (Size i = 0; i < freq_grid.size(); ++i) {
+        Stokvec value;
+        if constexpr (std::same_as<Field, AtmField>) {
+          run(value, freq_grid[i], mc_seed + static_cast<Index>(i), perturbed, surf_field, subsurf_field);
+        } else if constexpr (std::same_as<Field, SurfaceField>) {
+          run(value, freq_grid[i], mc_seed + static_cast<Index>(i), atm_field, perturbed, subsurf_field);
+        } else {
+          run(value, freq_grid[i], mc_seed + static_cast<Index>(i), atm_field, surf_field, perturbed);
+        }
+        spectral_rad_jac[target.x_start + j, i] = (value - spectral_rad[i]) / target.d;
+      }
+    }
+  };
+
+  for (const auto& target : jac_targets.atm) finite_difference(target, atm_field);
+  for (const auto& target : jac_targets.surf) finite_difference(target, surf_field);
+  for (const auto& target : jac_targets.subsurf) finite_difference(target, subsurf_field);
+
+  for (const auto& target : jac_targets.line) {
+    ARTS_USER_ERROR_IF(target.x_size != 1,
+                       "Monte Carlo spectroscopic target {} has {} state elements; expected one",
+                       target.type,
+                       target.x_size)
+    ARTS_USER_ERROR_IF(target.d == 0.0, "Monte Carlo Jacobian perturbation must be nonzero for target {}", target.type)
+
+    for (Size i = 0; i < freq_grid.size(); ++i) {
+      Stokvec value;
+      run(value,
+          freq_grid[i],
+          mc_seed + static_cast<Index>(i),
+          atm_field,
+          surf_field,
+          subsurf_field,
+          static_cast<Index>(target.target_pos),
+          target.d);
+      spectral_rad_jac[target.x_start, i] = (value - spectral_rad[i]) / target.d;
+    }
   }
 }
 ARTS_METHOD_ERROR_CATCH
