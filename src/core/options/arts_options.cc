@@ -51,6 +51,27 @@ std::vector<EnumeratedOption> internal_options_create() {
   });
 
   opts.emplace_back(EnumeratedOption{
+      .name = "PredefinedSensor",
+      .desc =
+          R"(Code-defined satellite sensor channel configurations.
+
+Each option identifies a complete instrument channel set, including channel
+centers, mixer offsets, bandwidths, and polarization.  These definitions are
+compiled into ARTS and require no external sensor-response data files.
+)",
+      .values_and_desc =
+          {Value{"AMSUA", "AMSU-A", "The 15-channel Advanced Microwave Sounding Unit A instrument."},
+           Value{"AMSUB", "AMSU-B", "The 5-channel Advanced Microwave Sounding Unit B instrument."},
+           Value{"ICI", "IceCloudImager", "The 11-channel Ice Cloud Imager instrument."},
+           Value{"HIRS", "NOAA14HIRS", "The 19-channel NOAA-14 High-resolution Infrared Radiation Sounder."},
+           Value{"AVHRR", "NOAA19AVHRR", "The 3-channel NOAA-19 Advanced Very High Resolution Radiometer response."},
+           Value{"MVIRI", "MET2MVIRI", "The 3-channel Meteosat-2 Visible and Infrared Imager response."},
+           Value{"SEVIRI",
+                 "MET9SEVIRI",
+                 "The 12-channel Meteosat-9 Spinning Enhanced Visible and Infrared Imager response."}},
+  });
+
+  opts.emplace_back(EnumeratedOption{
       .name = "ray_path_observer_agendaSetGeometricMaxStep",
       .desc =
           R"(For use with *ray_path_observer_agendaSetGeometric*.  Determines how to densify the geometric path.

@@ -899,6 +899,7 @@ of this term multiplied by a negative distance.
   add_select_options(wsg_data,
                      {
                          "InterpolationExtrapolation",
+                         "PredefinedSensor",
                          "SpeciesEnum",
                          "TransmittanceOption",
                          "AtmKey",
