@@ -12,13 +12,13 @@
 
 namespace {
 
-struct ScalarOptics {
-  Numeric extinction{};
-  Numeric absorption{};
+struct PolarizedOptics {
+  Propmat extinction{};
+  Stokvec absorption{};
   Numeric temperature{};
 };
 
-ScalarOptics scalar_optics(const Workspace&                ws,
+PolarizedOptics polarized_optics(const Workspace&                ws,
                            Numeric                         frequency,
                            const PropagationPathPoint&     point,
                            const AtmPoint&                 atm,
@@ -42,18 +42,21 @@ ScalarOptics scalar_optics(const Workspace&                ws,
                                  atm,
                                  spectral_propmat_agenda);
 
-  Numeric particle_ext = 0.0;
-  Numeric particle_abs = 0.0;
+  Propmat particle_ext{};
+  Stokvec particle_abs{};
   if (not scattering_species.species.empty()) {
     auto za = std::make_shared<scattering::ZenithAngleGrid>(
         scattering::IrregularZenithAngleGrid(Vector{0.0, 180.0}));
     const auto bulk = scattering_species.get_bulk_scattering_properties_tro_gridded(atm, freq_grid, za);
-    particle_ext    = bulk.extinction_matrix[0, 0, 0];
-    particle_abs    = bulk.absorption_vector[0, 0, 0];
+    particle_ext    = Propmat{bulk.extinction_matrix[0, 0, 0]};
+    particle_abs    = Stokvec{bulk.absorption_vector[0, 0, 0],
+                              bulk.absorption_vector[0, 0, 1],
+                              bulk.absorption_vector[0, 0, 2],
+                              bulk.absorption_vector[0, 0, 3]};
   }
 
-  return {.extinction = gas[0].A() + particle_ext,
-          .absorption = gas[0].A() + particle_abs,
+  return {.extinction = gas[0] + particle_ext,
+          .absorption = Stokvec{gas[0].A(), gas[0].B(), gas[0].C(), gas[0].D()} + particle_abs,
           .temperature = atm.temperature};
 }
 
@@ -100,8 +103,9 @@ struct Collision {
   bool                     happened{false};
   PropagationPathPoint     point{};
   AtmPoint                 atm{};
-  ScalarOptics             optics{};
+  PolarizedOptics          optics{};
   PropagationPathPoint     end{};
+  Muelmat                  conditional_transport{Muelmat::id()};
 };
 
 Collision next_collision(const Workspace&                ws,
@@ -124,42 +128,63 @@ Collision next_collision(const Workspace&                ws,
   auto uniform         = rng.get<std::uniform_real_distribution>(0.0, 1.0);
   const Numeric target = -std::log(std::max(uniform(), std::numeric_limits<Numeric>::min()));
   Numeric tau          = 0.0;
-  auto previous = scalar_optics(ws, frequency, path[0], atm[0], scattering_species, spectral_propmat_agenda);
+  Muelmat conditional  = Muelmat::id();
+  auto previous = polarized_optics(ws, frequency, path[0], atm[0], scattering_species, spectral_propmat_agenda);
 
   for (Size i = 1; i < path.size(); ++i) {
-    const auto current = scalar_optics(ws, frequency, path[i], atm[i], scattering_species, spectral_propmat_agenda);
-    const Numeric dtau = 0.5 * (previous.extinction + current.extinction) * distances[i - 1];
+    const auto current = polarized_optics(ws, frequency, path[i], atm[i], scattering_species, spectral_propmat_agenda);
+    const Numeric dtau = 0.5 * (previous.extinction.A() + current.extinction.A()) * distances[i - 1];
     if (dtau > 0.0 and tau + dtau >= target) {
       const Numeric x = std::clamp((target - tau) / dtau, 0.0, 1.0);
       auto point      = interpolate(path[i - 1], path[i], x);
       auto atm_point  = atm_field.at(point.pos);
-      auto optics     = scalar_optics(ws, frequency, point, atm_point, scattering_species, spectral_propmat_agenda);
-      return {.happened = true, .point = point, .atm = std::move(atm_point), .optics = optics, .end = path.back()};
+      auto optics     = polarized_optics(ws, frequency, point, atm_point, scattering_species, spectral_propmat_agenda);
+      const Numeric ds = x * distances[i - 1];
+      const Numeric partial_tau = 0.5 * (previous.extinction.A() + optics.extinction.A()) * ds;
+      const Muelmat partial = rtepack::tran(previous.extinction, optics.extinction, ds)();
+      conditional = conditional * (std::exp(partial_tau) * partial);
+      return {.happened = true,
+              .point = point,
+              .atm = std::move(atm_point),
+              .optics = optics,
+              .end = path.back(),
+              .conditional_transport = conditional};
+    }
+    if (distances[i - 1] > 0.0) {
+      const Muelmat segment = rtepack::tran(previous.extinction, current.extinction, distances[i - 1])();
+      conditional = conditional * (std::exp(std::max(0.0, dtau)) * segment);
     }
     tau += std::max(0.0, dtau);
     previous = current;
   }
-  return {.end = path.back()};
+  return {.end = path.back(), .conditional_transport = conditional};
 }
 
-Numeric phase_weight(const ArrayOfScatteringSpecies& species,
+Muelmat phase_weight(const ArrayOfScatteringSpecies& species,
                      const AtmPoint&                 atm,
                      Numeric                         frequency,
                      const Vector2&                  old_los,
                      const Vector2&                  new_los,
                      Numeric                         scattering_coefficient) {
-  const auto unit = [](const Vector2& los) {
-    const Numeric za = Conversion::deg2rad(los[0]);
-    const Numeric aa = Conversion::deg2rad(los[1]);
-    return Vector3{std::sin(za) * std::sin(aa), std::sin(za) * std::cos(aa), std::cos(za)};
-  };
-  const Vector3 a = unit(old_los), b = unit(new_los);
-  const Numeric angle = Conversion::rad2deg(std::acos(std::clamp(dot(a, b), -1.0, 1.0)));
+  const Vector2 outgoing = path::mirror(old_los);
+  const Vector2 incoming = path::mirror(new_los);
+  Numeric delta_aa       = outgoing[1] - incoming[1];
+  while (delta_aa < 0.0) delta_aa += 360.0;
+  while (delta_aa > 360.0) delta_aa -= 360.0;
+  const auto rotations = scattering::detail::rotation_coefficients(
+      incoming[1], incoming[0], outgoing[1], outgoing[0]);
+  const Numeric scattering_angle = Conversion::rad2deg(std::get<0>(rotations));
   auto za = std::make_shared<scattering::ZenithAngleGrid>(
-      scattering::IrregularZenithAngleGrid(Vector{angle}));
+      scattering::IrregularZenithAngleGrid(Vector{scattering_angle}));
   const auto bulk = species.get_bulk_scattering_properties_tro_gridded(atm, AscendingGrid{frequency}, za);
   ARTS_USER_ERROR_IF(not bulk.phase_matrix, "MCGeneral requires phase matrices from all scattering species")
-  return 4.0 * Constant::pi * (*bulk.phase_matrix)[0, 0, 0, 0] / scattering_coefficient;
+  Vector flat(16, 0.0);
+  scattering::detail::expand_and_transform(
+      flat, (*bulk.phase_matrix)[0, 0, 0, joker], rotations, delta_aa > 180.0);
+  Muelmat out{0.0};
+  for (Index i = 0; i < 4; ++i)
+    for (Index j = 0; j < 4; ++j) out[i, j] = flat[4 * i + j];
+  return (4.0 * Constant::pi / scattering_coefficient) * out;
 }
 
 }  // namespace
@@ -203,7 +228,7 @@ void MCGeneral(const Workspace&                ws,
     const auto [initial_los, ray_rotation] = mc_antenna.draw_los(rng, ant_to_enu, sensor_los);
     Vector3 pos = sensor_pos;
     Vector2 los = initial_los;
-    Numeric weight = 1.0;
+    Muelmat weight = rotmat_stokes(-1.0, -1.0, ray_rotation, ant_to_enu);
     Stokvec sample{0.0};
 
     for (Index order = 0;;) {
@@ -217,6 +242,7 @@ void MCGeneral(const Workspace&                ws,
                                             scattering_species,
                                             ray_path_observer_agenda,
                                             spectral_propmat_agenda);
+      weight = weight * collision.conditional_transport;
       if (not collision.happened) {
         sample = weight * boundary_radiance(ws,
                                             frequency,
@@ -229,16 +255,19 @@ void MCGeneral(const Workspace&                ws,
       }
 
       auto uniform = rng.get<std::uniform_real_distribution>(0.0, 1.0);
-      const Numeric extinction = collision.optics.extinction;
-      const Numeric scattering = std::max(0.0, extinction - collision.optics.absorption);
+      const Numeric extinction = collision.optics.extinction.A();
+      const Numeric scattering = std::max(0.0, extinction - collision.optics.absorption.I());
       if (scattering <= 0.0 or uniform() >= scattering / extinction) {
-        sample[0] = weight * planck(frequency, collision.optics.temperature);
+        const Numeric absorption = collision.optics.absorption.I();
+        ARTS_USER_ERROR_IF(absorption <= 0.0, "Invalid non-positive absorption collision probability")
+        sample = weight * ((planck(frequency, collision.optics.temperature) / absorption) *
+                           collision.optics.absorption);
         break;
       }
       if (++order > mc_max_scatorder) break;
 
       const Vector2 new_los = isotropic_los(rng);
-      weight *= phase_weight(scattering_species, collision.atm, frequency, los, new_los, scattering);
+      weight = weight * phase_weight(scattering_species, collision.atm, frequency, los, new_los, scattering);
       pos = collision.point.pos;
       los = new_los;
     }

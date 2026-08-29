@@ -58,7 +58,9 @@ rad = np.asarray(ws.mc_spectral_rad).copy()
 err = np.asarray(ws.mc_error).copy()
 assert np.all(np.isfinite(rad)) and np.all(np.isfinite(err))
 assert rad[0] > 0.0 and err[0] > 0.0
-assert np.array_equal(rad[1:], np.zeros(3))
+# An unpolarizing HG scatterer must preserve an unpolarized boundary source;
+# this still exercises the four-Stokes Mueller transport and basis transforms.
+assert np.allclose(rad[1:], np.zeros(3), atol=1e-300)
 ws.MCGeneral(**scattering)
 assert np.array_equal(rad, np.asarray(ws.mc_spectral_rad))
 assert np.array_equal(err, np.asarray(ws.mc_error))

@@ -48,8 +48,13 @@ HenyeyGreensteinScatterer::get_bulk_scattering_properties_tro_gridded(
     av[0, f_ind, 0]  = extinction - scattering_xsec;
     Numeric g2       = g * g;
     for (Size ind = 0; ind < zenith_angles.size(); ++ind) {
-      pm[0, f_ind, ind, 0]  = (1.0 - g2);
-      pm[0, f_ind, ind, 0] /= std::pow(1.0 + g2 - 2.0 * g * cos(Conversion::deg2rad(zenith_angles[ind])), 3.0 / 2.0);
+      const Numeric phase =
+          (1.0 - g2) /
+          std::pow(1.0 + g2 - 2.0 * g * cos(Conversion::deg2rad(zenith_angles[ind])), 3.0 / 2.0);
+      pm[0, f_ind, ind, 0] = phase;
+      pm[0, f_ind, ind, 2] = phase;
+      pm[0, f_ind, ind, 3] = phase;
+      pm[0, f_ind, ind, 5] = phase;
     }
     pm *= scattering_xsec / (4.0 * Constant::pi);
   }

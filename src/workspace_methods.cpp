@@ -5993,9 +5993,9 @@ added without changing the interface.
 
 This ARTS3-native implementation samples antenna directions, extinction
 collisions, thermal absorption, repeated particle scattering, and space or
-surface background agendas.  The current transport kernel is scalar: Stokes I
-is calculated and Q, U, and V are zero.  Scattering directions use uniform
-solid-angle importance sampling and the supplied TRO phase function.
+surface background agendas.  It transports all four Stokes components using
+laboratory-frame phase matrices, including the required polarization-basis
+rotations.  Scattering directions use uniform solid-angle importance sampling.
 )--",
       .author = {"Cory Davis", "Patrick Eriksson", "OpenAI Codex"},
       .out = {"mc_spectral_rad", "mc_error", "mc_iteration_count"},
