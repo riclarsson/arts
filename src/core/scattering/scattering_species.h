@@ -48,6 +48,13 @@ struct ArrayOfScatteringSpecies {
                                              const Vector&                                f_grid,
                                              std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid) const;
 
+  [[nodiscard]] BulkScatteringProperties<scattering::Format::TRO, scattering::Representation::Gridded>
+  get_bulk_scattering_properties_tro_gridded_derivative(
+      const AtmPoint&,
+      const Vector&,
+      std::shared_ptr<scattering::ZenithAngleGrid>,
+      const AtmKeyVal&) const;
+
   [[nodiscard]] ScatteringTroSpectralVector get_bulk_scattering_properties_tro_spectral(const AtmPoint& atm_point,
                                                                                         const Vector&   f_grid,
                                                                                         Index           degree) const;

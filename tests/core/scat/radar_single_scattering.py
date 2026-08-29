@@ -9,6 +9,27 @@ import pyarts3 as pyarts
 A = pyarts.arts
 ws = pyarts.Workspace()
 
+
+def manual_atmospheric_derivative(workspace, key, flat_index, step, kwargs):
+    """Central difference made only by explicit atmospheric-field edits."""
+    original = np.asarray(workspace.atm_field[key].data.data).copy()
+    workspace.jac_targetsOff()
+    try:
+        plus = original.copy()
+        plus.flat[flat_index] += step
+        workspace.atm_field[key].data.data = plus
+        workspace.measurement_vecFromRadarSingleScattering(**kwargs)
+        y_plus = np.asarray(workspace.measurement_vec).copy()
+
+        minus = original.copy()
+        minus.flat[flat_index] -= step
+        workspace.atm_field[key].data.data = minus
+        workspace.measurement_vecFromRadarSingleScattering(**kwargs)
+        y_minus = np.asarray(workspace.measurement_vec).copy()
+    finally:
+        workspace.atm_field[key].data.data = original
+    return (y_plus - y_minus) / (2.0 * step)
+
 ws.surf_fieldPlanet(option="Earth")
 ws.surf_field[A.SurfaceKey("h")] = 0.0
 ws.surf_field[A.SurfaceKey("t")] = 280.0
@@ -238,6 +259,32 @@ old.measurement_vecFromRadarSingleScattering(
 particle_peak = np.nanmax(old.measurement_vec)
 assert abs(particle_peak + 30.0) < 0.01
 
+# The scattering-habit/PSD derivative is analytical in the forward method.
+# Build its numerical reference here by manually perturbing one number-density
+# grid point and rerunning with Jacobians disabled.
+particle_step = 10.0
+particle_index = int(np.argmin(np.abs(fine_altitude - 2.5e3)))
+old.jac_targetsInit()
+old.jac_targetsAddAtmosphere(target=number_density, d=particle_step)
+old.jac_targetsFinalize()
+old.measurement_vecFromRadarSingleScattering(
+    **old_common, unit="Ze", pext_scaling=1.0
+)
+particle_jac = np.asarray(old.measurement_jac).copy()
+particle_explicit = manual_atmospheric_derivative(
+    old,
+    number_density,
+    particle_index,
+    particle_step,
+    old_common | {"unit": "Ze", "pext_scaling": 1.0},
+)
+assert np.allclose(
+    particle_jac[:, particle_index],
+    particle_explicit,
+    rtol=2e-7,
+    atol=1e-10,
+)
+
 # Restore the old predefined gases and verify that gas attenuation and all
 # four legacy auxiliary outputs participate in the calculation.
 old.abs_speciesSet(
@@ -269,9 +316,32 @@ old.jac_targetsFinalize()
 old.measurement_vecFromRadarSingleScattering(
     **old_common, unit="Ze", pext_scaling=1.0
 )
-old_jac = np.asarray(old.measurement_jac)
+old_jac = np.asarray(old.measurement_jac).copy()
 nh2o = np.asarray(old.atm_field["H2O"].data.data).size
 assert old_jac.shape[0] == len(old.measurement_sensor)
 assert np.all(np.isfinite(old_jac))
 assert np.max(np.abs(old_jac[:, :nh2o])) > 0.0
 assert np.max(np.abs(old_jac[:, nh2o:])) > 0.0
+
+# Independently validate both propagation-matrix derivative blocks.  These
+# finite differences deliberately live in the test: the production radar
+# method receives analytical derivatives from spectral_propmat_agenda and
+# propagates them through the two-way rtepack transmission.
+h2o_altitude = np.asarray(old.atm_field["H2O"].data.grids[0])
+h2o_index = int(np.argmin(np.abs(h2o_altitude - 2.5e3)))
+gas_kwargs = old_common | {"unit": "Ze", "pext_scaling": 1.0}
+h2o_explicit = manual_atmospheric_derivative(
+    old, "H2O", h2o_index, 1e-7, gas_kwargs
+)
+temperature_explicit = manual_atmospheric_derivative(
+    old, "t", h2o_index, 0.05, gas_kwargs
+)
+assert np.allclose(
+    old_jac[:, h2o_index], h2o_explicit, rtol=3e-4, atol=1e-10
+)
+assert np.allclose(
+    old_jac[:, nh2o + h2o_index],
+    temperature_explicit,
+    rtol=2e-3,
+    atol=1e-10,
+)

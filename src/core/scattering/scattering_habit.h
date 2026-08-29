@@ -37,6 +37,10 @@ class ScatteringHabit {
   BulkScatteringProperties<Format::TRO, Representation::Gridded> get_bulk_scattering_properties_tro_gridded(
       const AtmPoint& point, const Vector& f_grid, std::shared_ptr<ZenithAngleGrid> za_scat_grid) const;
 
+  BulkScatteringProperties<Format::TRO, Representation::Gridded>
+  get_bulk_scattering_properties_tro_gridded_derivative(
+      const AtmPoint&, const Vector&, std::shared_ptr<ZenithAngleGrid>, const AtmKeyVal&) const;
+
   ScatteringTroSpectralVector get_bulk_scattering_properties_tro_spectral(const AtmPoint&,
                                                                           const Vector& f_grid,
                                                                           const Index   degree [[maybe_unused]]) const;

@@ -206,6 +206,105 @@ ScatteringHabit::get_bulk_scattering_properties_tro_gridded(const AtmPoint&     
   return std::move(*result);
 }
 
+BulkScatteringProperties<Format::TRO, Representation::Gridded>
+ScatteringHabit::get_bulk_scattering_properties_tro_gridded_derivative(
+    const AtmPoint& point,
+    const Vector& f_grid,
+    std::shared_ptr<ZenithAngleGrid> za_scat_grid,
+    const AtmKeyVal& target) const {
+  const auto sizes = particle_habit.get_sizes(std::visit([](const auto& p) { return p.get_size_parameter(); }, psd));
+  const auto pnd = std::visit(
+      [&point, &sizes, this](const auto& p) {
+        return p.evaluate_with_derivatives(point, sizes, mass_size_rel_a, mass_size_rel_b);
+      }, psd);
+  ARTS_USER_ERROR_IF(pnd.values.size() != static_cast<Size>(particle_habit.size()),
+                     "PSD and particle-habit sizes differ.")
+
+  const auto* property = std::get_if<ScatteringSpeciesProperty>(&target);
+  const Vector* derivative = nullptr;
+  if (property) {
+    const auto iter = pnd.derivatives.find(*property);
+    if (iter != pnd.derivatives.end()) derivative = &iter->second;
+  }
+
+  auto grids = ScatteringDataGrids(std::make_shared<Vector>(Vector{point.temperature}),
+                                   std::make_shared<Vector>(f_grid),
+                                   za_scat_grid);
+  using Bulk = BulkScatteringProperties<Format::TRO, Representation::Gridded>;
+  std::optional<Bulk> result;
+  for (Index i = 0; i < particle_habit.size(); ++i) {
+    auto data = std::visit([&grids](const auto& ssd) { return ssd_to_tro_gridded(grids, ssd); }, particle_habit[i]);
+    const Numeric weight = derivative ? (*derivative)[i] : 0.0;
+    if (data.phase_matrix) *data.phase_matrix *= weight;
+    data.extinction_matrix *= weight;
+    data.absorption_vector *= weight;
+    Bulk bulk{std::move(data.phase_matrix), std::move(data.extinction_matrix), std::move(data.absorption_vector)};
+
+    if (target == AtmKeyVal{AtmKey::t}) {
+      Bulk temperature_derivative = std::visit(
+          [&](const auto& ssd) -> Bulk {
+            if constexpr (std::remove_cvref_t<decltype(ssd)>::get_format() == Format::ARO) {
+              ARTS_USER_ERROR("TRO radar derivatives cannot use ARO particle data")
+            } else {
+              const auto gridded = [&]() {
+                if constexpr (std::remove_cvref_t<decltype(ssd)>::get_representation() == Representation::Gridded)
+                  return ssd;
+                else
+                  return ssd.to_gridded();
+              }();
+              ARTS_USER_ERROR_IF(not gridded.phase_matrix, "Temperature derivatives require particle phase matrices")
+              const Vector& temperatures = *gridded.phase_matrix->get_t_grid();
+              ARTS_USER_ERROR_IF(temperatures.size() < 2,
+                                 "Temperature-dependent particle derivatives require at least two temperatures")
+
+              auto value_at = [&](Numeric temperature) {
+                ScatteringDataGrids local_grids(std::make_shared<Vector>(Vector{temperature}),
+                                                std::make_shared<Vector>(f_grid),
+                                                za_scat_grid);
+                auto value = ssd_to_tro_gridded(local_grids, ssd);
+                return Bulk{std::move(value.phase_matrix),
+                            std::move(value.extinction_matrix),
+                            std::move(value.absorption_vector)};
+              };
+              auto upper = std::ranges::lower_bound(temperatures, point.temperature);
+              const Size located = static_cast<Size>(upper - temperatures.begin());
+              Size right = std::clamp<Size>(located, 1, temperatures.size() - 1);
+              Size left = right - 1;
+
+              if (upper != temperatures.end() and *upper == point.temperature and located == right and right > 0 and
+                  right + 1 < temperatures.size()) {
+                auto below = value_at(temperatures[right - 1]);
+                auto middle = value_at(temperatures[right]);
+                auto above = value_at(temperatures[right + 1]);
+                below *= -0.5 / (temperatures[right] - temperatures[right - 1]);
+                middle *= 0.5 / (temperatures[right] - temperatures[right - 1]) -
+                          0.5 / (temperatures[right + 1] - temperatures[right]);
+                above *= 0.5 / (temperatures[right + 1] - temperatures[right]);
+                below += middle;
+                below += above;
+                return below;
+              }
+
+              auto below = value_at(temperatures[left]);
+              auto above = value_at(temperatures[right]);
+              const Numeric inverse_spacing = 1.0 / (temperatures[right] - temperatures[left]);
+              below *= -inverse_spacing;
+              above *= inverse_spacing;
+              below += above;
+              return below;
+            }
+            std::unreachable();
+          }, particle_habit[i]);
+      temperature_derivative *= pnd.values[i];
+      bulk += temperature_derivative;
+    }
+    if (result) *result += bulk;
+    else result = std::move(bulk);
+  }
+  ARTS_USER_ERROR_IF(not result, "Cannot calculate bulk properties for an empty particle habit.")
+  return std::move(*result);
+}
+
 BulkScatteringProperties<Format::ARO, Representation::Gridded>
 ScatteringHabit::get_bulk_scattering_properties_aro_gridded(const AtmPoint&                  point,
                                                             const Vector&                    f_grid,

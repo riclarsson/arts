@@ -66,6 +66,13 @@ template <Format format, Representation repr> struct BulkScatteringProperties {
     absorption_vector += other.absorption_vector;
     return *this;
   }
+
+  BulkScatteringProperties& operator*=(Numeric factor) {
+    if (phase_matrix) *phase_matrix *= factor;
+    extinction_matrix *= factor;
+    absorption_vector *= factor;
+    return *this;
+  }
 };
 
 //////////////////////////////////////////////////////////////////////////////

@@ -40,9 +40,9 @@ HenyeyGreensteinScatterer::get_bulk_scattering_properties_tro_gridded(
 
   auto zenith_angles = grid_vector(*zenith_angle_grid);
   for (Size f_ind = 0; f_ind < f_grid.size(); ++f_ind) {
-    float extinction, ssa;
+    Numeric extinction, ssa;
     std::tie(extinction, ssa) = ext_ssa_callback(f_grid[f_ind], atm_point);
-    float scattering_xsec     = extinction * ssa;
+    Numeric scattering_xsec   = extinction * ssa;
 
     emd[0, f_ind, 0] = extinction;
     av[0, f_ind, 0]  = extinction - scattering_xsec;
@@ -59,6 +59,45 @@ HenyeyGreensteinScatterer::get_bulk_scattering_properties_tro_gridded(
   }
 
   return BulkScatteringProperties<Format::TRO, Representation::Gridded>{pm, emd, av};
+}
+
+BulkScatteringProperties<Format::TRO, Representation::Gridded>
+HenyeyGreensteinScatterer::get_bulk_scattering_properties_tro_gridded_derivative(
+    const AtmPoint& atm_point,
+    const Vector& f_grid,
+    std::shared_ptr<ZenithAngleGrid> zenith_angle_grid,
+    const AtmKeyVal& target) const {
+  const auto* lookup = ext_ssa_callback.f.target<ExtinctionSSALookup>();
+  ARTS_USER_ERROR_IF(not lookup,
+                     "Analytical derivatives of a HenyeyGreensteinScatterer require its "
+                     "extinction/SSA atmospheric-field constructor, not an arbitrary callback")
+
+  auto t_grid     = std::make_shared<Vector>(Vector{0.0});
+  auto f_grid_ptr = std::make_shared<Vector>(f_grid);
+  PhaseMatrixData<Numeric, Format::TRO, Representation::Gridded> phase{t_grid, f_grid_ptr, zenith_angle_grid};
+  ExtinctionMatrixData<Numeric, Format::TRO, Representation::Gridded> extinction{t_grid, f_grid_ptr};
+  AbsorptionVectorData<Numeric, Format::TRO, Representation::Gridded> absorption{t_grid, f_grid_ptr};
+
+  const bool d_ext = target == AtmKeyVal{lookup->extinction_field};
+  const bool d_ssa = target == AtmKeyVal{lookup->ssa_field};
+  const auto angles = grid_vector(*zenith_angle_grid);
+  for (Size iv = 0; iv < f_grid.size(); ++iv) {
+    const auto [ext, ssa] = ext_ssa_callback(f_grid[iv], atm_point);
+    const Numeric dscat = d_ext ? ssa : (d_ssa ? ext : 0.0);
+    extinction[0, iv, 0] = d_ext ? 1.0 : 0.0;
+    absorption[0, iv, 0] = d_ext ? 1.0 - ssa : (d_ssa ? -ext : 0.0);
+    const Numeric g2 = g * g;
+    for (Size ia = 0; ia < angles.size(); ++ia) {
+      const Numeric p = dscat * (1.0 - g2) /
+                        (4.0 * Constant::pi *
+                         std::pow(1.0 + g2 - 2.0 * g * std::cos(Conversion::deg2rad(angles[ia])), 1.5));
+      phase[0, iv, ia, 0] = p;
+      phase[0, iv, ia, 2] = p;
+      phase[0, iv, ia, 3] = p;
+      phase[0, iv, ia, 5] = p;
+    }
+  }
+  return {std::move(phase), std::move(extinction), std::move(absorption)};
 }
 
 ScatteringTroSpectralVector HenyeyGreensteinScatterer::get_bulk_scattering_properties_tro_spectral(

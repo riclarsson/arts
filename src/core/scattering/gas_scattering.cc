@@ -132,6 +132,20 @@ BulkScatteringProperties<Format::TRO, Representation::Gridded> GasScatterer::get
           .absorption_vector = std::move(absorption)};
 }
 
+BulkScatteringProperties<Format::TRO, Representation::Gridded>
+GasScatterer::get_bulk_scattering_properties_tro_gridded_derivative(
+    const AtmPoint& atm_point,
+    const Vector& f_grid,
+    std::shared_ptr<ZenithAngleGrid> za_scat_grid,
+    const AtmKeyVal& target) const {
+  auto out = get_bulk_scattering_properties_tro_gridded(atm_point, f_grid, std::move(za_scat_grid));
+  Numeric factor = 0.0;
+  if (target == AtmKeyVal{AtmKey::p}) factor = 1.0 / atm_point.pressure;
+  if (target == AtmKeyVal{AtmKey::t}) factor = -1.0 / atm_point.temperature;
+  out *= factor;
+  return out;
+}
+
 ScatteringTroSpectralVector GasScatterer::get_bulk_scattering_properties_tro_spectral(const AtmPoint& atm_point,
                                                                                       const Vector&   f_grid,
                                                                                       Index           degree) const {
