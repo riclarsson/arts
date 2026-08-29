@@ -79,4 +79,22 @@ Vector dplanck_df(const ConstVectorView& f, const Numeric& t);
 
 Numeric rayjean(const Numeric& f, const Numeric& t);
 
+/** Refractive index of water and steam in the visible and near infrared.
+ *
+ * Implements the formulation of Harvey et al. (1998), "Revised
+ * Formulation for the Refractive Index of Water and Steam as a Function of
+ * Wavelength, Temperature and Density".  The formulation only supplies the
+ * real part of the refractive index.
+ *
+ * @param frequency Frequency [Hz].
+ * @param temperature Temperature [K].
+ * @param density Water mass density [kg/m3].
+ * @param check_validity Enforce the published validity range.
+ * @return Real refractive index.
+ */
+Numeric refractive_index_water_visible_nir_harvey98(Numeric frequency,
+                                                    Numeric temperature,
+                                                    Numeric density,
+                                                    bool    check_validity = true);
+
 #endif  // physics_h

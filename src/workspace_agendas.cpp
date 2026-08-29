@@ -90,6 +90,10 @@ in question here only compute a single frequency point at a time.
 
 If you do not need single-frequency-point calculations, consider using
 *spectral_propmat_agenda* instead as it will likely be more efficient.
+
+For visible/near-infrared water or steam refraction, the convenience method
+*single_propmat_agendaSetWaterVisibleNIRHarvey98* configures this agenda to
+provide the required *single_dispersion*.
 )--",
       .output = {"single_propmat",
                  "single_nlte_srcvec",
@@ -167,6 +171,10 @@ position and line of sight.
 It is up to internal methods if they respect *single_dispersion* or not.
 
 It is up to internal methods if they respect *max_stepsize* or not.
+
+The ``RefractiveStepwise`` option consumes *single_dispersion*.  It can, for
+example, be paired with *single_propmat_agendaSetWaterVisibleNIRHarvey98* for
+Harvey98 water/steam refraction.
 
 A special exception may be made for a 1-size *ray_path* that is in space or at the surface,
 where the next point may be the same point as the input.

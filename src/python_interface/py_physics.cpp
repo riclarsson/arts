@@ -12,6 +12,46 @@ void py_physics(py::module_& m) try {
 )--";
 
   physics.def(
+      "refractive_index_water_visible_nir_harvey98",
+      [](py::object frequency, py::object temperature, py::object density, bool check_validity) {
+        return vectorize(
+            [check_validity](Numeric f, Numeric t, Numeric rho) {
+              return refractive_index_water_visible_nir_harvey98(f, t, rho, check_validity);
+            },
+            frequency,
+            temperature,
+            density);
+      },
+      "frequency"_a,
+      "temperature"_a,
+      "density"_a,
+      "check_validity"_a = true,
+      R"--(Real refractive index of water and steam in the visible and near infrared.
+
+Implements Harvey et al. (1998), "Revised Formulation for the Refractive
+Index of Water and Steam as a Function of Wavelength, Temperature and
+Density".  The function broadcasts scalar and array inputs using NumPy rules.
+
+Parameters
+----------
+frequency : Numeric or numpy.ndarray
+    Frequency [Hz].
+temperature : Numeric or numpy.ndarray
+    Temperature [K].
+density : Numeric or numpy.ndarray
+    Water mass density [kg/m3].
+check_validity : bool, optional
+    Enforce the published ranges: 261.15 K < temperature < 773.15 K,
+    0 kg/m3 < density < 1060 kg/m3, and 0.2 micrometres < wavelength <
+    1.9 micrometres.
+
+Returns
+-------
+n : Numeric or numpy.ndarray
+    Real refractive index.
+)--");
+
+  physics.def(
       "number_density",
       [](py::object p, py::object t) {
         return vectorize([](Numeric a, Numeric b) { return number_density(a, b); }, p, t);

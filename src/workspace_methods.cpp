@@ -2534,6 +2534,55 @@ This is only for LTE lines in Voigt.
                                                "single_dispersion_jac"},
                                     .in     = {"jac_targets"}};
 
+  wsm_data["single_dispersionAddWaterVisibleNIRHarvey98"] = {
+      .desc =
+          R"--(Add the Harvey et al. (1998) water/steam refractivity to *single_dispersion*.
+
+The model covers the real refractive index in the visible and near infrared.
+The added value is :math:`n-1`, matching the convention consumed by
+*ray_point_back_propagation_agenda* when it uses its ``RefractiveStepwise``
+option.
+
+By default, the water mass density is derived from the H2O VMR, pressure,
+temperature, and isotopologue masses in *atm_point*.  Set
+``water_mass_density`` to a non-negative value to use an explicit density
+instead.  An explicit value is useful for liquid-water calculations.
+
+This method only contributes refractivity.  It does not add absorption to
+*single_propmat* or derivatives to *single_dispersion_jac*.
+)--",
+      .author    = {"Manfred Brath", "Richard Larsson"},
+      .out       = {"single_dispersion"},
+      .in        = {"single_dispersion", "freq", "atm_point"},
+      .gin       = {"water_mass_density", "check_validity"},
+      .gin_type  = {"Numeric", "Index"},
+      .gin_value = {Numeric{-1.0}, Index{1}},
+      .gin_desc  = {"Water mass density [kg/m3]. A negative value derives it from the H2O VMR in atm_point.",
+                    "Enforce the published temperature, density, and wavelength validity ranges."},
+  };
+
+  wsm_data["single_propmat_agendaSetWaterVisibleNIRHarvey98"] = {
+      .desc =
+          R"--(Configure *single_propmat_agenda* for Harvey98 water/steam refraction.
+
+The agenda initializes all single-frequency propagation quantities and then
+adds Harvey98 water refractivity.  Pair it with
+``ray_point_back_propagation_agendaSet(option="RefractiveStepwise")`` and a
+frequency-dependent propagation method such as
+*spectral_radClearskyEmissionFrequencyDependentPropagation*.
+
+The resulting agenda contains no absorption model.  Build a custom
+*single_propmat_agenda* if absorption and Harvey98 refraction are both needed.
+)--",
+      .author    = {"Manfred Brath", "Richard Larsson"},
+      .out       = {"single_propmat_agenda"},
+      .gin       = {"water_mass_density", "check_validity"},
+      .gin_type  = {"Numeric", "Index"},
+      .gin_value = {Numeric{-1.0}, Index{1}},
+      .gin_desc  = {"Water mass density [kg/m3]. A negative value derives it from the H2O VMR in atm_point.",
+                    "Enforce the published temperature, density, and wavelength validity ranges."},
+  };
+
   wsm_data["single_propmatAddVoigtLTE"] = {
       .desc      = R"--(Add line-by-line absorption to the propagation matrix.
 
