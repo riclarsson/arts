@@ -11,6 +11,7 @@
 
 #include "bulk_scattering_properties.h"
 #include "general_tro_spectral.h"
+#include "gas_scattering.h"
 #include "henyey_greenstein.h"
 #include "particle_habit.h"
 #include "properties.h"
@@ -21,7 +22,7 @@ namespace scattering {
 
 struct ScatteringDataSpec {};
 
-using Species = std::variant<HenyeyGreensteinScatterer, ScatteringGeneralSpectralTRO, ScatteringHabit>;
+using Species = std::variant<GasScatterer, HenyeyGreensteinScatterer, ScatteringGeneralSpectralTRO, ScatteringHabit>;
 
 }  // namespace scattering
 
@@ -79,12 +80,10 @@ template <> struct std::formatter<ArrayOfScatteringSpecies> {
 };
 
 using HenyeyGreensteinScatterer = scattering::HenyeyGreensteinScatterer;
+using GasScatterer              = scattering::GasScatterer;
 using ParticleHabit             = scattering::ParticleHabit;
 using ScatteringHabit           = scattering::ScatteringHabit;
 using PSD                       = scattering::PSD;
-
-std::ostream& operator<<(std::ostream& os,
-                         const std::variant<HenyeyGreensteinScatterer, scattering::ScatteringHabit>& /*species*/);
 
 //! Naming the variant
 template <> struct xml_io_stream_name<ScatteringSpecies> {

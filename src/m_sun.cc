@@ -385,3 +385,100 @@ void spectral_rad_scat_pathSunsFirstOrderRayleigh(const Workspace& ws,
   ARTS_USER_ERROR_IF(error.size(), "{}", error)
 }
 ARTS_METHOD_ERROR_CATCH
+
+void spectral_rad_scat_pathSunsFirstOrder(const Workspace&                                 ws,
+                                          ArrayOfStokvecVector&                            spectral_rad_scat_path,
+                                          const ArrayOfPropagationPathPoint&               ray_path,
+                                          const ArrayOfArrayOfArrayOfPropagationPathPoint& ray_path_suns_path,
+                                          const ArrayOfSun&                                suns,
+                                          const JacobianTargets&                           jac_targets,
+                                          const AscendingGrid&                             freq_grid,
+                                          const AtmField&                                  atm_field,
+                                          const SurfaceField&                              surf_field,
+                                          const ArrayOfScatteringSpecies&                  scattering_species,
+                                          const Agenda&              spectral_propmat_and_atm_path_agenda,
+                                          const TransmittanceOption& rte_option,
+                                          const Index&               hse_derivative) try {
+  ARTS_TIME_REPORT
+
+  ARTS_USER_ERROR_IF(surf_field.bad_ellipsoid(),
+                     "Surface field not properly set up - bad reference ellipsoid: {:B,}",
+                     surf_field.ellipsoid)
+  ARTS_USER_ERROR_IF(jac_targets.x_size(), "Cannot have any Jacobian targets")
+  ARTS_USER_ERROR_IF(scattering_species.species.empty(), "No scattering species")
+
+  const Size np = ray_path.size();
+  ARTS_USER_ERROR_IF(np != ray_path_suns_path.size(), "Bad ray_path_suns_path: incorrect number of path points")
+
+  const Size nsuns = suns.size();
+  ARTS_USER_ERROR_IF(stdr::any_of(ray_path_suns_path, Cmp::ne(nsuns), &ArrayOfArrayOfPropagationPathPoint::size),
+                     "Bad ray_path_suns_path: incorrect number of suns")
+
+  const Size nf = freq_grid.size();
+  spectral_rad_scat_path.resize(np);
+  for (auto& p : spectral_rad_scat_path) {
+    p.resize(nf);
+    p = 0.0;
+  }
+
+  String error{};
+
+#pragma omp parallel for if (not arts_omp_in_parallel())
+  for (Size ip = 0; ip < np; ++ip) {
+    try {
+      StokvecVector       spectral_rad;
+      StokvecMatrix       spectral_rad_jac;
+      StokvecVector       spectral_rad_bkg;
+      const StokvecMatrix spectral_rad_bkg_jac(0, nf);
+
+      const auto& ray_point = ray_path[ip];
+      const auto  atm_point = atm_field.at(ray_point.pos);
+
+      for (Size isun = 0; isun < nsuns; ++isun) {
+        auto        sun_path = ray_path_suns_path[ip][isun];
+        const auto& sun      = suns[isun];
+
+        spectral_radSunOrCosmicBackground(spectral_rad_bkg, freq_grid, sun_path, sun, surf_field);
+        spectral_radClearskyBackgroundTransmission(ws,
+                                                   spectral_rad,
+                                                   spectral_rad_jac,
+                                                   sun_path,
+                                                   atm_field,
+                                                   freq_grid,
+                                                   jac_targets,
+                                                   rte_option,
+                                                   spectral_propmat_and_atm_path_agenda,
+                                                   spectral_rad_bkg,
+                                                   spectral_rad_bkg_jac,
+                                                   surf_field,
+                                                   hse_derivative);
+
+        const Numeric radiance_to_irradiance = pi * sun.sin_alpha_squared(sun_path.back().pos, surf_field.ellipsoid);
+        const Vector2 incoming               = sun_path.front().los;
+        const Vector2 outgoing               = ray_point.los;
+        Numeric       delta_aa               = outgoing[1] - incoming[1];
+        while (delta_aa < -180.0) delta_aa += 360.0;
+        while (delta_aa > 180.0) delta_aa -= 360.0;
+        auto za_scat_grid =
+            std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{outgoing[0]}));
+        const auto bulk = scattering_species.get_bulk_scattering_properties_aro_gridded(
+            atm_point, freq_grid, Vector{incoming[0]}, Vector{delta_aa}, std::move(za_scat_grid));
+        ARTS_USER_ERROR_IF(not bulk.phase_matrix, "The scattering species returned no phase matrix")
+
+        for (Size iv = 0; iv < nf; ++iv) {
+          const auto flat = (*bulk.phase_matrix)[0, iv, 0, 0, 0, joker];
+          Muelmat    phase{0.0};
+          for (Index i = 0; i < 4; ++i)
+            for (Index j = 0; j < 4; ++j) phase[i, j] = flat[4 * i + j];
+          spectral_rad_scat_path[ip][iv] += phase * radiance_to_irradiance * spectral_rad[iv];
+        }
+      }
+    } catch (const std::exception& e) {
+#pragma omp critical
+      error += e.what();
+    }
+  }
+
+  ARTS_USER_ERROR_IF(error.size(), "{}", error)
+}
+ARTS_METHOD_ERROR_CATCH

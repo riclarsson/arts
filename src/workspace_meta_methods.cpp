@@ -225,6 +225,26 @@ This method simply is a convenience wrapper for that use case.
   });
 
   wsm_meta.push_back(WorkspaceMethodInternalMetaRecord{
+      .name    = "spectral_radClearskyScattering",
+      .desc    = "Computes clearsky spectral radiances with first-order solar scattering from scat_species",
+      .author  = {"Richard Larsson"},
+      .methods = {"ray_pointBackground",
+                  "spectral_rad_bkgAgendasAtEndOfPath",
+                  "spectral_propmat_and_atm_path_agendaExecute",
+                  "spectral_propmat_scat_pathFromSpectralAgenda",
+                  "spectral_propmat_pathAddScattering",
+                  "spectral_tramat_pathFromPath",
+                  "spectral_rad_srcvec_pathFromPropmat",
+                  "spectral_rad_srcvec_pathCorrectScattering",
+                  "spectral_rad_scat_pathSunsFirstOrder",
+                  "spectral_rad_srcvec_pathAddScattering",
+                  "spectral_radStepByStepEmission",
+                  "spectral_rad_jacFromBackground",
+                  "spectral_rad_jacAddPathPropagation"},
+      .out     = {"spectral_rad", "spectral_rad_jac", "ray_path"},
+  });
+
+  wsm_meta.push_back(WorkspaceMethodInternalMetaRecord{
       .name    = "spectral_radClearskyTransmission",
       .desc    = "Computes clearsky transmission of spectral radiances",
       .author  = {"Richard Larsson"},

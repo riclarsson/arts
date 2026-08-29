@@ -290,12 +290,68 @@ void py_scattering_species(py::module_& m) try {
   //           scattering::Format::ARO,
   //           scattering::Representation::Spectral>>;
   using BulkScatteringPropertiesAROGridded =
-      std::variant<scattering::BulkScatteringProperties<scattering::Format::ARO,
-                                                        scattering::Representation::Gridded>>;
+      std::variant<scattering::BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Gridded>>;
 
   //
   // Modified gamma PSD
   //
+
+  py::class_<scattering::AirSimpleGasScattering>(m, "AirSimpleGasScattering").def(py::init<>()).doc() =
+      "AirSimple molecular scattering coefficient model";
+
+  py::class_<scattering::ConstantGasScattering>(m, "ConstantGasScattering")
+      .def(py::init<Numeric>(), "cross_section"_a)
+      .def_rw("cross_section", &scattering::ConstantGasScattering::cross_section)
+      .doc() = "Constant molecular scattering cross-section model";
+
+  py::class_<scattering::IsotropicGasScattering>(m, "IsotropicGasScattering").def(py::init<>()).doc() =
+      "Isotropic unpolarized gas-scattering phase matrix";
+
+  py::class_<scattering::RayleighGasScattering>(m, "RayleighGasScattering")
+      .def(py::init<Numeric>(), "depolarization_factor"_a = 0.0)
+      .def_rw("depolarization_factor", &scattering::RayleighGasScattering::depolarization_factor)
+      .doc() = "Polarized Rayleigh gas-scattering phase matrix";
+
+  py::class_<GasScatterer>(m, "GasScatterer")
+      .def(py::init<>())
+      .def(py::init<scattering::GasScatteringCoefficient, scattering::GasScatteringPhaseMatrix>(),
+           "coefficient"_a,
+           "phase_matrix"_a)
+      .def_rw("coefficient", &GasScatterer::coefficient)
+      .def_rw("phase_matrix", &GasScatterer::phase_matrix)
+      .def_static(
+          "air_simple_rayleigh",
+          [](Numeric depolarization_factor) {
+            return GasScatterer{scattering::AirSimpleGasScattering{},
+                                scattering::RayleighGasScattering{depolarization_factor}};
+          },
+          "depolarization_factor"_a = 0.0)
+      .def_static(
+          "constant_isotropic",
+          [](Numeric cross_section) {
+            return GasScatterer{scattering::ConstantGasScattering{cross_section}, scattering::IsotropicGasScattering{}};
+          },
+          "cross_section"_a)
+      .def(
+          "get_bulk_scattering_properties_tro_gridded",
+          [](const GasScatterer&         scatterer,
+             const AtmPoint&             atm_point,
+             const Vector&               f_grid,
+             scattering::ZenithAngleGrid za_grid) {
+            return BulkScatteringPropertiesTROGridded{scatterer.get_bulk_scattering_properties_tro_gridded(
+                atm_point, f_grid, std::make_shared<scattering::ZenithAngleGrid>(std::move(za_grid)))};
+          },
+          "atm_point"_a,
+          "f_grid"_a,
+          "za_grid"_a,
+          "Get bulk scattering properties")
+      .def("get_bulk_scattering_properties_tro_spectral",
+           &GasScatterer::get_bulk_scattering_properties_tro_spectral,
+           "atm_point"_a,
+           "f_grid"_a,
+           "degree"_a,
+           "Get bulk scattering properties")
+      .doc() = "A molecular gas-scattering species";
 
   py::class_<HenyeyGreensteinScatterer>(m, "HenyeyGreensteinScatterer")
       .def(py::init<ExtSSACallback, Numeric>(), "func"_a, "g"_a)
@@ -487,18 +543,16 @@ void py_scattering_species(py::module_& m) try {
       .doc() = "Bulk scattering properties";
 
   py::class_<ParticleHabit>(m, "ParticleHabit")
-      .def_static("liquid_sphere",
-                  [](Vector t_grid,
-                     Vector f_grid,
-                     Vector diameters,
-                     const scattering::ZenithAngleGrid& za_scat_grid) {
-                    return ParticleHabit::liquid_sphere(t_grid, f_grid, diameters, za_scat_grid);
-                  },
-                  "t_grid"_a,
-                  "f_grid"_a,
-                  "diameters"_a,
-                  "za_scat_grid"_a,
-                  "Create a totally-random liquid-sphere habit with ARTS' Mie solver")
+      .def_static(
+          "liquid_sphere",
+          [](Vector t_grid, Vector f_grid, Vector diameters, const scattering::ZenithAngleGrid& za_scat_grid) {
+            return ParticleHabit::liquid_sphere(t_grid, f_grid, diameters, za_scat_grid);
+          },
+          "t_grid"_a,
+          "f_grid"_a,
+          "diameters"_a,
+          "za_scat_grid"_a,
+          "Create a totally-random liquid-sphere habit with ARTS' Mie solver")
       .def_static("from_legacy_tro", &ParticleHabit::from_legacy_tro, "ssd"_a, "smd"_a, "Create from legacy TRO")
       .def_static("from_legacy_aro", &ParticleHabit::from_legacy_aro, "ssd"_a, "smd"_a, "Create from legacy ARO")
       .def("to_tro_spectral",

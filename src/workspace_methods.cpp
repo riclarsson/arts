@@ -1221,6 +1221,24 @@ The calculations are in parallel if the program is not in parallel already.
       .in     = {"spectral_propmat_path", "spectral_propmat_scat_path"},
   };
 
+  wsm_data["spectral_rad_srcvec_pathCorrectScattering"] = {
+      .desc =
+          R"--(Remove thermal emission incorrectly associated with nonabsorbing scattering extinction.
+
+Call this after *spectral_rad_srcvec_pathFromPropmat* when scattering has been
+added to *spectral_propmat_path*.  True particulate absorption in
+*spectral_absvec_scat_path* retains its thermal source.
+)--",
+      .author = {"Richard Larsson"},
+      .out    = {"spectral_rad_srcvec_path"},
+      .in     = {"spectral_rad_srcvec_path",
+                 "spectral_propmat_path",
+                 "spectral_propmat_scat_path",
+                 "spectral_absvec_scat_path",
+                 "freq_grid_path",
+                 "atm_path"},
+  };
+
   wsm_data["spectral_rad_srcvec_pathAddScattering"] = {
       .desc =
           R"--(Adds the scattering part of the source vector to the rest along the path.
@@ -4718,6 +4736,33 @@ Hence, a temperature of 0 means 0s the edges of the *freq_grid*.
       .gin_type  = {"Numeric", "Index"},
       .gin_value = {Numeric{0.0}, Index{0}},
       .gin_desc  = {R"--(The depolarization factor to use.)--", "Flag to compute the hypsometric distance derivatives"},
+      .pass_workspace = true,
+  };
+
+  wsm_data["spectral_rad_scat_pathSunsFirstOrder"] = {
+      .desc =
+          R"--(Compute first-order solar scattering from *scat_species* along *ray_path*.
+
+Unlike *spectral_rad_scat_pathSunsFirstOrderRayleigh*, both the scattering
+coefficient and the polarized phase matrix come from *scat_species*.  This
+supports gas, particulate, and mixed scattering species.
+)--",
+      .author = {"Richard Larsson"},
+      .out    = {"spectral_rad_scat_path"},
+      .in     = {"ray_path",
+                 "ray_path_suns_path",
+                 "suns",
+                 "jac_targets",
+                 "freq_grid",
+                 "atm_field",
+                 "surf_field",
+                 "scat_species",
+                 "spectral_propmat_and_atm_path_agenda",
+                 "rte_option"},
+      .gin       = {"hse_derivative"},
+      .gin_type  = {"Index"},
+      .gin_value = {Index{0}},
+      .gin_desc  = {"Flag to compute the hypsometric distance derivatives"},
       .pass_workspace = true,
   };
 
