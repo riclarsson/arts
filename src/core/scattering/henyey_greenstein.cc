@@ -67,7 +67,7 @@ ScatteringTroSpectralVector HenyeyGreensteinScatterer::get_bulk_scattering_prope
   auto t_grid     = std::make_shared<Vector>(Vector{0.0});
   auto f_grid_ptr = std::make_shared<Vector>(f_grid);
 
-  SpecmatMatrix pm(f_grid.size(), l + 1);
+  SpecmatMatrix pm(f_grid.size(), l + 1, Specmat(0.0));
   PropmatVector emd(f_grid.size());
   StokvecVector av(f_grid.size());
 
@@ -97,9 +97,12 @@ HenyeyGreensteinScatterer::get_bulk_scattering_properties_aro_gridded(
     const Vector&                                za_inc_grid,
     const Vector&                                delta_aa_grid,
     std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid) const {
-  auto bsp_tro = get_bulk_scattering_properties_tro_gridded(atm_point, f_grid, za_scat_grid);
-  return bsp_tro.to_lab_frame(
-      std::make_shared<Vector>(za_inc_grid), std::make_shared<Vector>(delta_aa_grid), za_scat_grid);
+  auto scattering_angles = std::make_shared<scattering::ZenithAngleGrid>(
+      scattering::IrregularZenithAngleGrid(nlinspace(0.0, 180.0, 181)));
+  return get_bulk_scattering_properties_tro_gridded(atm_point, f_grid, scattering_angles)
+      .to_lab_frame(std::make_shared<Vector>(za_inc_grid),
+                    std::make_shared<Vector>(delta_aa_grid),
+                    std::move(za_scat_grid));
 }
 
 BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Spectral>

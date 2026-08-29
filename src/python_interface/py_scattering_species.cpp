@@ -475,6 +475,18 @@ void py_scattering_species(py::module_& m) try {
       .doc() = "Bulk scattering properties";
 
   py::class_<ParticleHabit>(m, "ParticleHabit")
+      .def_static("liquid_sphere",
+                  [](Vector t_grid,
+                     Vector f_grid,
+                     Vector diameters,
+                     const scattering::ZenithAngleGrid& za_scat_grid) {
+                    return ParticleHabit::liquid_sphere(t_grid, f_grid, diameters, za_scat_grid);
+                  },
+                  "t_grid"_a,
+                  "f_grid"_a,
+                  "diameters"_a,
+                  "za_scat_grid"_a,
+                  "Create a totally-random liquid-sphere habit with ARTS' Mie solver")
       .def_static("from_legacy_tro", &ParticleHabit::from_legacy_tro, "ssd"_a, "smd"_a, "Create from legacy TRO")
       .def("to_tro_spectral",
            &ParticleHabit::to_tro_spectral,

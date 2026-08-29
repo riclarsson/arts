@@ -45,14 +45,9 @@ PolarizedOptics polarized_optics(const Workspace&                ws,
   Propmat particle_ext{};
   Stokvec particle_abs{};
   if (not scattering_species.species.empty()) {
-    auto za = std::make_shared<scattering::ZenithAngleGrid>(
-        scattering::IrregularZenithAngleGrid(Vector{0.0, 180.0}));
-    const auto bulk = scattering_species.get_bulk_scattering_properties_tro_gridded(atm, freq_grid, za);
-    particle_ext    = Propmat{bulk.extinction_matrix[0, 0, 0]};
-    particle_abs    = Stokvec{bulk.absorption_vector[0, 0, 0],
-                              bulk.absorption_vector[0, 0, 1],
-                              bulk.absorption_vector[0, 0, 2],
-                              bulk.absorption_vector[0, 0, 3]};
+    const auto bulk = scattering_species.get_bulk_scattering_properties_tro_spectral(atm, freq_grid, 64);
+    particle_ext    = bulk.extinction_matrix[0];
+    particle_abs    = bulk.absorption_vector[0];
   }
 
   return {.extinction = gas[0] + particle_ext,
@@ -171,16 +166,12 @@ Muelmat phase_weight(const ArrayOfScatteringSpecies& species,
   Numeric delta_aa       = outgoing[1] - incoming[1];
   while (delta_aa < 0.0) delta_aa += 360.0;
   while (delta_aa > 360.0) delta_aa -= 360.0;
-  const auto rotations = scattering::detail::rotation_coefficients(
-      incoming[1], incoming[0], outgoing[1], outgoing[0]);
-  const Numeric scattering_angle = Conversion::rad2deg(std::get<0>(rotations));
   auto za = std::make_shared<scattering::ZenithAngleGrid>(
-      scattering::IrregularZenithAngleGrid(Vector{scattering_angle}));
-  const auto bulk = species.get_bulk_scattering_properties_tro_gridded(atm, AscendingGrid{frequency}, za);
-  ARTS_USER_ERROR_IF(not bulk.phase_matrix, "MCGeneral requires phase matrices from all scattering species")
-  Vector flat(16, 0.0);
-  scattering::detail::expand_and_transform(
-      flat, (*bulk.phase_matrix)[0, 0, 0, joker], rotations, delta_aa > 180.0);
+      scattering::IrregularZenithAngleGrid(Vector{outgoing[0]}));
+  const auto bulk = species.get_bulk_scattering_properties_aro_gridded(
+      atm, AscendingGrid{frequency}, Vector{incoming[0]}, Vector{delta_aa}, za);
+  ARTS_USER_ERROR_IF(not bulk.phase_matrix, "MCGeneral failed to transform the phase matrix to the laboratory frame")
+  const auto flat = (*bulk.phase_matrix)[0, 0, 0, 0, 0, joker];
   Muelmat out{0.0};
   for (Index i = 0; i < 4; ++i)
     for (Index j = 0; j < 4; ++j) out[i, j] = flat[4 * i + j];

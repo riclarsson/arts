@@ -176,6 +176,20 @@ BulkScatteringPropertiesTROGridded ScatteringHabit::get_bulk_scattering_properti
   return BulkScatteringPropertiesTROGridded(phase_matrix_new, extinction_matrix_new, absorption_vector_new);
 }
 
+BulkScatteringProperties<Format::ARO, Representation::Gridded>
+ScatteringHabit::get_bulk_scattering_properties_aro_gridded(
+    const AtmPoint&                  point,
+    const Vector&                    f_grid,
+    const Vector&                    za_inc_grid,
+    const Vector&                    delta_aa_grid,
+    std::shared_ptr<ZenithAngleGrid> za_scat_grid) const {
+  constexpr Index degree = 64;
+  return get_bulk_scattering_properties_tro_spectral(point, f_grid, degree)
+      .to_lab_frame(std::make_shared<Vector>(za_inc_grid),
+                    std::make_shared<Vector>(delta_aa_grid),
+                    std::move(za_scat_grid));
+}
+
 ScatteringTroSpectralVector ScatteringHabit::get_bulk_scattering_properties_tro_spectral(const AtmPoint& point,
                                                                                          const Vector&   f_grid,
                                                                                          const Index     degree

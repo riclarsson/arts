@@ -35,9 +35,15 @@ ScatteringTroSpectralVector::to_general(const SpecmatMatrix& phase_matrix, const
   scattering::PhaseMatrixData<Numeric, scattering::Format::TRO, scattering::Representation::Spectral> pm{
       t_grid, f_grid_ptr, scattering::sht::provider.get_instance_lm(l, 0)};
 
-  for (Index f_ind = 0; f_ind < pm.npages(); ++f_ind) {
-    for (Index ind = 0; ind < pm.nrows(); ++ind) {
-      for (Index is = 0; is < pm.ncols(); is++) { pm[0, f_ind, ind, is] = phase_matrix[f_ind, ind].data[is]; }
+  for (Index f_ind = 0; f_ind < phase_matrix.nrows(); ++f_ind) {
+    for (Index ind = 0; ind < phase_matrix.ncols(); ++ind) {
+      const auto& x = phase_matrix[f_ind, ind];
+      pm[0, f_ind, ind, 0] = x[0, 0];
+      pm[0, f_ind, ind, 1] = x[0, 1];
+      pm[0, f_ind, ind, 2] = x[1, 1];
+      pm[0, f_ind, ind, 3] = x[2, 2];
+      pm[0, f_ind, ind, 4] = x[2, 3];
+      pm[0, f_ind, ind, 5] = x[3, 3];
     }
   }
 
@@ -77,7 +83,7 @@ ScatteringTroSpectralVector::to_general(const StokvecVector&           absorptio
   scattering::AbsorptionVectorData<Numeric, scattering::Format::TRO, scattering::Representation::Spectral> av{
       t_grid, f_grid_ptr};
 
-  for (Index f_ind = 0; av.nrows(); ++f_ind) {
+  for (Index f_ind = 0; f_ind < av.nrows(); ++f_ind) {
     for (Index i = 0; i < av.ncols(); i++) { av[0, f_ind, i] = absorption_vector[f_ind][i]; }
   }
   return av;
@@ -100,15 +106,11 @@ ScatteringTroSpectralVector::general_t ScatteringTroSpectralVector::to_general(c
 }
 
 ScatteringTroSpectralVector::gridded_t ScatteringTroSpectralVector::to_lab_frame(
-    std::shared_ptr<const Vector> /*za_inc_grid*/,
-    std::shared_ptr<const Vector> /*delta_aa_grid*/,
-    std::shared_ptr<const scattering::ZenithAngleGrid> /*za_scat_grid_new*/) const {
-  // return to_general().to_lab_frame(std::move(za_inc_grid),
-  //                                  std::move(delta_aa_grid),
-  //                                  std::move(za_scat_grid_new));
-
-  throw std::runtime_error("Not implemented.");
-  std::unreachable();
+    std::shared_ptr<const Vector> za_inc_grid,
+    std::shared_ptr<const Vector> delta_aa_grid,
+    std::shared_ptr<const scattering::ZenithAngleGrid> za_scat_grid_new) const {
+  return to_general().to_lab_frame(
+      std::move(za_inc_grid), std::move(delta_aa_grid), std::move(za_scat_grid_new));
 }
 
 void xml_io_stream<ScatteringGeneralSpectralTRO>::write(std::ostream&                       os,

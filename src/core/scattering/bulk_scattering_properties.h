@@ -24,12 +24,21 @@ template <Format format, Representation repr> struct BulkScatteringProperties {
       std::shared_ptr<const Vector>          za_inc_grid,
       std::shared_ptr<const Vector>          delta_aa_grid,
       std::shared_ptr<const ZenithAngleGrid> za_scat_grid_new) {
-    return BulkScatteringProperties<Format::ARO, Representation::Gridded>{
-        phase_matrix.transform([&](const PhaseMatrix<format, repr>& pm) {
-          return pm.to_lab_frame(za_inc_grid, delta_aa_grid, za_scat_grid_new);
-        }),
-        extinction_matrix.to_lab_frame(delta_aa_grid),
-        absorption_vector.to_lab_frame(delta_aa_grid)};
+    if constexpr (repr == Representation::Spectral) {
+      return BulkScatteringProperties<Format::ARO, Representation::Gridded>{
+          phase_matrix.transform([&](const PhaseMatrix<format, repr>& pm) {
+            return pm.to_lab_frame(za_inc_grid, delta_aa_grid, za_scat_grid_new);
+          }),
+          extinction_matrix.to_gridded().to_lab_frame(za_inc_grid),
+          absorption_vector.to_gridded().to_lab_frame(za_inc_grid)};
+    } else {
+      return BulkScatteringProperties<Format::ARO, Representation::Gridded>{
+          phase_matrix.transform([&](const PhaseMatrix<format, repr>& pm) {
+            return pm.to_lab_frame(za_inc_grid, delta_aa_grid, za_scat_grid_new);
+          }),
+          extinction_matrix.to_lab_frame(za_inc_grid),
+          absorption_vector.to_lab_frame(za_inc_grid)};
+    }
   }
 
   BulkScatteringProperties<format, Representation::Spectral> to_spectral() {
