@@ -49,8 +49,7 @@ HenyeyGreensteinScatterer::get_bulk_scattering_properties_tro_gridded(
     Numeric g2       = g * g;
     for (Size ind = 0; ind < zenith_angles.size(); ++ind) {
       const Numeric phase =
-          (1.0 - g2) /
-          std::pow(1.0 + g2 - 2.0 * g * cos(Conversion::deg2rad(zenith_angles[ind])), 3.0 / 2.0);
+          (1.0 - g2) / std::pow(1.0 + g2 - 2.0 * g * cos(Conversion::deg2rad(zenith_angles[ind])), 3.0 / 2.0);
       pm[0, f_ind, ind, 0] = phase;
       pm[0, f_ind, ind, 2] = phase;
       pm[0, f_ind, ind, 3] = phase;
@@ -97,12 +96,11 @@ HenyeyGreensteinScatterer::get_bulk_scattering_properties_aro_gridded(
     const Vector&                                za_inc_grid,
     const Vector&                                delta_aa_grid,
     std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid) const {
-  auto scattering_angles = std::make_shared<scattering::ZenithAngleGrid>(
-      scattering::IrregularZenithAngleGrid(nlinspace(0.0, 180.0, 181)));
+  auto scattering_angles =
+      std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(nlinspace(0.0, 180.0, 181)));
   return get_bulk_scattering_properties_tro_gridded(atm_point, f_grid, scattering_angles)
-      .to_lab_frame(std::make_shared<Vector>(za_inc_grid),
-                    std::make_shared<Vector>(delta_aa_grid),
-                    std::move(za_scat_grid));
+      .to_lab_frame(
+          std::make_shared<Vector>(za_inc_grid), std::make_shared<Vector>(delta_aa_grid), std::move(za_scat_grid));
 }
 
 BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Spectral>

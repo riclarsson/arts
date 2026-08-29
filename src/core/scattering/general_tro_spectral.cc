@@ -37,7 +37,7 @@ ScatteringTroSpectralVector::to_general(const SpecmatMatrix& phase_matrix, const
 
   for (Index f_ind = 0; f_ind < phase_matrix.nrows(); ++f_ind) {
     for (Index ind = 0; ind < phase_matrix.ncols(); ++ind) {
-      const auto& x = phase_matrix[f_ind, ind];
+      const auto& x        = phase_matrix[f_ind, ind];
       pm[0, f_ind, ind, 0] = x[0, 0];
       pm[0, f_ind, ind, 1] = x[0, 1];
       pm[0, f_ind, ind, 2] = x[1, 1];
@@ -106,11 +106,10 @@ ScatteringTroSpectralVector::general_t ScatteringTroSpectralVector::to_general(c
 }
 
 ScatteringTroSpectralVector::gridded_t ScatteringTroSpectralVector::to_lab_frame(
-    std::shared_ptr<const Vector> za_inc_grid,
-    std::shared_ptr<const Vector> delta_aa_grid,
+    std::shared_ptr<const Vector>                      za_inc_grid,
+    std::shared_ptr<const Vector>                      delta_aa_grid,
     std::shared_ptr<const scattering::ZenithAngleGrid> za_scat_grid_new) const {
-  return to_general().to_lab_frame(
-      std::move(za_inc_grid), std::move(delta_aa_grid), std::move(za_scat_grid_new));
+  return to_general().to_lab_frame(std::move(za_inc_grid), std::move(delta_aa_grid), std::move(za_scat_grid_new));
 }
 
 void xml_io_stream<ScatteringGeneralSpectralTRO>::write(std::ostream&                       os,

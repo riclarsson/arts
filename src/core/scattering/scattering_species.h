@@ -10,8 +10,8 @@
 #include <variant>
 
 #include "bulk_scattering_properties.h"
-#include "general_tro_spectral.h"
 #include "gas_scattering.h"
+#include "general_tro_spectral.h"
 #include "henyey_greenstein.h"
 #include "particle_habit.h"
 #include "properties.h"

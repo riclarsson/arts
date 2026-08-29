@@ -28,8 +28,8 @@ struct MonodispersePSD {
   MonodispersePSD(ScatteringSpeciesProperty number_density_, Numeric t_min_ = 0.0, Numeric t_max_ = 350.0);
 
   static constexpr SizeParameter get_size_parameter() { return SizeParameter::DVeq; }
-  Vector evaluate(const AtmPoint&, const Vector&, Numeric, Numeric) const;
-  PSDData evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+  Vector                         evaluate(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+  PSDData                        evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
 };
 
 /*** Single-moment modified gamma distribution

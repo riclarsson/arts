@@ -25,10 +25,10 @@ PolarizedOptics polarized_optics(const Workspace&                ws,
                                  const ArrayOfScatteringSpecies& scattering_species,
                                  const Agenda&                   spectral_propmat_agenda) {
   const AscendingGrid freq_grid{frequency};
-  PropmatVector gas;
-  StokvecVector src;
-  PropmatMatrix gas_jac;
-  StokvecMatrix src_jac;
+  PropmatVector       gas;
+  StokvecVector       src;
+  PropmatMatrix       gas_jac;
+  StokvecMatrix       src_jac;
   spectral_propmat_agendaExecute(ws,
                                  gas,
                                  src,
@@ -48,9 +48,8 @@ PolarizedOptics polarized_optics(const Workspace&                ws,
     // Path points already store the direction of propagation.  In particular,
     // observer agendas mirror their external LOS when constructing the path.
     const Numeric za = point.los[0];
-    auto za_grid = std::make_shared<scattering::ZenithAngleGrid>(
-        scattering::IrregularZenithAngleGrid(Vector{za}));
-    const auto bulk = scattering_species.get_bulk_scattering_properties_aro_gridded(
+    auto za_grid     = std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{za}));
+    const auto bulk  = scattering_species.get_bulk_scattering_properties_aro_gridded(
         atm, freq_grid, Vector{za}, Vector{0.0}, std::move(za_grid));
     particle_ext.A() = bulk.extinction_matrix[0, 0, 0, 0];
     particle_ext.B() = bulk.extinction_matrix[0, 0, 0, 1];
@@ -59,21 +58,19 @@ PolarizedOptics polarized_optics(const Workspace&                ws,
     particle_abs.Q() = bulk.absorption_vector[0, 0, 0, 1];
   }
 
-  return {.extinction = gas[0] + particle_ext,
-          .absorption = Stokvec{gas[0].A(), gas[0].B(), gas[0].C(), gas[0].D()} + particle_abs,
+  return {.extinction  = gas[0] + particle_ext,
+          .absorption  = Stokvec{gas[0].A(), gas[0].B(), gas[0].C(), gas[0].D()} + particle_abs,
           .temperature = atm.temperature};
 }
 
-PropagationPathPoint interpolate(const PropagationPathPoint& a,
-                                 const PropagationPathPoint& b,
-                                 Numeric                     x) {
+PropagationPathPoint interpolate(const PropagationPathPoint& a, const PropagationPathPoint& b, Numeric x) {
   PropagationPathPoint p = a;
-  p.pos_type              = PathPositionType::atm;
-  p.los_type              = PathPositionType::atm;
-  p.pos                   = (1.0 - x) * a.pos + x * b.pos;
-  p.los                   = (1.0 - x) * a.los + x * b.los;
-  p.nreal                 = (1.0 - x) * a.nreal + x * b.nreal;
-  p.ngroup                = (1.0 - x) * a.ngroup + x * b.ngroup;
+  p.pos_type             = PathPositionType::atm;
+  p.los_type             = PathPositionType::atm;
+  p.pos                  = (1.0 - x) * a.pos + x * b.pos;
+  p.los                  = (1.0 - x) * a.los + x * b.los;
+  p.nreal                = (1.0 - x) * a.nreal + x * b.nreal;
+  p.ngroup               = (1.0 - x) * a.ngroup + x * b.ngroup;
   return p;
 }
 
@@ -84,8 +81,8 @@ Stokvec boundary_radiance(const Workspace&            ws,
                           const SubsurfaceField&      subsurf_field,
                           const Agenda&               spectral_rad_space_agenda,
                           const Agenda&               spectral_rad_surface_agenda) {
-  StokvecVector value;
-  StokvecMatrix jac;
+  StokvecVector       value;
+  StokvecMatrix       jac;
   const AscendingGrid grid{frequency};
   if (point.los_type == PathPositionType::space) {
     spectral_rad_space_agendaExecute(ws, value, jac, grid, JacobianTargets{}, point, spectral_rad_space_agenda);
@@ -104,16 +101,16 @@ Vector2 isotropic_los(RandomNumberGenerator<>& rng) {
 }
 
 struct Collision {
-  bool                     happened{false};
-  PropagationPathPoint     point{};
-  AtmPoint                 atm{};
-  PolarizedOptics          optics{};
-  PropagationPathPoint     end{};
-  Muelmat                  conditional_transport{Muelmat::id()};
+  bool                 happened{false};
+  PropagationPathPoint point{};
+  AtmPoint             atm{};
+  PolarizedOptics      optics{};
+  PropagationPathPoint end{};
+  Muelmat              conditional_transport{Muelmat::id()};
 };
 
 Collision next_collision(const Workspace&                ws,
-                         RandomNumberGenerator<>&         rng,
+                         RandomNumberGenerator<>&        rng,
                          Numeric                         frequency,
                          const Vector3&                  pos,
                          const Vector2&                  los,
@@ -127,39 +124,39 @@ Collision next_collision(const Workspace&                ws,
   ARTS_USER_ERROR_IF(path.empty(), "The ray-path agenda returned an empty path")
   if (path.size() == 1) return {.end = path.back()};
 
-  const auto atm       = forward_atm_path(path, atm_field);
-  const auto distances = path::distance(path, surf_field.ellipsoid);
-  auto uniform         = rng.get<std::uniform_real_distribution>(0.0, 1.0);
-  const Numeric target = -std::log(std::max(uniform(), std::numeric_limits<Numeric>::min()));
-  Numeric tau          = 0.0;
-  Muelmat conditional  = Muelmat::id();
+  const auto    atm         = forward_atm_path(path, atm_field);
+  const auto    distances   = path::distance(path, surf_field.ellipsoid);
+  auto          uniform     = rng.get<std::uniform_real_distribution>(0.0, 1.0);
+  const Numeric target      = -std::log(std::max(uniform(), std::numeric_limits<Numeric>::min()));
+  Numeric       tau         = 0.0;
+  Muelmat       conditional = Muelmat::id();
   auto previous = polarized_optics(ws, frequency, path[0], atm[0], scattering_species, spectral_propmat_agenda);
 
   for (Size i = 1; i < path.size(); ++i) {
     const auto current = polarized_optics(ws, frequency, path[i], atm[i], scattering_species, spectral_propmat_agenda);
     const Numeric dtau = 0.5 * (previous.extinction.A() + current.extinction.A()) * distances[i - 1];
     if (dtau > 0.0 and tau + dtau >= target) {
-      const Numeric x = std::clamp((target - tau) / dtau, 0.0, 1.0);
-      auto point      = interpolate(path[i - 1], path[i], x);
-      auto atm_point  = atm_field.at(point.pos);
-      auto optics     = polarized_optics(ws, frequency, point, atm_point, scattering_species, spectral_propmat_agenda);
+      const Numeric x         = std::clamp((target - tau) / dtau, 0.0, 1.0);
+      auto          point     = interpolate(path[i - 1], path[i], x);
+      auto          atm_point = atm_field.at(point.pos);
+      auto optics      = polarized_optics(ws, frequency, point, atm_point, scattering_species, spectral_propmat_agenda);
       const Numeric ds = x * distances[i - 1];
       const Numeric partial_tau = 0.5 * (previous.extinction.A() + optics.extinction.A()) * ds;
-      const Muelmat partial = rtepack::tran(previous.extinction, optics.extinction, ds)();
-      conditional = conditional * (std::exp(partial_tau) * partial);
-      return {.happened = true,
-              .point = point,
-              .atm = std::move(atm_point),
-              .optics = optics,
-              .end = path.back(),
+      const Muelmat partial     = rtepack::tran(previous.extinction, optics.extinction, ds)();
+      conditional               = conditional * (std::exp(partial_tau) * partial);
+      return {.happened              = true,
+              .point                 = point,
+              .atm                   = std::move(atm_point),
+              .optics                = optics,
+              .end                   = path.back(),
               .conditional_transport = conditional};
     }
     if (distances[i - 1] > 0.0) {
       const Muelmat segment = rtepack::tran(previous.extinction, current.extinction, distances[i - 1])();
-      conditional = conditional * (std::exp(std::max(0.0, dtau)) * segment);
+      conditional           = conditional * (std::exp(std::max(0.0, dtau)) * segment);
     }
-    tau += std::max(0.0, dtau);
-    previous = current;
+    tau      += std::max(0.0, dtau);
+    previous  = current;
   }
   return {.end = path.back(), .conditional_transport = conditional};
 }
@@ -174,16 +171,15 @@ Muelmat phase_weight(const ArrayOfScatteringSpecies& species,
   // both to propagation directions before evaluating the phase matrix.
   const Vector2 outgoing = path::mirror(old_los);
   const Vector2 incoming = path::mirror(new_los);
-  Numeric delta_aa       = outgoing[1] - incoming[1];
+  Numeric       delta_aa = outgoing[1] - incoming[1];
   while (delta_aa < -180.0) delta_aa += 360.0;
   while (delta_aa > 180.0) delta_aa -= 360.0;
-  auto za = std::make_shared<scattering::ZenithAngleGrid>(
-      scattering::IrregularZenithAngleGrid(Vector{outgoing[0]}));
+  auto za = std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{outgoing[0]}));
   const auto bulk = species.get_bulk_scattering_properties_aro_gridded(
       atm, AscendingGrid{frequency}, Vector{incoming[0]}, Vector{delta_aa}, za);
   ARTS_USER_ERROR_IF(not bulk.phase_matrix, "MCGeneral failed to transform the phase matrix to the laboratory frame")
   const auto flat = (*bulk.phase_matrix)[0, 0, 0, 0, 0, joker];
-  Muelmat out{0.0};
+  Muelmat    out{0.0};
   for (Index i = 0; i < 4; ++i)
     for (Index j = 0; j < 4; ++j) out[i, j] = flat[4 * i + j];
   return (4.0 * Constant::pi / scattering_coefficient) * out;
@@ -222,15 +218,15 @@ void MCGeneral(const Workspace&                ws,
   RandomNumberGenerator<> rng(mc_seed);
   rng.force_seed(mc_seed);
   const Matrix33 ant_to_enu = rotmat_enu(sensor_los);
-  Stokvec sum{0.0}, sumsq{0.0};
-  const auto started = std::chrono::steady_clock::now();
-  mc_iteration_count = 0;
+  Stokvec        sum{0.0}, sumsq{0.0};
+  const auto     started = std::chrono::steady_clock::now();
+  mc_iteration_count     = 0;
 
   for (; mc_iteration_count < mc_max_iter; ++mc_iteration_count) {
     const auto [initial_los, ray_rotation] = mc_antenna.draw_los(rng, ant_to_enu, sensor_los);
-    Vector3 pos = sensor_pos;
-    Vector2 los = initial_los;
-    Muelmat weight = rotmat_stokes(-1.0, -1.0, ray_rotation, ant_to_enu);
+    Vector3 pos                            = sensor_pos;
+    Vector2 los                            = initial_los;
+    Muelmat weight                         = rotmat_stokes(-1.0, -1.0, ray_rotation, ant_to_enu);
     Stokvec sample{0.0};
 
     for (Index order = 0;;) {
@@ -244,7 +240,7 @@ void MCGeneral(const Workspace&                ws,
                                             scattering_species,
                                             ray_path_observer_agenda,
                                             spectral_propmat_agenda);
-      weight = weight * collision.conditional_transport;
+      weight               = weight * collision.conditional_transport;
       if (not collision.happened) {
         sample = weight * boundary_radiance(ws,
                                             frequency,
@@ -256,22 +252,22 @@ void MCGeneral(const Workspace&                ws,
         break;
       }
 
-      auto uniform = rng.get<std::uniform_real_distribution>(0.0, 1.0);
+      auto          uniform    = rng.get<std::uniform_real_distribution>(0.0, 1.0);
       const Numeric extinction = collision.optics.extinction.A();
       const Numeric scattering = std::max(0.0, extinction - collision.optics.absorption.I());
       if (scattering <= 0.0 or uniform() >= scattering / extinction) {
         const Numeric absorption = collision.optics.absorption.I();
         ARTS_USER_ERROR_IF(absorption <= 0.0, "Invalid non-positive absorption collision probability")
-        sample = weight * ((planck(frequency, collision.optics.temperature) / absorption) *
-                           collision.optics.absorption);
+        sample =
+            weight * ((planck(frequency, collision.optics.temperature) / absorption) * collision.optics.absorption);
         break;
       }
       if (++order > mc_max_scatorder) break;
 
       const Vector2 new_los = isotropic_los(rng);
       weight = weight * phase_weight(scattering_species, collision.atm, frequency, los, new_los, scattering);
-      pos = collision.point.pos;
-      los = new_los;
+      pos    = collision.point.pos;
+      los    = new_los;
     }
 
     sum += sample;
@@ -283,7 +279,7 @@ void MCGeneral(const Workspace&                ws,
     Numeric largest_error = 0.0;
     for (Index s = 0; s < 4; ++s) {
       const Numeric mean = sum[s] / nn;
-      largest_error = std::max(largest_error, std::sqrt(std::max(0.0, sumsq[s] / nn - mean * mean) / nn));
+      largest_error      = std::max(largest_error, std::sqrt(std::max(0.0, sumsq[s] / nn - mean * mean) / nn));
     }
     const Numeric elapsed = std::chrono::duration<Numeric>(std::chrono::steady_clock::now() - started).count();
     if ((mc_std_err > 0.0 and largest_error <= mc_std_err) or (mc_max_time > 0.0 and elapsed >= mc_max_time)) {
@@ -295,9 +291,9 @@ void MCGeneral(const Workspace&                ws,
   ARTS_USER_ERROR_IF(mc_iteration_count == 0, "MCGeneral produced no samples")
   const Numeric n = static_cast<Numeric>(mc_iteration_count);
   for (Index s = 0; s < 4; ++s) {
-    mc_spectral_rad[s] = sum[s] / n;
+    mc_spectral_rad[s]     = sum[s] / n;
     const Numeric variance = std::max(0.0, sumsq[s] / n - mc_spectral_rad[s] * mc_spectral_rad[s]);
-    mc_error[s] = std::sqrt(variance / n);
+    mc_error[s]            = std::sqrt(variance / n);
   }
 }
 ARTS_METHOD_ERROR_CATCH

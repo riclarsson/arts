@@ -177,15 +177,15 @@ BulkScatteringPropertiesTROGridded ScatteringHabit::get_bulk_scattering_properti
 }
 
 BulkScatteringProperties<Format::ARO, Representation::Gridded>
-ScatteringHabit::get_bulk_scattering_properties_aro_gridded(
-    const AtmPoint&                  point,
-    const Vector&                    f_grid,
-    const Vector&                    za_inc_grid,
-    const Vector&                    delta_aa_grid,
-    std::shared_ptr<ZenithAngleGrid> za_scat_grid) const {
+ScatteringHabit::get_bulk_scattering_properties_aro_gridded(const AtmPoint&                  point,
+                                                            const Vector&                    f_grid,
+                                                            const Vector&                    za_inc_grid,
+                                                            const Vector&                    delta_aa_grid,
+                                                            std::shared_ptr<ZenithAngleGrid> za_scat_grid) const {
   const auto sizes = particle_habit.get_sizes(std::visit([](const auto& p) { return p.get_size_parameter(); }, psd));
-  const auto pnd = std::visit(
-      [&point, &sizes, this](const auto& p) { return p.evaluate(point, sizes, mass_size_rel_a, mass_size_rel_b); }, psd);
+  const auto pnd   = std::visit(
+      [&point, &sizes, this](const auto& p) { return p.evaluate(point, sizes, mass_size_rel_a, mass_size_rel_b); },
+      psd);
   ARTS_USER_ERROR_IF(pnd.size() != particle_habit.size(), "PSD and particle-habit sizes differ.")
 
   auto grids = ScatteringDataGrids(std::make_shared<Vector>(Vector{point.temperature}),
@@ -193,7 +193,7 @@ ScatteringHabit::get_bulk_scattering_properties_aro_gridded(
                                    std::make_shared<Vector>(za_inc_grid),
                                    std::make_shared<Vector>(delta_aa_grid),
                                    std::move(za_scat_grid));
-  using SSD = SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>;
+  using SSD  = SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>;
   std::optional<BulkScatteringProperties<Format::ARO, Representation::Gridded>> result;
   for (Index i = 0; i < particle_habit.size(); ++i) {
     SSD data = std::visit([&grids](const auto& ssd) { return ssd_to_aro_gridded(grids, ssd); }, particle_habit[i]);

@@ -39,10 +39,10 @@ class ScatteringHabit {
                                                                           const Index   degree [[maybe_unused]]) const;
 
   BulkScatteringProperties<Format::ARO, Representation::Gridded> get_bulk_scattering_properties_aro_gridded(
-      const AtmPoint&                 point,
-      const Vector&                   f_grid,
-      const Vector&                   za_inc_grid,
-      const Vector&                   delta_aa_grid,
+      const AtmPoint&                  point,
+      const Vector&                    f_grid,
+      const Vector&                    za_inc_grid,
+      const Vector&                    delta_aa_grid,
       std::shared_ptr<ZenithAngleGrid> za_scat_grid) const;
 
   //  BulkScatteringProperties<Format::TRO, Representation::Gridded>
