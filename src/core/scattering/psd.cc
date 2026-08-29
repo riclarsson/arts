@@ -6,6 +6,22 @@
 #include <cmath>
 
 namespace scattering {
+
+MonodispersePSD::MonodispersePSD(ScatteringSpeciesProperty number_density_, Numeric t_min_, Numeric t_max_)
+    : number_density(std::move(number_density_)), t_min(t_min_), t_max(t_max_) {}
+
+Vector MonodispersePSD::evaluate(const AtmPoint& point, const Vector& particle_sizes, Numeric, Numeric) const {
+  ARTS_USER_ERROR_IF(particle_sizes.size() != 1, "MonodispersePSD requires exactly one particle.")
+  ARTS_USER_ERROR_IF(not point.has(number_density), "The PSD requires {}.", number_density)
+  return Vector{point.temperature < t_min || point.temperature > t_max ? 0.0 : point[number_density]};
+}
+
+PSDData MonodispersePSD::evaluate_with_derivatives(const AtmPoint& point,
+                                                   const Vector&   sizes,
+                                                   Numeric         a,
+                                                   Numeric         b) const {
+  return {.values = evaluate(point, sizes, a, b), .derivatives = {{number_density, Vector{1.0}}}};
+}
 namespace {
 bool temperature_allowed(Numeric temperature, Numeric t_min, Numeric t_max, bool picky) {
   if (temperature >= t_min and temperature <= t_max) return true;

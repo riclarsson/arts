@@ -117,6 +117,70 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
         properties, phase_matrix, extinction_matrix, absorption_vector, backscatter_matrix, forwardscatter_matrix);
   }
 
+  static SingleScatteringData<Numeric, Format::ARO, Representation::Gridded> from_legacy_aro(
+      ::SingleScatteringData ssd, ::ScatteringMetaData smd) {
+    ARTS_USER_ERROR_IF(ssd.ptype != PType::PTYPE_AZIMUTH_RND,
+                       "Converting legacy scattering data to ARO format requires PType::PTYPE_AZIMUTH_RND.")
+    ARTS_USER_ERROR_IF(ssd.pha_mat_data.extent(5) != 1,
+                       "Legacy ARO conversion requires a singleton incident-azimuth dimension.")
+
+    auto t_grid        = std::make_shared<Vector>(ssd.T_grid);
+    auto f_grid        = std::make_shared<Vector>(ssd.f_grid);
+    auto za_inc_grid   = std::make_shared<Vector>(ssd.za_grid);
+    ARTS_USER_ERROR_IF(ssd.aa_grid.empty() || ssd.aa_grid.front() != 0.0 || ssd.aa_grid.back() != 180.0,
+                       "Legacy ARO azimuth grid must span 0 to 180 degrees.")
+    Vector signed_delta_aa(2 * ssd.aa_grid.size() - 1);
+    for (Index i = 1; i < ssd.aa_grid.size(); ++i) {
+      signed_delta_aa[ssd.aa_grid.size() - 1 - i] = -ssd.aa_grid[i];
+    }
+    for (Index i = 0; i < ssd.aa_grid.size(); ++i) {
+      signed_delta_aa[ssd.aa_grid.size() - 1 + i] = ssd.aa_grid[i];
+    }
+    auto delta_aa_grid = std::make_shared<Vector>(std::move(signed_delta_aa));
+    auto za_scat_grid  = std::make_shared<ZenithAngleGrid>(IrregularZenithAngleGrid(ssd.za_grid));
+
+    PhaseMatrixData<Numeric, Format::ARO, Representation::Gridded> phase_matrix(
+        t_grid, f_grid, za_inc_grid, delta_aa_grid, za_scat_grid);
+    ExtinctionMatrixData<Numeric, Format::ARO, Representation::Gridded> extinction_matrix(
+        t_grid, f_grid, za_inc_grid);
+    AbsorptionVectorData<Numeric, Format::ARO, Representation::Gridded> absorption_vector(
+        t_grid, f_grid, za_inc_grid);
+
+    for (Index i_t = 0; i_t < t_grid->size(); ++i_t) {
+      for (Index i_f = 0; i_f < f_grid->size(); ++i_f) {
+        for (Index i_za_inc = 0; i_za_inc < za_inc_grid->size(); ++i_za_inc) {
+          for (Index i_delta_aa = 0; i_delta_aa < delta_aa_grid->size(); ++i_delta_aa) {
+            const bool  negative = (*delta_aa_grid)[i_delta_aa] < 0.0;
+            const Index source_aa = negative ? ssd.aa_grid.size() - 1 - i_delta_aa
+                                             : i_delta_aa - (ssd.aa_grid.size() - 1);
+            for (Index i_za_scat = 0; i_za_scat < grid_size(*za_scat_grid); ++i_za_scat) {
+              for (Index i_s = 0; i_s < phase_matrix.n_stokes_coeffs; ++i_s) {
+                const bool odd = i_s == 2 || i_s == 3 || i_s == 6 || i_s == 7 || i_s == 8 || i_s == 9 ||
+                                 i_s == 12 || i_s == 13;
+                phase_matrix[i_t, i_f, i_za_inc, i_delta_aa, i_za_scat, i_s] =
+                    (negative && odd ? -1.0 : 1.0) *
+                    ssd.pha_mat_data[i_f, i_t, i_za_scat, source_aa, i_za_inc, 0, i_s];
+              }
+            }
+          }
+          for (Index i_s = 0; i_s < extinction_matrix.n_stokes_coeffs; ++i_s) {
+            extinction_matrix[i_t, i_f, i_za_inc, i_s] = ssd.ext_mat_data[i_f, i_t, i_za_inc, 0, i_s];
+          }
+          for (Index i_s = 0; i_s < absorption_vector.n_stokes_coeffs; ++i_s) {
+            absorption_vector[i_t, i_f, i_za_inc, i_s] = ssd.abs_vec_data[i_f, i_t, i_za_inc, 0, i_s];
+          }
+        }
+      }
+    }
+
+    auto properties = ParticleProperties{
+        smd.description, smd.source, smd.refr_index, smd.mass, smd.diameter_volume_equ, smd.diameter_max};
+    auto backscatter_matrix    = phase_matrix.extract_backscatter_matrix();
+    auto forwardscatter_matrix = phase_matrix.extract_forwardscatter_matrix();
+    return SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>(
+        properties, phase_matrix, extinction_matrix, absorption_vector, backscatter_matrix, forwardscatter_matrix);
+  }
+
   /** Create SingleScatteringData container without particle propreties.
    *
    * @param phase_matrix_ The phase matrix data.

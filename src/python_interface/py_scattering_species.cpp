@@ -95,6 +95,15 @@ auto bind_phase_matrix_data_tro_spectral(py::module_& m, const std::string& clas
   return s;
 }
 
+template <typename Scalar> [[nodiscard]]
+auto bind_phase_matrix_data_aro_gridded(py::module_& m, const std::string& class_name) {
+  using PMD = scattering::PhaseMatrixData<Scalar, scattering::Format::ARO, scattering::Representation::Gridded>;
+
+  py::class_<PMD, matpack::data_t<Scalar, 6>> s(m, class_name.c_str());
+  s.def(py::init<>());
+  return s;
+}
+
 template <typename Scalar, scattering::Representation repr> [[nodiscard]]
 auto bind_absorption_vector_data_tro(py::module_& m, const std::string& name) {
   using AVD = scattering::AbsorptionVectorData<Scalar, scattering::Format::TRO, repr>;
@@ -280,10 +289,9 @@ void py_scattering_species(py::module_& m) try {
   //       std::variant<scattering::BulkScatteringProperties<
   //           scattering::Format::ARO,
   //           scattering::Representation::Spectral>>;
-  //   using BulkScatteringPropertiesAROGridded =
-  //       std::variant<scattering::BulkScatteringProperties<
-  //           scattering::Format::ARO,
-  //           scattering::Representation::Gridded>>;
+  using BulkScatteringPropertiesAROGridded =
+      std::variant<scattering::BulkScatteringProperties<scattering::Format::ARO,
+                                                        scattering::Representation::Gridded>>;
 
   //
   // Modified gamma PSD
@@ -377,28 +385,28 @@ void py_scattering_species(py::module_& m) try {
           "atm_point"_a,
           "f_grid"_a,
           "za_grid"_a,
+          "Get bulk scattering properties")
+      .def(
+          "get_bulk_scattering_properties_aro_gridded",
+          [](const ArrayOfScatteringSpecies& aoss,
+             const AtmPoint&                 atm_point,
+             const Vector&                   f_grid,
+             const Vector&                   za_inc_grid,
+             const Vector&                   delta_aa_grid,
+             scattering::ZenithAngleGrid     za_scat_grid) {
+            return BulkScatteringPropertiesAROGridded{aoss.get_bulk_scattering_properties_aro_gridded(
+                atm_point,
+                f_grid,
+                za_inc_grid,
+                delta_aa_grid,
+                std::make_shared<scattering::ZenithAngleGrid>(std::move(za_scat_grid)))};
+          },
+          "atm_point"_a,
+          "f_grid"_a,
+          "za_inc_grid"_a,
+          "delta_aa_grid"_a,
+          "za_scat_grid"_a,
           "Get bulk scattering properties");
-  //   .def(
-  //       "get_bulk_scattering_properties_aro_gridded",
-  //       [](const ArrayOfScatteringSpecies& aoss,
-  //          const AtmPoint& atm_point,
-  //          const Vector& f_grid,
-  //          const Vector& za_inc_grid,
-  //          const Vector& delta_aa_grid,
-  //          scattering::ZenithAngleGrid za_scat_grid) {
-  //         return BulkScatteringPropertiesAROGridded{
-  //             aoss.get_bulk_scattering_properties_aro_gridded(atm_point,
-  //                                                             f_grid,
-  //                                                             za_inc_grid,
-  //                                                             delta_aa_grid,
-  //                                                             std::make_shared<scattering::ZenithAngleGrid>(std::move(za_scat_grid)))};
-  //       },
-  //       "atm_point"_a,
-  //       "f_grid"_a,
-  //       "za_inc_grid"_a,
-  //       "delta_aa_grid"_a,
-  //       "za_scat_grid"_a,
-  //       "Get bulk scattering properties")
   //   .def(
   //       "get_bulk_scattering_properties_aro_spectral",
   //       [](const ArrayOfScatteringSpecies& aoss,
@@ -422,6 +430,7 @@ void py_scattering_species(py::module_& m) try {
 
   bind_phase_matrix_data_tro_gridded<double>(m, "PhaseMatrixDataTROGridded4").doc()   = "Phase matrix data";
   bind_phase_matrix_data_tro_spectral<double>(m, "PhaseMatrixDataTROSpectral4").doc() = "Phase matrix data";
+  bind_phase_matrix_data_aro_gridded<double>(m, "PhaseMatrixDataAROGridded4").doc()   = "Phase matrix data";
 
   bind_absorption_vector_data_tro<double, scattering::Representation::Gridded>(m, "AbsorptionVectorDataGriddedTRO4")
       .doc() = "Absorption vector data";
@@ -473,6 +482,9 @@ void py_scattering_species(py::module_& m) try {
   bind_bulk_scattering_properties<scattering::Format::TRO, scattering::Representation::Spectral>(
       m, "BulkScatteringPropertiesTROSpectral4")
       .doc() = "Bulk scattering properties";
+  bind_bulk_scattering_properties<scattering::Format::ARO, scattering::Representation::Gridded>(
+      m, "BulkScatteringPropertiesAROGridded4")
+      .doc() = "Bulk scattering properties";
 
   py::class_<ParticleHabit>(m, "ParticleHabit")
       .def_static("liquid_sphere",
@@ -488,6 +500,7 @@ void py_scattering_species(py::module_& m) try {
                   "za_scat_grid"_a,
                   "Create a totally-random liquid-sphere habit with ARTS' Mie solver")
       .def_static("from_legacy_tro", &ParticleHabit::from_legacy_tro, "ssd"_a, "smd"_a, "Create from legacy TRO")
+      .def_static("from_legacy_aro", &ParticleHabit::from_legacy_aro, "ssd"_a, "smd"_a, "Create from legacy ARO")
       .def("to_tro_spectral",
            &ParticleHabit::to_tro_spectral,
            "t_grid"_a,

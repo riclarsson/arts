@@ -7,8 +7,14 @@
 
 namespace scattering {
 
-using PSD =
-    std::variant<MGDSingleMoment, MGDMass, MGDTwoMoment, DelanoeEtAl14, FieldEtAl07, McFarquharHeymsfield97, BinnedPSD>;
+using PSD = std::variant<MonodispersePSD,
+                         MGDSingleMoment,
+                         MGDMass,
+                         MGDTwoMoment,
+                         DelanoeEtAl14,
+                         FieldEtAl07,
+                         McFarquharHeymsfield97,
+                         BinnedPSD>;
 
 /*** A scattering habit
  *

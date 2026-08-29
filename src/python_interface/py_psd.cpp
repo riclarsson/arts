@@ -39,6 +39,17 @@ void py_psd(py::module_& m) try {
                    })
       .doc() = "Particle-size distribution values and derivatives by atmospheric property.";
 
+  py::class_<scattering::MonodispersePSD>(m, "MonodispersePSD")
+      .def(py::init<ScatteringSpeciesProperty, Numeric, Numeric>(),
+           "number_density"_a,
+           "t_min"_a = 0.0,
+           "t_max"_a = 350.0)
+      .def("evaluate", &scattering::MonodispersePSD::evaluate, "Evaluate PSD at an atmospheric point.")
+      .def("evaluate_with_derivatives",
+           &scattering::MonodispersePSD::evaluate_with_derivatives,
+           "Evaluate the PSD and its derivatives at an atmospheric point.")
+      .doc() = "A monodisperse population scaled by an atmospheric number-density field.";
+
   py::enum_<scattering::MGDTwoMomentType>(m, "MGDTwoMomentType")
       .value("MassMeanSize", scattering::MGDTwoMomentType::MassMeanSize)
       .value("MassNumberDensity", scattering::MGDTwoMomentType::MassNumberDensity)

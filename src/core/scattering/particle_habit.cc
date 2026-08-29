@@ -150,6 +150,31 @@ ParticleHabit ParticleHabit::from_legacy_tro(std::vector<::SingleScatteringData>
   return ParticleHabit(ssd);
 }
 
+ParticleHabit ParticleHabit::from_legacy_aro(std::vector<::SingleScatteringData> ssd_,
+                                             std::vector<::ScatteringMetaData>   meta_) {
+  ARTS_USER_ERROR_IF(ssd_.size() != meta_.size(), "Scattering data and metadata sizes differ.")
+  ARTS_USER_ERROR_IF(ssd_.empty(), "Cannot construct an empty particle habit.")
+  std::vector<SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>> converted;
+  converted.reserve(ssd_.size());
+  for (Index ind = 0; ind < static_cast<Index>(ssd_.size()); ++ind) {
+    converted.push_back(
+        SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>::from_legacy_aro(ssd_[ind], meta_[ind]));
+  }
+  Vector signed_delta_aa(2 * ssd_[0].aa_grid.size() - 1);
+  for (Index i = 1; i < ssd_[0].aa_grid.size(); ++i) {
+    signed_delta_aa[ssd_[0].aa_grid.size() - 1 - i] = -ssd_[0].aa_grid[i];
+  }
+  for (Index i = 0; i < ssd_[0].aa_grid.size(); ++i) {
+    signed_delta_aa[ssd_[0].aa_grid.size() - 1 + i] = ssd_[0].aa_grid[i];
+  }
+  auto grids = ScatteringDataGrids(std::make_shared<Vector>(ssd_[0].T_grid),
+                                   std::make_shared<Vector>(ssd_[0].f_grid),
+                                   std::make_shared<Vector>(ssd_[0].za_grid),
+                                   std::make_shared<Vector>(std::move(signed_delta_aa)),
+                                   std::make_shared<ZenithAngleGrid>(IrregularZenithAngleGrid(ssd_[0].za_grid)));
+  return ParticleHabit(converted, grids);
+}
+
 ParticleHabit ParticleHabit::liquid_sphere(const StridedVectorView& t_grid,
                                            const StridedVectorView& f_grid,
                                            const StridedVectorView& diameters,

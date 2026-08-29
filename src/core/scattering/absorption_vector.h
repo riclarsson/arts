@@ -252,7 +252,7 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
   }
 
   AbsorptionVectorData regrid(const ScatteringDataGrids& grids) const {
-    auto weights = calc_regrid_weights(t_grid_, f_grid_, za_inc_grid_, nullptr, nullptr, nullptr, grids);
+    auto weights = calc_regrid_weights(t_grid_, f_grid_, nullptr, za_inc_grid_, nullptr, nullptr, grids);
     return regrid(grids, weights);
   }
 

@@ -116,6 +116,8 @@ class ParticleHabit {
 
   static ParticleHabit from_legacy_tro(std::vector<::SingleScatteringData> ssd_,
                                        std::vector<::ScatteringMetaData>   meta_);
+  static ParticleHabit from_legacy_aro(std::vector<::SingleScatteringData> ssd_,
+                                       std::vector<::ScatteringMetaData>   meta_);
 
   ParticleHabit()                                = default;
   ParticleHabit(const ParticleHabit&)            = default;

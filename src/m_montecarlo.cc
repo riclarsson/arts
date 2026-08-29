@@ -19,11 +19,11 @@ struct PolarizedOptics {
 };
 
 PolarizedOptics polarized_optics(const Workspace&                ws,
-                           Numeric                         frequency,
-                           const PropagationPathPoint&     point,
-                           const AtmPoint&                 atm,
-                           const ArrayOfScatteringSpecies& scattering_species,
-                           const Agenda&                   spectral_propmat_agenda) {
+                                 Numeric                         frequency,
+                                 const PropagationPathPoint&     point,
+                                 const AtmPoint&                 atm,
+                                 const ArrayOfScatteringSpecies& scattering_species,
+                                 const Agenda&                   spectral_propmat_agenda) {
   const AscendingGrid freq_grid{frequency};
   PropmatVector gas;
   StokvecVector src;
@@ -45,9 +45,18 @@ PolarizedOptics polarized_optics(const Workspace&                ws,
   Propmat particle_ext{};
   Stokvec particle_abs{};
   if (not scattering_species.species.empty()) {
-    const auto bulk = scattering_species.get_bulk_scattering_properties_tro_spectral(atm, freq_grid, 64);
-    particle_ext    = bulk.extinction_matrix[0];
-    particle_abs    = bulk.absorption_vector[0];
+    // Path points already store the direction of propagation.  In particular,
+    // observer agendas mirror their external LOS when constructing the path.
+    const Numeric za = point.los[0];
+    auto za_grid = std::make_shared<scattering::ZenithAngleGrid>(
+        scattering::IrregularZenithAngleGrid(Vector{za}));
+    const auto bulk = scattering_species.get_bulk_scattering_properties_aro_gridded(
+        atm, freq_grid, Vector{za}, Vector{0.0}, std::move(za_grid));
+    particle_ext.A() = bulk.extinction_matrix[0, 0, 0, 0];
+    particle_ext.B() = bulk.extinction_matrix[0, 0, 0, 1];
+    particle_ext.W() = bulk.extinction_matrix[0, 0, 0, 2];
+    particle_abs.I() = bulk.absorption_vector[0, 0, 0, 0];
+    particle_abs.Q() = bulk.absorption_vector[0, 0, 0, 1];
   }
 
   return {.extinction = gas[0] + particle_ext,
@@ -161,11 +170,13 @@ Muelmat phase_weight(const ArrayOfScatteringSpecies& species,
                      const Vector2&                  old_los,
                      const Vector2&                  new_los,
                      Numeric                         scattering_coefficient) {
+  // old_los and new_los use the external observer-LOS convention.  Convert
+  // both to propagation directions before evaluating the phase matrix.
   const Vector2 outgoing = path::mirror(old_los);
   const Vector2 incoming = path::mirror(new_los);
   Numeric delta_aa       = outgoing[1] - incoming[1];
-  while (delta_aa < 0.0) delta_aa += 360.0;
-  while (delta_aa > 360.0) delta_aa -= 360.0;
+  while (delta_aa < -180.0) delta_aa += 360.0;
+  while (delta_aa > 180.0) delta_aa -= 360.0;
   auto za = std::make_shared<scattering::ZenithAngleGrid>(
       scattering::IrregularZenithAngleGrid(Vector{outgoing[0]}));
   const auto bulk = species.get_bulk_scattering_properties_aro_gridded(
