@@ -20,14 +20,17 @@ void test_sensor_builder_returns_meta_per_geometry() try {
 
   const std::array<Vector3, 2> pos{{{600e3, 10.0, 20.0}, {601e3, 11.0, 21.0}}};
   const std::array<Vector2, 2> los{{{20.0, 30.0}, {40.0, 50.0}}};
+  const std::array<Time, 2>    time{{Time{"2001-01-01 00:00:00"}, Time{"2001-01-01 00:01:00"}}};
   const Vector2                ell{Body::Earth::a, Body::Earth::b};
 
-  const auto [obsels, meta] = builder(pos, los, ell);
+  const auto [obsels, meta] = builder(pos, los, time, ell);
 
   ARTS_USER_ERROR_IF(obsels.size() != 4, "Expected 4 obsels, got {}", obsels.size())
   ARTS_USER_ERROR_IF(meta.size() != 2, "Expected 2 meta entries, got {}", meta.size())
   ARTS_USER_ERROR_IF(meta[0].count() != 2 or meta[1].count() != 2,
                      "Each meta block must describe one 2-channel geometry")
+  ARTS_USER_ERROR_IF(not meta[0].time or *meta[0].time != time[0], "First metadata time mismatch")
+  ARTS_USER_ERROR_IF(not meta[1].time or *meta[1].time != time[1], "Second metadata time mismatch")
 
   const auto& gf0 = std::get<SortedGriddedField1>(meta[0].data);
   const auto& gf1 = std::get<SortedGriddedField1>(meta[1].data);
@@ -60,6 +63,14 @@ void test_sensor_builder_rejects_mismatched_geometry_counts() try {
   } catch (const std::runtime_error&) { threw = true; }
 
   ARTS_USER_ERROR_IF(not threw, "Builder must reject mismatching position and LOS counts")
+
+  const std::array<Vector2, 1> matching_los{{{20.0, 30.0}}};
+  const std::array<Time, 2>    mismatched_time{{Time{}, Time{}}};
+  threw = false;
+  try {
+    static_cast<void>(builder(pos, matching_los, mismatched_time, ell));
+  } catch (const std::runtime_error&) { threw = true; }
+  ARTS_USER_ERROR_IF(not threw, "Builder must reject mismatching geometry and time counts")
 } catch (const std::exception& e) {
   throw std::runtime_error(std::format("test_sensor_builder_rejects_mismatched_geometry_counts failed:\n{}", e.what()));
 }

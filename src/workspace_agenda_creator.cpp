@@ -109,6 +109,7 @@ Agenda get_spectral_rad_observer_agenda(const std::string_view option) {
       agenda.add("ray_path_observer_agendaExecute");
       agenda.add("spectral_radClearskyEmission");
       break;
+    case MonteCarlo: agenda.add("spectral_radMonteCarlo"); break;
   }
 
   return std::move(agenda).finalize(false);

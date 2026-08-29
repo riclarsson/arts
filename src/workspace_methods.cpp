@@ -6144,6 +6144,43 @@ rotations.  Scattering directions use uniform solid-angle importance sampling.
       .pass_workspace = true,
   };
 
+  wsm_data["spectral_radMonteCarlo"] = {
+      .desc           = R"--(Computes pencil-beam spectral radiance with passive Monte Carlo.
+
+This is the observer-level interface used by *spectral_rad_observer_agenda* and
+therefore by *measurement_vecFromSensor*. Frequency, polarization, and antenna
+weighting are owned by *measurement_sensor*, so this method deliberately uses
+a pencil beam internally. One Monte Carlo calculation is performed for every
+frequency in *freq_grid*.
+
+Jacobian targets are not yet supported and must be empty.
+)--",
+      .author         = {"OpenAI Codex"},
+      .out            = {"spectral_rad", "spectral_rad_jac", "ray_path"},
+      .in             = {"freq_grid",
+                         "jac_targets",
+                         "obs_pos",
+                         "obs_los",
+                         "atm_field",
+                         "surf_field",
+                         "subsurf_field",
+                         "scat_species",
+                         "ray_path_observer_agenda",
+                         "spectral_propmat_agenda",
+                         "spectral_rad_space_agenda",
+                         "spectral_rad_surface_agenda"},
+      .gin            = {"mc_seed", "mc_min_iter", "mc_max_iter", "mc_max_scatorder", "mc_std_err", "mc_max_time"},
+      .gin_type       = {"Index", "Index", "Index", "Index", "Numeric", "Numeric"},
+      .gin_value      = {Index{0}, Index{100}, Index{10000}, Index{20}, Numeric{0.0}, Numeric{0.0}},
+      .gin_desc       = {"Base random seed; the frequency index is added to it.",
+                         "Minimum histories per frequency.",
+                         "Maximum histories per frequency.",
+                         "Maximum scattering order.",
+                         "Absolute standard-error threshold; zero disables it.",
+                         "Wall-clock limit per frequency [s]; zero disables it."},
+      .pass_workspace = true,
+  };
+
   /* 
   MANUAL ENTRIES BELOW THIS POINT MESSES WITH THE LOGIC OF WSM_DATA
   */

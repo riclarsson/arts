@@ -5,6 +5,7 @@
 #include <frequency_range_selection.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/bind_vector.h>
+#include <nanobind/stl/optional.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/tuple.h>
@@ -339,6 +340,10 @@ See :meth:`SensorObsel.normalize` for details.
          "data",
          &SensorMetaInfo::data,
          "The variant gridded field data\n\n.. :class:`~pyarts3.arts.GriddedField1` or :class:`~pyarts3.arts.CameraGriddedField`")
+      .def_rw(
+          "time",
+          &SensorMetaInfo::time,
+          "Observation time for this measurement block, or None when unspecified.\n\n.. :class:`~pyarts3.arts.Time` or :class:`None`")
       .def_prop_ro("count",
                    &SensorMetaInfo::count,
                    "Total number of scalar elements (product of all grid sizes)\n\n.. :class:`int`");
@@ -598,7 +603,23 @@ See :meth:`SensorObsel.normalize` for details.
 
 Each ``pos[i]`` is combined with ``los[i]``.  The returned obsels are ordered by
 geometry first and channel second, and the returned value is
-``(measurement_sensor, measurement_sensor_meta)``.)")
+          ``(measurement_sensor, measurement_sensor_meta)``.)")
+      .def(
+          "__call__",
+          [](const sensor::Builder&      self,
+             const std::vector<Vector3>& pos,
+             const std::vector<Vector2>& los,
+             const ArrayOfTime&          time,
+             const Vector2&              ell) { return self(pos, los, time, ell); },
+          "pos"_a,
+          "los"_a,
+          "time"_a,
+          "ell"_a,
+          R"(Build sensor obsels and metadata from time-tagged geometries.
+
+Each geometry produces one contiguous metadata block.  ``time[i]`` is stored
+with that block so measurements at otherwise identical geometries remain
+distinguishable by acquisition time.)")
       .def(
           "__call__",
           [](const sensor::Builder& self, const Vector3 pos, const Vector2 los, const Vector2 ell) {

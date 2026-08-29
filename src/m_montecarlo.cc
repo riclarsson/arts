@@ -298,3 +298,67 @@ void MCGeneral(const Workspace&                ws,
   }
 }
 ARTS_METHOD_ERROR_CATCH
+
+void spectral_radMonteCarlo(const Workspace&                ws,
+                            StokvecVector&                  spectral_rad,
+                            StokvecMatrix&                  spectral_rad_jac,
+                            ArrayOfPropagationPathPoint&    ray_path,
+                            const AscendingGrid&            freq_grid,
+                            const JacobianTargets&          jac_targets,
+                            const Vector3&                  obs_pos,
+                            const Vector2&                  obs_los,
+                            const AtmField&                 atm_field,
+                            const SurfaceField&             surf_field,
+                            const SubsurfaceField&          subsurf_field,
+                            const ArrayOfScatteringSpecies& scat_species,
+                            const Agenda&                   ray_path_observer_agenda,
+                            const Agenda&                   spectral_propmat_agenda,
+                            const Agenda&                   spectral_rad_space_agenda,
+                            const Agenda&                   spectral_rad_surface_agenda,
+                            const Index&                    mc_seed,
+                            const Index&                    mc_min_iter,
+                            const Index&                    mc_max_iter,
+                            const Index&                    mc_max_scatorder,
+                            const Numeric&                  mc_std_err,
+                            const Numeric&                  mc_max_time) try {
+  ARTS_TIME_REPORT
+
+  ARTS_USER_ERROR_IF(not jac_targets.empty(), "spectral_radMonteCarlo does not yet support Jacobian targets")
+
+  ray_path_observer_agendaExecute(ws, ray_path, obs_pos, obs_los, ray_path_observer_agenda);
+  ARTS_USER_ERROR_IF(ray_path.empty(), "The ray-path agenda returned an empty path")
+
+  spectral_rad.resize(freq_grid.size());
+  spectral_rad_jac.resize(0, freq_grid.size());
+
+  MCAntenna pencil;
+  pencil.set_pencil_beam();
+
+  for (Size i = 0; i < freq_grid.size(); ++i) {
+    Stokvec error;
+    Index   iterations;
+    MCGeneral(ws,
+              spectral_rad[i],
+              error,
+              iterations,
+              atm_field,
+              surf_field,
+              subsurf_field,
+              scat_species,
+              pencil,
+              ray_path_observer_agenda,
+              spectral_propmat_agenda,
+              spectral_rad_space_agenda,
+              spectral_rad_surface_agenda,
+              freq_grid[i],
+              obs_pos,
+              obs_los,
+              mc_seed + static_cast<Index>(i),
+              mc_min_iter,
+              mc_max_iter,
+              mc_max_scatorder,
+              mc_std_err,
+              mc_max_time);
+  }
+}
+ARTS_METHOD_ERROR_CATCH
