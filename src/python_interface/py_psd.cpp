@@ -19,24 +19,27 @@ namespace Python {
 
 void py_psd(py::module_& m) try {
   py::class_<scattering::PSDData>(m, "PSDData")
-      .def_ro("values", &scattering::PSDData::values)
+      .def_ro("values", &scattering::PSDData::values, "PSD values\n\n.. :class:`Vector`")
       .def(
           "derivative",
           [](const scattering::PSDData& data, const ScatteringSpeciesProperty& property) -> const Vector& {
             return data.derivatives.at(property);
           },
           "property"_a,
+          "Return the PSD derivative for an atmospheric property.",
           py::rv_policy::reference_internal)
-      .def_prop_ro("derivative_properties",
-                   [](const scattering::PSDData& data) {
-                     std::vector<ScatteringSpeciesProperty> result;
-                     result.reserve(data.derivatives.size());
-                     for (const auto& [property, derivative] : data.derivatives) {
-                       static_cast<void>(derivative);
-                       result.push_back(property);
-                     }
-                     return result;
-                   })
+      .def_prop_ro(
+          "derivative_properties",
+          [](const scattering::PSDData& data) {
+            std::vector<ScatteringSpeciesProperty> result;
+            result.reserve(data.derivatives.size());
+            for (const auto& [property, derivative] : data.derivatives) {
+              static_cast<void>(derivative);
+              result.push_back(property);
+            }
+            return result;
+          },
+          "Atmospheric properties with available PSD derivatives\n\n.. :class:`list[ScatteringSpeciesProperty]`")
       .doc() = "Particle-size distribution values and derivatives by atmospheric property.";
 
   py::class_<scattering::MonodispersePSD>(m, "MonodispersePSD")

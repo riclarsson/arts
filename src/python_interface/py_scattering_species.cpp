@@ -301,7 +301,9 @@ void py_scattering_species(py::module_& m) try {
 
   py::class_<scattering::ConstantGasScattering>(m, "ConstantGasScattering")
       .def(py::init<Numeric>(), "cross_section"_a)
-      .def_rw("cross_section", &scattering::ConstantGasScattering::cross_section)
+      .def_rw("cross_section",
+              &scattering::ConstantGasScattering::cross_section,
+              "Molecular scattering cross-section [m^2]\n\n.. :class:`Numeric`")
       .doc() = "Constant molecular scattering cross-section model";
 
   py::class_<scattering::IsotropicGasScattering>(m, "IsotropicGasScattering").def(py::init<>()).doc() =
@@ -309,7 +311,9 @@ void py_scattering_species(py::module_& m) try {
 
   py::class_<scattering::RayleighGasScattering>(m, "RayleighGasScattering")
       .def(py::init<Numeric>(), "depolarization_factor"_a = 0.0)
-      .def_rw("depolarization_factor", &scattering::RayleighGasScattering::depolarization_factor)
+      .def_rw("depolarization_factor",
+              &scattering::RayleighGasScattering::depolarization_factor,
+              "Rayleigh depolarization factor\n\n.. :class:`Numeric`")
       .doc() = "Polarized Rayleigh gas-scattering phase matrix";
 
   py::class_<GasScatterer>(m, "GasScatterer")
@@ -317,21 +321,29 @@ void py_scattering_species(py::module_& m) try {
       .def(py::init<scattering::GasScatteringCoefficient, scattering::GasScatteringPhaseMatrix>(),
            "coefficient"_a,
            "phase_matrix"_a)
-      .def_rw("coefficient", &GasScatterer::coefficient)
-      .def_rw("phase_matrix", &GasScatterer::phase_matrix)
+      .def_rw("coefficient",
+              &GasScatterer::coefficient,
+              "Gas-scattering coefficient model\n\n.. :class:`AirSimpleGasScattering` or "
+              ":class:`ConstantGasScattering`")
+      .def_rw("phase_matrix",
+              &GasScatterer::phase_matrix,
+              "Gas-scattering phase-matrix model\n\n.. :class:`IsotropicGasScattering` or "
+              ":class:`RayleighGasScattering`")
       .def_static(
           "air_simple_rayleigh",
           [](Numeric depolarization_factor) {
             return GasScatterer{scattering::AirSimpleGasScattering{},
                                 scattering::RayleighGasScattering{depolarization_factor}};
           },
-          "depolarization_factor"_a = 0.0)
+          "depolarization_factor"_a = 0.0,
+          "Create an AirSimple coefficient model with a Rayleigh phase matrix.")
       .def_static(
           "constant_isotropic",
           [](Numeric cross_section) {
             return GasScatterer{scattering::ConstantGasScattering{cross_section}, scattering::IsotropicGasScattering{}};
           },
-          "cross_section"_a)
+          "cross_section"_a,
+          "Create a constant-cross-section model with an isotropic phase matrix.")
       .def(
           "get_bulk_scattering_properties_tro_gridded",
           [](const GasScatterer&         scatterer,
