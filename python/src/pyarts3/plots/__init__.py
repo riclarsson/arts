@@ -29,6 +29,7 @@ forwarded yet again to the underlying matplotlib plotting functions.
 import numpy as _numpy
 import matplotlib as _matplotlib
 from . import AbsorptionBands
+from . import AbsorptionLookupTables
 from . import ArrayOfPropagationPathPoint
 from . import ArrayOfSensorObsel
 from . import AscendingGrid
