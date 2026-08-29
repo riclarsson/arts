@@ -10,6 +10,13 @@
 #include "rtepack_stokes_vector.h"
 
 namespace rtepack {
+stokvec level_emission(const stokvec &absorption,
+                       const stokvec &nlte,
+                       const Numeric  frequency,
+                       const Numeric  temperature) {
+  return planck(frequency, temperature) * absorption + nlte;
+}
+
 void level_nlte(stokvec_vector_view              J,
                 stokvec_matrix_view              dJ,
                 const propmat_vector_const_view &K,

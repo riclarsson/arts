@@ -15,7 +15,7 @@ namespace {
 struct PolarizedOptics {
   Propmat extinction{};
   Stokvec absorption{};
-  Numeric temperature{};
+  Stokvec emission{};
 };
 
 PolarizedOptics polarized_optics(const Workspace&                ws,
@@ -58,9 +58,11 @@ PolarizedOptics polarized_optics(const Workspace&                ws,
     particle_abs.Q() = bulk.absorption_vector[0, 0, 0, 1];
   }
 
-  return {.extinction  = gas[0] + particle_ext,
-          .absorption  = Stokvec{gas[0].A(), gas[0].B(), gas[0].C(), gas[0].D()} + particle_abs,
-          .temperature = atm.temperature};
+  const Stokvec absorption = Stokvec{gas[0].A(), gas[0].B(), gas[0].C(), gas[0].D()} + particle_abs;
+
+  return {.extinction = gas[0] + particle_ext,
+          .absorption = absorption,
+          .emission   = rtepack::level_emission(absorption, src[0], frequency, atm.temperature)};
 }
 
 PropagationPathPoint interpolate(const PropagationPathPoint& a, const PropagationPathPoint& b, Numeric x) {
@@ -258,8 +260,7 @@ void MCGeneral(const Workspace&                ws,
       if (scattering <= 0.0 or uniform() >= scattering / extinction) {
         const Numeric absorption = collision.optics.absorption.I();
         ARTS_USER_ERROR_IF(absorption <= 0.0, "Invalid non-positive absorption collision probability")
-        sample =
-            weight * ((planck(frequency, collision.optics.temperature) / absorption) * collision.optics.absorption);
+        sample = weight * (collision.optics.emission / absorption);
         break;
       }
       if (++order > mc_max_scatorder) break;
