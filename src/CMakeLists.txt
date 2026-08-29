@@ -199,6 +199,7 @@ add_library(artsworkspace STATIC
   m_propagation_path.cc
   m_propagation_path_observer.cc
   m_propmat.cc
+  m_radar.cc
   m_refraction.cc
   m_retrieval.cc
   m_rad.cc

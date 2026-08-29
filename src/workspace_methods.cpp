@@ -6093,6 +6093,109 @@ added without changing the interface.
       .pass_workspace = true,
   };
 
+  wsm_data["measurement_sensorAddSimpleRadar"] = {
+      .desc = R"--(Adds range-resolved pencil-beam radar observation elements.
+
+For every frequency in *freq_grid*, one observation element is appended for
+every interval in ``range_bins``.  The ordering is frequency first and range
+bin second, matching the ARTS2 ``yRadar`` convention.  All generated elements
+share their frequency and position/LOS grids.  The matching limits are
+appended to *radar_range_limits*, and *measurement_sensor_meta* receives one
+range grid per frequency.
+
+The receiving polarization is a Stokes dot-product vector.  For example,
+``[0.5, 0.5, 0, 0]`` is the old ARTS polarization index 5 (vertical linear).
+)--",
+      .author    = {"Patrick Eriksson", "OpenAI Codex"},
+      .out       = {"measurement_sensor", "measurement_sensor_meta", "radar_range_limits"},
+      .in        = {"measurement_sensor", "measurement_sensor_meta", "radar_range_limits", "freq_grid"},
+      .gin       = {"pos", "los", "pol", "range_bins"},
+      .gin_type  = {"Vector3", "Vector2", "Stokvec", "AscendingGrid"},
+      .gin_value = {std::nullopt,
+                    std::nullopt,
+                    Stokvec{0.5, 0.5, 0.0, 0.0},
+                    std::nullopt},
+      .gin_desc  = {"Radar position [altitude, latitude, longitude].",
+                    "Radar viewing direction [zenith, azimuth].",
+                    "Receiving-polarization Stokes weights.",
+                    "Common range-bin edges."},
+  };
+
+  wsm_data["measurement_vecFromRadarSingleScattering"] = {
+      .desc = R"--(Deterministic polarized single-scattering active-radar forward model.
+
+This is the ARTS3 counterpart of the ARTS2 ``yRadar`` and
+``iyRadarSingleScat`` workflow.  It calculates particle backscatter and
+two-way polarized attenuation by gases and particles along the propagation
+paths of *measurement_sensor*.  Surface clutter and multiple scattering are
+not included.
+
+Each element of *measurement_sensor* is paired with the corresponding row of
+*radar_range_limits*.  This keeps *measurement_vec* and *measurement_jac* in
+the standard retrieval layout: one sensor observation element produces one
+measurement.  Use *measurement_sensorAddSimpleRadar* for the common
+frequency/polarization/range-bin arrangement.
+
+``range_mode`` may be ``"Altitude"`` [m], ``"Distance"`` [m one way],
+``"RoundTripTime"`` [s, including path group refractive indices], or
+``"Legacy"`` (the ARTS2 rule: altitude if the largest edge exceeds 1,
+otherwise round-trip time).
+
+The output unit may be ``"1"`` (backscatter coefficient, 1/(m sr)),
+``"Ze"`` (mm6/m3), or ``"dBZe"``.  A negative ``k2`` derives the liquid-water
+dielectric factor at ``ze_tref`` using the Liebe-93 parameterization, as in
+ARTS2.  ``pext_scaling`` scales only particulate extinction, not particle
+backscatter.
+
+Atmospheric entries in finalized *jac_targets* are differentiated through the
+complete range-gated calculation, including gas and particle attenuation and
+particle backscatter.  The perturbation stored on each target is used; a
+scale-aware default is selected when it is zero.  This numerical assembly is
+also valid for scattering-species properties used by PSDs.
+
+Allowed auxiliary quantities are ``"Radiative background"``,
+``"Backscattering"``, ``"Abs species extinction"``, and
+``"Particle extinction"``.  They are returned as rows of *radar_aux* in the
+requested order.
+)--",
+      .author         = {"Patrick Eriksson", "OpenAI Codex"},
+      .out            = {"measurement_vec", "measurement_jac", "radar_aux"},
+      .in             = {"measurement_sensor",
+                         "radar_range_limits",
+                         "jac_targets",
+                         "atm_field",
+                         "surf_field",
+                         "scat_species",
+                         "ray_path_observer_agenda",
+                         "spectral_propmat_agenda"},
+      .gin            = {"transmitted_stokes",
+                         "range_mode",
+                         "unit",
+                         "ze_tref",
+                         "k2",
+                         "dbze_min",
+                         "pext_scaling",
+                         "aux_vars"},
+      .gin_type       = {"Stokvec", "String", "String", "Numeric", "Numeric", "Numeric", "Numeric", "ArrayOfString"},
+      .gin_value      = {Stokvec{1.0, 1.0, 0.0, 0.0},
+                         String{"Legacy"},
+                         String{"1"},
+                         Numeric{273.15},
+                         Numeric{-1.0},
+                         Numeric{-99.0},
+                         Numeric{1.0},
+                         ArrayOfString{}},
+      .gin_desc       = {"Transmitted Stokes vector; its I component must equal one.",
+                         "Range coordinate: Altitude, Distance, RoundTripTime, or Legacy.",
+                         "Output unit: 1, Ze, or dBZe.",
+                         "Liquid-water reference temperature [K] for automatic k2.",
+                         "Reference dielectric factor squared; negative selects Liebe-93.",
+                         "Lower clipping value for dBZe.",
+                         "Multiplicative factor for particulate extinction (0 to 2).",
+                         "Requested auxiliary quantities."},
+      .pass_workspace = true,
+  };
+
   wsm_data["MCGeneral"] = {
       .desc           = R"--(Backward passive Monte Carlo radiative-transfer calculation.
 

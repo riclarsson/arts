@@ -176,6 +176,36 @@ BulkScatteringPropertiesTROGridded ScatteringHabit::get_bulk_scattering_properti
   return BulkScatteringPropertiesTROGridded(phase_matrix_new, extinction_matrix_new, absorption_vector_new);
 }
 
+BulkScatteringProperties<Format::TRO, Representation::Gridded>
+ScatteringHabit::get_bulk_scattering_properties_tro_gridded(const AtmPoint&                  point,
+                                                            const Vector&                    f_grid,
+                                                            std::shared_ptr<ZenithAngleGrid> za_scat_grid) const {
+  const auto sizes = particle_habit.get_sizes(std::visit([](const auto& p) { return p.get_size_parameter(); }, psd));
+  const auto pnd   = std::visit(
+      [&point, &sizes, this](const auto& p) { return p.evaluate(point, sizes, mass_size_rel_a, mass_size_rel_b); },
+      psd);
+  ARTS_USER_ERROR_IF(pnd.size() != static_cast<Size>(particle_habit.size()), "PSD and particle-habit sizes differ.")
+
+  auto grids = ScatteringDataGrids(
+      std::make_shared<Vector>(Vector{point.temperature}), std::make_shared<Vector>(f_grid), std::move(za_scat_grid));
+  using Bulk = BulkScatteringProperties<Format::TRO, Representation::Gridded>;
+  std::optional<Bulk> result;
+  for (Index i = 0; i < particle_habit.size(); ++i) {
+    auto data = std::visit([&grids](const auto& ssd) { return ssd_to_tro_gridded(grids, ssd); }, particle_habit[i]);
+    if (data.phase_matrix) *data.phase_matrix *= pnd[i];
+    data.extinction_matrix *= pnd[i];
+    data.absorption_vector *= pnd[i];
+    Bulk bulk{std::move(data.phase_matrix), std::move(data.extinction_matrix), std::move(data.absorption_vector)};
+    if (result) {
+      *result += bulk;
+    } else {
+      result = std::move(bulk);
+    }
+  }
+  ARTS_USER_ERROR_IF(not result, "Cannot calculate bulk properties for an empty particle habit.")
+  return std::move(*result);
+}
+
 BulkScatteringProperties<Format::ARO, Representation::Gridded>
 ScatteringHabit::get_bulk_scattering_properties_aro_gridded(const AtmPoint&                  point,
                                                             const Vector&                    f_grid,

@@ -219,6 +219,26 @@ When Bath is selected, all species are used.  Otherwise, this variable should co
       .type = "Matrix",
   };
 
+  wsv_data["radar_range_limits"] = {
+      .desc = R"--(Range-gate limits for active-radar measurements.
+
+The matrix has one row per element of *measurement_sensor* and two columns
+holding the lower and upper edge.  The coordinate represented by the limits is
+selected by the radar forward method (altitude, one-way distance, or
+round-trip time).
+)--",
+      .type = "Matrix",
+  };
+
+  wsv_data["radar_aux"] = {
+      .desc = R"--(Auxiliary active-radar quantities.
+
+Rows follow the requested auxiliary-variable names and columns follow
+*measurement_vec*.
+)--",
+      .type = "Matrix",
+  };
+
   //! Atmosphere
 
   wsv_data["atm_field"] = {
