@@ -49,11 +49,10 @@ struct ArrayOfScatteringSpecies {
                                              std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid) const;
 
   [[nodiscard]] BulkScatteringProperties<scattering::Format::TRO, scattering::Representation::Gridded>
-  get_bulk_scattering_properties_tro_gridded_derivative(
-      const AtmPoint&,
-      const Vector&,
-      std::shared_ptr<scattering::ZenithAngleGrid>,
-      const AtmKeyVal&) const;
+  get_bulk_scattering_properties_tro_gridded_derivative(const AtmPoint&,
+                                                        const Vector&,
+                                                        std::shared_ptr<scattering::ZenithAngleGrid>,
+                                                        const AtmKeyVal&) const;
 
   [[nodiscard]] ScatteringTroSpectralVector get_bulk_scattering_properties_tro_spectral(const AtmPoint& atm_point,
                                                                                         const Vector&   f_grid,
@@ -65,6 +64,14 @@ struct ArrayOfScatteringSpecies {
                                              const Vector&                                za_inc_grid,
                                              const Vector&                                delta_aa_grid,
                                              std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid) const;
+
+  [[nodiscard]] BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Gridded>
+  get_bulk_scattering_properties_aro_gridded_derivative(const AtmPoint&,
+                                                        const Vector&,
+                                                        const Vector&,
+                                                        const Vector&,
+                                                        std::shared_ptr<scattering::ZenithAngleGrid>,
+                                                        const AtmKeyVal&) const;
 
   [[nodiscard]] BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Spectral>
   get_bulk_scattering_properties_aro_spectral(

@@ -110,10 +110,12 @@ template <std::floating_point Scalar, Representation repr> class ExtinctionMatri
 
   ExtinctionMatrixData<Scalar, Format::ARO, repr> to_lab_frame(std::shared_ptr<const Vector> za_inc_grid) const {
     ExtinctionMatrixData<Scalar, Format::ARO, repr> em_new{t_grid_, f_grid_, za_inc_grid};
+    auto                                            coeffs = em_new.get_coeff_vector_view();
     for (Size t_ind = 0; t_ind < t_grid_->size(); ++t_ind) {
       for (Size f_ind = 0; f_ind < f_grid_->size(); ++f_ind) {
         for (Size za_inc_ind = 0; za_inc_ind < za_inc_grid->size(); ++za_inc_ind) {
-          em_new[t_ind, f_ind, za_inc_ind, 0] = this->operator[](t_ind, f_ind, 0);
+          coeffs[t_ind, f_ind, za_inc_ind] = typename ExtinctionMatrixData<Scalar, Format::ARO, repr>::CoeffVector{
+              this->operator[](t_ind, f_ind, 0), 0.0, 0.0};
         }
       }
     }
@@ -125,17 +127,22 @@ template <std::floating_point Scalar, Representation repr> class ExtinctionMatri
     auto                 coeffs_this = get_const_coeff_vector_view();
     auto                 coeffs_res  = result.get_coeff_vector_view();
     for (Index i_t = 0; i_t < static_cast<Index>(weights.t_grid_weights.size()); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t  = weights.t_grid_weights[i_t];
+      Numeric     w_t_l = gp_t.fd[1];
+      Numeric     w_t_r = gp_t.fd[0];
+      const Index it0   = std::clamp<Index>(gp_t.idx, 0, n_temps_ - 1);
+      const Index it1   = std::min(it0 + 1, n_temps_ - 1);
       for (Index i_f = 0; i_f < static_cast<Index>(weights.f_grid_weights.size()); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
-        coeffs_res[i_t, i_f] =
-            (w_t_l * w_f_l * coeffs_this[gp_t.idx, gp_f.idx] + w_t_l * w_f_r * coeffs_this[gp_t.idx, gp_f.idx + 1] +
-             w_t_r * w_f_l * coeffs_this[gp_t.idx + 1, gp_f.idx] +
-             w_t_r * w_f_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1]);
+        GridPos     gp_f  = weights.f_grid_weights[i_f];
+        Numeric     w_f_l = gp_f.fd[1];
+        Numeric     w_f_r = gp_f.fd[0];
+        const Index if0   = std::clamp<Index>(gp_f.idx, 0, n_freqs_ - 1);
+        const Index if1   = std::min(if0 + 1, n_freqs_ - 1);
+        coeffs_res[i_t, i_f].setZero();
+        if (w_t_l > 0.0 and w_f_l > 0.0) coeffs_res[i_t, i_f] += w_t_l * w_f_l * coeffs_this[it0, if0];
+        if (w_t_l > 0.0 and w_f_r > 0.0) coeffs_res[i_t, i_f] += w_t_l * w_f_r * coeffs_this[it0, if1];
+        if (w_t_r > 0.0 and w_f_l > 0.0) coeffs_res[i_t, i_f] += w_t_r * w_f_l * coeffs_this[it1, if0];
+        if (w_t_r > 0.0 and w_f_r > 0.0) coeffs_res[i_t, i_f] += w_t_r * w_f_r * coeffs_this[it1, if1];
       }
     }
     return result;

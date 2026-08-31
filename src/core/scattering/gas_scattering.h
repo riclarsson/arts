@@ -72,8 +72,10 @@ struct GasScatterer {
                                              std::shared_ptr<ZenithAngleGrid> za_scat_grid) const;
 
   [[nodiscard]] BulkScatteringProperties<Format::TRO, Representation::Gridded>
-  get_bulk_scattering_properties_tro_gridded_derivative(
-      const AtmPoint&, const Vector&, std::shared_ptr<ZenithAngleGrid>, const AtmKeyVal&) const;
+  get_bulk_scattering_properties_tro_gridded_derivative(const AtmPoint&,
+                                                        const Vector&,
+                                                        std::shared_ptr<ZenithAngleGrid>,
+                                                        const AtmKeyVal&) const;
 
   [[nodiscard]] ScatteringTroSpectralVector get_bulk_scattering_properties_tro_spectral(const AtmPoint&,
                                                                                         const Vector& f_grid,
@@ -85,6 +87,14 @@ struct GasScatterer {
                                              const Vector&                    za_inc_grid,
                                              const Vector&                    delta_aa_grid,
                                              std::shared_ptr<ZenithAngleGrid> za_scat_grid) const;
+
+  [[nodiscard]] BulkScatteringProperties<Format::ARO, Representation::Gridded>
+  get_bulk_scattering_properties_aro_gridded_derivative(const AtmPoint&,
+                                                        const Vector&,
+                                                        const Vector&,
+                                                        const Vector&,
+                                                        std::shared_ptr<ZenithAngleGrid>,
+                                                        const AtmKeyVal&) const;
 
   [[nodiscard]] BulkScatteringProperties<Format::ARO, Representation::Spectral>
   get_bulk_scattering_properties_aro_spectral(

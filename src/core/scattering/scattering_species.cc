@@ -34,16 +34,16 @@ ArrayOfScatteringSpecies::get_bulk_scattering_properties_tro_gridded(
 
 BulkScatteringProperties<scattering::Format::TRO, scattering::Representation::Gridded>
 ArrayOfScatteringSpecies::get_bulk_scattering_properties_tro_gridded_derivative(
-    const AtmPoint& atm_point,
-    const Vector& f_grid,
+    const AtmPoint&                              atm_point,
+    const Vector&                                f_grid,
     std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid,
-    const AtmKeyVal& target) const {
+    const AtmKeyVal&                             target) const {
   ARTS_USER_ERROR_IF(species.empty(), "Cannot differentiate an empty scattering-species array")
-  const auto visitor = [&](const auto& spec)
-      -> BulkScatteringProperties<scattering::Format::TRO, scattering::Representation::Gridded> {
+  const auto visitor =
+      [&](const auto& spec) -> BulkScatteringProperties<scattering::Format::TRO, scattering::Representation::Gridded> {
     if constexpr (requires {
-      spec.get_bulk_scattering_properties_tro_gridded_derivative(atm_point, f_grid, za_scat_grid, target);
-    }) {
+                    spec.get_bulk_scattering_properties_tro_gridded_derivative(atm_point, f_grid, za_scat_grid, target);
+                  }) {
       return spec.get_bulk_scattering_properties_tro_gridded_derivative(atm_point, f_grid, za_scat_grid, target);
     } else {
       throw std::runtime_error(std::format("TRO-gridded derivatives are not implemented for species:\n{:N}", spec));
@@ -109,6 +109,33 @@ ArrayOfScatteringSpecies::get_bulk_scattering_properties_aro_gridded(
     bsp             += std::visit(visitor, scat_spec);
   }
   return bsp;
+}
+
+BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Gridded>
+ArrayOfScatteringSpecies::get_bulk_scattering_properties_aro_gridded_derivative(
+    const AtmPoint&                              atm_point,
+    const Vector&                                f_grid,
+    const Vector&                                za_inc_grid,
+    const Vector&                                delta_aa_grid,
+    std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid,
+    const AtmKeyVal&                             target) const {
+  ARTS_USER_ERROR_IF(species.empty(), "Cannot differentiate an empty scattering-species array")
+  const auto visitor =
+      [&](const auto& spec) -> BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Gridded> {
+    if constexpr (requires {
+                    spec.get_bulk_scattering_properties_aro_gridded_derivative(
+                        atm_point, f_grid, za_inc_grid, delta_aa_grid, za_scat_grid, target);
+                  }) {
+      return spec.get_bulk_scattering_properties_aro_gridded_derivative(
+          atm_point, f_grid, za_inc_grid, delta_aa_grid, za_scat_grid, target);
+    } else {
+      throw std::runtime_error(std::format("ARO-gridded derivatives are not implemented for species:\n{:N}", spec));
+    }
+    std::unreachable();
+  };
+  auto out = std::visit(visitor, species.front());
+  for (Size i = 1; i < species.size(); ++i) out += std::visit(visitor, species[i]);
+  return out;
 }
 
 BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Spectral>

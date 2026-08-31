@@ -36,6 +36,9 @@ auto ssd_to_tro_gridded(const ScatteringDataGrids& new_grids, const SingleScatte
     ARTS_USER_ERROR("Cannot convert scattering data from ARO format to TRO format.");
   } else {
     if constexpr (repr == Representation::Gridded) {
+      // Regrid also provides the required owning copy.  Returning ssd
+      // directly aliases its matpack storage; bulk PSD scaling would then
+      // modify the particle habit and make later evaluations stateful.
       return ssd.regrid(new_grids);
     } else {
       return ssd.to_gridded().regrid(new_grids);

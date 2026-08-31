@@ -6094,7 +6094,7 @@ added without changing the interface.
   };
 
   wsm_data["measurement_sensorAddSimpleRadar"] = {
-      .desc = R"--(Adds range-resolved pencil-beam radar observation elements.
+      .desc      = R"--(Adds range-resolved pencil-beam radar observation elements.
 
 For every frequency in *freq_grid*, one observation element is appended for
 every interval in ``range_bins``.  The ordering is frequency first and range
@@ -6111,10 +6111,7 @@ The receiving polarization is a Stokes dot-product vector.  For example,
       .in        = {"measurement_sensor", "measurement_sensor_meta", "radar_range_limits", "freq_grid"},
       .gin       = {"pos", "los", "pol", "range_bins"},
       .gin_type  = {"Vector3", "Vector2", "Stokvec", "AscendingGrid"},
-      .gin_value = {std::nullopt,
-                    std::nullopt,
-                    Stokvec{0.5, 0.5, 0.0, 0.0},
-                    std::nullopt},
+      .gin_value = {std::nullopt, std::nullopt, Stokvec{0.5, 0.5, 0.0, 0.0}, std::nullopt},
       .gin_desc  = {"Radar position [altitude, latitude, longitude].",
                     "Radar viewing direction [zenith, azimuth].",
                     "Receiving-polarization Stokes weights.",
@@ -6122,7 +6119,7 @@ The receiving polarization is a Stokes dot-product vector.  For example,
   };
 
   wsm_data["measurement_vecFromRadarSingleScattering"] = {
-      .desc = R"--(Deterministic polarized single-scattering active-radar forward model.
+      .desc     = R"--(Deterministic polarized single-scattering active-radar forward model.
 
 This is the ARTS3 counterpart of the ARTS2 ``yRadar`` and
 ``iyRadarSingleScat`` workflow.  It calculates particle backscatter and
@@ -6150,33 +6147,28 @@ backscatter.
 Atmospheric entries in finalized *jac_targets* are differentiated through the
 complete range-gated calculation, including gas and particle attenuation and
 particle backscatter.  The perturbation stored on each target is used; a
-scale-aware default is selected when it is zero.  This numerical assembly is
-also valid for scattering-species properties used by PSDs.
+scale-aware default is selected when it is zero.  Gas propagation derivatives
+come from *spectral_propmat_agenda*, scattering derivatives come from
+*scat_species*, and their ordered two-way transmission product is propagated
+analytically through rtepack.  There is no production finite-difference loop.
 
 Allowed auxiliary quantities are ``"Radiative background"``,
 ``"Backscattering"``, ``"Abs species extinction"``, and
 ``"Particle extinction"``.  They are returned as rows of *radar_aux* in the
 requested order.
 )--",
-      .author         = {"Patrick Eriksson", "OpenAI Codex"},
-      .out            = {"measurement_vec", "measurement_jac", "radar_aux"},
-      .in             = {"measurement_sensor",
-                         "radar_range_limits",
-                         "jac_targets",
-                         "atm_field",
-                         "surf_field",
-                         "scat_species",
-                         "ray_path_observer_agenda",
-                         "spectral_propmat_agenda"},
-      .gin            = {"transmitted_stokes",
-                         "range_mode",
-                         "unit",
-                         "ze_tref",
-                         "k2",
-                         "dbze_min",
-                         "pext_scaling",
-                         "aux_vars"},
-      .gin_type       = {"Stokvec", "String", "String", "Numeric", "Numeric", "Numeric", "Numeric", "ArrayOfString"},
+      .author   = {"Patrick Eriksson", "OpenAI Codex"},
+      .out      = {"measurement_vec", "measurement_jac", "radar_aux"},
+      .in       = {"measurement_sensor",
+                   "radar_range_limits",
+                   "jac_targets",
+                   "atm_field",
+                   "surf_field",
+                   "scat_species",
+                   "ray_path_observer_agenda",
+                   "spectral_propmat_agenda"},
+      .gin      = {"transmitted_stokes", "range_mode", "unit", "ze_tref", "k2", "dbze_min", "pext_scaling", "aux_vars"},
+      .gin_type = {"Stokvec", "String", "String", "Numeric", "Numeric", "Numeric", "Numeric", "ArrayOfString"},
       .gin_value      = {Stokvec{1.0, 1.0, 0.0, 0.0},
                          String{"Legacy"},
                          String{"1"},
@@ -6193,6 +6185,102 @@ requested order.
                          "Lower clipping value for dBZe.",
                          "Multiplicative factor for particulate extinction (0 to 2).",
                          "Requested auxiliary quantities."},
+      .pass_workspace = true,
+  };
+
+  wsm_data["model_state_vecFromRadarOnionPeeling"] = {
+      .desc           = R"--(Retrieve an atmospheric radar profile by analytical onion peeling.
+
+Range gates are processed from the sensor outwards.  At each gate, the
+strongest not-yet-peeled atmospheric state coordinate is updated by a bounded
+Newton iteration.  The forward value and derivative are provided by
+*measurement_vecFromRadarSingleScattering*, so gaseous and particulate
+attenuation, ARO polarization, non-commuting outgoing/return propagation
+matrices, sensor polarization, and range-bin integration are identical to the
+standard radar forward model.
+
+Unlike the ARTS2 implementation, this method does not create or consume a
+large dBZe/temperature inversion table.  Scattering properties are evaluated
+directly through *scat_species*.  *jac_targets* defines the retrieved state,
+including its grids and transformations.  All targets must currently be
+atmospheric targets.  The returned *model_state_vec*, updated *atm_field*,
+*measurement_vec_fit*, and *measurement_jac* are mutually consistent and can
+be used directly as the initial state and forward/Jacobian inputs of OEM.
+
+Observations at or below ``measurement_noise_floor`` are ignored.  ``state_min``,
+``state_max``, and ``max_step`` apply in model-state coordinates, after any
+target transformation.  Gates with no sensitivity to an unpeeled state
+coordinate are left unused.  A non-convergent gate is reported as an error.
+This formulation is not restricted to the old two-species liquid/ice layout;
+phase selection may instead be expressed by the scattering-species properties
+and atmospheric state chosen by the caller.
+              )--",
+      .author         = {"Patrick Eriksson", "OpenAI Codex"},
+      .out            = {"model_state_vec", "measurement_vec_fit", "measurement_jac", "atm_field"},
+      .in             = {"measurement_vec",
+                         "measurement_sensor",
+                         "radar_range_limits",
+                         "jac_targets",
+                         "surf_field",
+                         "scat_species",
+                         "ray_path_observer_agenda",
+                         "spectral_propmat_agenda"},
+      .gin            = {"transmitted_stokes",
+                         "range_mode",
+                         "unit",
+                         "ze_tref",
+                         "k2",
+                         "dbze_min",
+                         "pext_scaling",
+                         "measurement_noise_floor",
+                         "state_min",
+                         "state_max",
+                         "max_step",
+                         "tolerance",
+                         "max_iterations",
+                         "max_sweeps"},
+      .gin_type       = {"Stokvec",
+                         "String",
+                         "String",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Index",
+                         "Index"},
+      .gin_value      = {Stokvec{1.0, 1.0, 0.0, 0.0},
+                         String{"Legacy"},
+                         String{"1"},
+                         Numeric{273.15},
+                         Numeric{-1.0},
+                         Numeric{-99.0},
+                         Numeric{1.0},
+                         Numeric{-1e99},
+                         Numeric{0.0},
+                         Numeric{1e99},
+                         Numeric{1e99},
+                         Numeric{1e-6},
+                         Index{12},
+                         Index{8}},
+      .gin_desc       = {"Transmitted Stokes vector; its I component must equal one.",
+                         "Range coordinate: Altitude, Distance, RoundTripTime, or Legacy.",
+                         "Forward and observation unit: 1, Ze, or dBZe.",
+                         "Liquid-water reference temperature [K] for automatic k2.",
+                         "Reference dielectric factor squared; negative selects Liebe-93.",
+                         "Lower clipping value for dBZe.",
+                         "Multiplicative factor for particulate extinction (0 to 2).",
+                         "Measurements at or below this value are ignored.",
+                         "Lower bound in model-state coordinates.",
+                         "Upper bound in model-state coordinates.",
+                         "Maximum absolute Newton step in model-state coordinates.",
+                         "Relative gate-fit convergence tolerance.",
+                         "Maximum Newton iterations per gate.",
+                         "Maximum repeated outward sweeps for interpolating state grids."},
       .pass_workspace = true,
   };
 

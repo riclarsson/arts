@@ -133,12 +133,11 @@ BulkScatteringProperties<Format::TRO, Representation::Gridded> GasScatterer::get
 }
 
 BulkScatteringProperties<Format::TRO, Representation::Gridded>
-GasScatterer::get_bulk_scattering_properties_tro_gridded_derivative(
-    const AtmPoint& atm_point,
-    const Vector& f_grid,
-    std::shared_ptr<ZenithAngleGrid> za_scat_grid,
-    const AtmKeyVal& target) const {
-  auto out = get_bulk_scattering_properties_tro_gridded(atm_point, f_grid, std::move(za_scat_grid));
+GasScatterer::get_bulk_scattering_properties_tro_gridded_derivative(const AtmPoint&                  atm_point,
+                                                                    const Vector&                    f_grid,
+                                                                    std::shared_ptr<ZenithAngleGrid> za_scat_grid,
+                                                                    const AtmKeyVal&                 target) const {
+  auto    out    = get_bulk_scattering_properties_tro_gridded(atm_point, f_grid, std::move(za_scat_grid));
   Numeric factor = 0.0;
   if (target == AtmKeyVal{AtmKey::p}) factor = 1.0 / atm_point.pressure;
   if (target == AtmKeyVal{AtmKey::t}) factor = -1.0 / atm_point.temperature;
@@ -205,6 +204,19 @@ BulkScatteringProperties<Format::ARO, Representation::Gridded> GasScatterer::get
     std::shared_ptr<ZenithAngleGrid> za_scat_grid) const {
   auto scattering_angles = std::make_shared<ZenithAngleGrid>(IrregularZenithAngleGrid(nlinspace(0.0, 180.0, 181)));
   return get_bulk_scattering_properties_tro_gridded(atm_point, f_grid, std::move(scattering_angles))
+      .to_lab_frame(
+          std::make_shared<Vector>(za_inc_grid), std::make_shared<Vector>(delta_aa_grid), std::move(za_scat_grid));
+}
+
+BulkScatteringProperties<Format::ARO, Representation::Gridded>
+GasScatterer::get_bulk_scattering_properties_aro_gridded_derivative(const AtmPoint&                  atm_point,
+                                                                    const Vector&                    f_grid,
+                                                                    const Vector&                    za_inc_grid,
+                                                                    const Vector&                    delta_aa_grid,
+                                                                    std::shared_ptr<ZenithAngleGrid> za_scat_grid,
+                                                                    const AtmKeyVal&                 target) const {
+  auto scattering_angles = std::make_shared<ZenithAngleGrid>(IrregularZenithAngleGrid(nlinspace(0.0, 180.0, 181)));
+  return get_bulk_scattering_properties_tro_gridded_derivative(atm_point, f_grid, std::move(scattering_angles), target)
       .to_lab_frame(
           std::make_shared<Vector>(za_inc_grid), std::make_shared<Vector>(delta_aa_grid), std::move(za_scat_grid));
 }

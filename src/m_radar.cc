@@ -12,17 +12,25 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <string_view>
 #include <vector>
 
 namespace {
 
-Muelmat as_muelmat(const Matrix& x) {
-  ARTS_USER_ERROR_IF(x.nrows() != 4 or x.ncols() != 4, "Expected a 4 by 4 phase matrix, got {:B,}", x.shape())
+template <typename VectorType> Muelmat as_muelmat(const VectorType& x) {
+  ARTS_USER_ERROR_IF(x.size() != 16, "Expected 16 full phase-matrix coefficients, got {}", x.size())
   Muelmat out{0.0};
   for (Index i = 0; i < 4; ++i)
-    for (Index j = 0; j < 4; ++j) out[i, j] = x[i, j];
+    for (Index j = 0; j < 4; ++j) {
+      ARTS_USER_ERROR_IF(not std::isfinite(x[4 * i + j]),
+                         "Non-finite ARO phase-matrix coefficient at [{}, {}]: {}",
+                         i,
+                         j,
+                         x[4 * i + j])
+      out[i, j] = x[4 * i + j];
+    }
   return out;
 }
 
@@ -57,13 +65,28 @@ Numeric ze_factor(const Numeric frequency, const Numeric ze_tref, const Numeric 
 }
 
 struct OpticalProfile {
-  std::vector<PropmatVector> extinction;
+  std::vector<PropmatVector> outgoing_extinction;
+  std::vector<PropmatVector> return_extinction;
   std::vector<PropmatVector> gas_extinction;
   std::vector<PropmatVector> particle_extinction;
   std::vector<MuelmatVector> backscatter;
-  std::vector<PropmatMatrix> extinction_jac;
+  std::vector<PropmatMatrix> outgoing_extinction_jac;
+  std::vector<PropmatMatrix> return_extinction_jac;
   std::vector<MuelmatMatrix> backscatter_jac;
 };
+
+template <typename VectorType> Propmat as_propmat(const VectorType& x) {
+  ARTS_USER_ERROR_IF(x.size() != 3, "Expected three ARO extinction coefficients, got {}", x.size())
+  for (Index i = 0; i < 3; ++i)
+    ARTS_USER_ERROR_IF(not std::isfinite(x[i]), "Non-finite ARO extinction coefficient {}: {}", i, x[i])
+  return Propmat{x[0], x[1], 0.0, 0.0, 0.0, 0.0, x[2]};
+}
+
+Numeric normalized_delta_aa(Numeric aa) {
+  while (aa < -180.0) aa += 360.0;
+  while (aa > 180.0) aa -= 360.0;
+  return aa;
+}
 
 OpticalProfile optical_profile(const Workspace&                   ws,
                                const AscendingGrid&               frequency,
@@ -78,27 +101,27 @@ OpticalProfile optical_profile(const Workspace&                   ws,
   const Size nq = jac_targets.target_count();
 
   OpticalProfile out;
-  out.extinction.resize(np, PropmatVector(nf));
+  out.outgoing_extinction.resize(np, PropmatVector(nf));
+  out.return_extinction.resize(np, PropmatVector(nf));
   out.gas_extinction.resize(np, PropmatVector(nf));
   out.particle_extinction.resize(np, PropmatVector(nf));
   out.backscatter.resize(np, MuelmatVector(nf, Muelmat{0.0}));
-  out.extinction_jac.resize(np, PropmatMatrix(nq, nf));
+  out.outgoing_extinction_jac.resize(np, PropmatMatrix(nq, nf));
+  out.return_extinction_jac.resize(np, PropmatMatrix(nq, nf));
   out.backscatter_jac.resize(np, MuelmatMatrix(nq, nf, Muelmat{0.0}));
 
   const ArrayOfAtmPoint atm_path = forward_atm_path(ray_path, atm_field);
-  const auto            za_grid =
-      std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{180.0}));
 
   for (Size ip = 0; ip < np; ++ip) {
-    PropmatVector gas;
-    StokvecVector source;
-    PropmatMatrix gas_jac;
-    StokvecMatrix source_jac;
+    PropmatVector gas_return;
+    StokvecVector source_return;
+    PropmatMatrix gas_return_jac;
+    StokvecMatrix source_return_jac;
     spectral_propmat_agendaExecute(ws,
-                                   gas,
-                                   source,
-                                   gas_jac,
-                                   source_jac,
+                                   gas_return,
+                                   source_return,
+                                   gas_return_jac,
+                                   source_return_jac,
                                    frequency,
                                    Vector3{0.0, 0.0, 0.0},
                                    jac_targets,
@@ -106,30 +129,84 @@ OpticalProfile optical_profile(const Workspace&                   ws,
                                    ray_path[ip],
                                    atm_path[ip],
                                    spectral_propmat_agenda);
-    ARTS_USER_ERROR_IF(gas.size() != nf, "spectral_propmat_agenda returned {} frequencies, expected {}", gas.size(), nf)
+    PropagationPathPoint outgoing_point = ray_path[ip];
+    outgoing_point.los                  = path::mirror(outgoing_point.los);
+    PropmatVector gas_outgoing;
+    StokvecVector source_outgoing;
+    PropmatMatrix gas_outgoing_jac;
+    StokvecMatrix source_outgoing_jac;
+    spectral_propmat_agendaExecute(ws,
+                                   gas_outgoing,
+                                   source_outgoing,
+                                   gas_outgoing_jac,
+                                   source_outgoing_jac,
+                                   frequency,
+                                   Vector3{0.0, 0.0, 0.0},
+                                   jac_targets,
+                                   {},
+                                   outgoing_point,
+                                   atm_path[ip],
+                                   spectral_propmat_agenda);
+    ARTS_USER_ERROR_IF(gas_return.size() != nf or gas_outgoing.size() != nf,
+                       "spectral_propmat_agenda returned inconsistent frequency dimensions")
 
-    const auto bulk = scattering_species.get_bulk_scattering_properties_tro_gridded(atm_path[ip], frequency, za_grid);
-    ARTS_USER_ERROR_IF(not bulk.phase_matrix.has_value(),
+    // Propagation-path LOS is the propagation direction toward the receiver;
+    // its mirror is the transmitted propagation direction.  ARO phase
+    // matrices take the latter as incident and the former as scattered.
+    const Vector2 receive_los  = ray_path[ip].los;
+    const Vector2 transmit_los = outgoing_point.los;
+    // Azimuth is undefined at zenith and nadir.  Use its canonical value at
+    // either pole to avoid a 0*NaN rotation without changing the scattering
+    // angle or the physical polarization basis.
+    const auto   at_pole = [](const Numeric za) { return std::abs(std::sin(za * Constant::pi / 180.0)) < 1e-12; };
+    const Vector delta_aa{at_pole(transmit_los[0]) or at_pole(receive_los[0])
+                              ? 0.0
+                              : normalized_delta_aa(receive_los[1] - transmit_los[1])};
+    auto         receive_za =
+        std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{receive_los[0]}));
+    const auto bulk_outgoing = scattering_species.get_bulk_scattering_properties_aro_gridded(
+        atm_path[ip], frequency, Vector{transmit_los[0]}, delta_aa, receive_za);
+    auto transmit_za =
+        std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{transmit_los[0]}));
+    const auto bulk_return = scattering_species.get_bulk_scattering_properties_aro_gridded(
+        atm_path[ip], frequency, Vector{receive_los[0]}, Vector{0.0}, transmit_za);
+    ARTS_USER_ERROR_IF(not bulk_outgoing.phase_matrix.has_value(),
                        "Radar single scattering requires phase matrices from all scattering species")
 
-    const auto& phase = *bulk.phase_matrix;
+    const auto& phase                      = *bulk_outgoing.phase_matrix;
+    const auto  phase_coeffs               = phase.get_const_coeff_vector_view();
+    const auto  outgoing_extinction_coeffs = bulk_outgoing.extinction_matrix.get_const_coeff_vector_view();
+    const auto  return_extinction_coeffs   = bulk_return.extinction_matrix.get_const_coeff_vector_view();
     for (Size iv = 0; iv < nf; ++iv) {
-      out.gas_extinction[ip][iv]       = gas[iv];
-      out.particle_extinction[ip][iv]  = Propmat{bulk.extinction_matrix[0, iv, 0]};
-      out.extinction[ip][iv]           = gas[iv];
-      out.extinction[ip][iv]          += pext_scaling * out.particle_extinction[ip][iv];
-      out.backscatter[ip][iv]          = as_muelmat(scattering::expand_phase_matrix(phase[0, iv, 0, joker]));
+      out.gas_extinction[ip][iv]       = gas_outgoing[iv];
+      out.particle_extinction[ip][iv]  = as_propmat(outgoing_extinction_coeffs[0, iv, 0]);
+      out.outgoing_extinction[ip][iv]  = gas_outgoing[iv];
+      out.outgoing_extinction[ip][iv] += pext_scaling * out.particle_extinction[ip][iv];
+      out.return_extinction[ip][iv]    = gas_return[iv];
+      out.return_extinction[ip][iv]   += pext_scaling * as_propmat(return_extinction_coeffs[0, iv, 0]);
+      out.backscatter[ip][iv]          = as_muelmat(phase_coeffs[0, iv, 0, 0, 0]);
     }
     for (const auto& target : jac_targets.atm) {
-      const auto dbulk = scattering_species.get_bulk_scattering_properties_tro_gridded_derivative(
-          atm_path[ip], frequency, za_grid, target.type);
-      ARTS_USER_ERROR_IF(not dbulk.phase_matrix, "Radar derivatives require scattering phase matrices")
+      auto receive_za_jac =
+          std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{receive_los[0]}));
+      const auto dbulk_outgoing = scattering_species.get_bulk_scattering_properties_aro_gridded_derivative(
+          atm_path[ip], frequency, Vector{transmit_los[0]}, delta_aa, receive_za_jac, target.type);
+      auto transmit_za_jac =
+          std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{transmit_los[0]}));
+      const auto dbulk_return = scattering_species.get_bulk_scattering_properties_aro_gridded_derivative(
+          atm_path[ip], frequency, Vector{receive_los[0]}, Vector{0.0}, transmit_za_jac, target.type);
+      ARTS_USER_ERROR_IF(not dbulk_outgoing.phase_matrix, "Radar derivatives require scattering phase matrices")
+      const auto dphase_coeffs               = dbulk_outgoing.phase_matrix->get_const_coeff_vector_view();
+      const auto doutgoing_extinction_coeffs = dbulk_outgoing.extinction_matrix.get_const_coeff_vector_view();
+      const auto dreturn_extinction_coeffs   = dbulk_return.extinction_matrix.get_const_coeff_vector_view();
       for (Size iv = 0; iv < nf; ++iv) {
-        out.extinction_jac[ip][target.target_pos, iv] = gas_jac[target.target_pos, iv];
-        out.extinction_jac[ip][target.target_pos, iv] +=
-            pext_scaling * Propmat{dbulk.extinction_matrix[0, iv, 0]};
-        out.backscatter_jac[ip][target.target_pos, iv] =
-            as_muelmat(scattering::expand_phase_matrix((*dbulk.phase_matrix)[0, iv, 0, joker]));
+        out.outgoing_extinction_jac[ip][target.target_pos, iv] = gas_outgoing_jac[target.target_pos, iv];
+        out.outgoing_extinction_jac[ip][target.target_pos, iv] +=
+            pext_scaling * as_propmat(doutgoing_extinction_coeffs[0, iv, 0]);
+        out.return_extinction_jac[ip][target.target_pos, iv] = gas_return_jac[target.target_pos, iv];
+        out.return_extinction_jac[ip][target.target_pos, iv] +=
+            pext_scaling * as_propmat(dreturn_extinction_coeffs[0, iv, 0]);
+        out.backscatter_jac[ip][target.target_pos, iv] = as_muelmat(dphase_coeffs[0, iv, 0, 0, 0]);
       }
     }
   }
@@ -263,23 +340,19 @@ RadarResult radar_forward(const Workspace&                       ws,
     const Size  iposlos   = simulation.iposlos;
     if (ray_path.size() < 2) continue;
 
-    const OpticalProfile optical = optical_profile(ws,
-                                                   frequency,
-                                                   ray_path,
-                                                   atm_field,
-                                                   scattering_species,
-                                                   spectral_propmat_agenda,
-                                                   jac_targets,
-                                                   pext_scaling);
+    const OpticalProfile optical = optical_profile(
+        ws, frequency, ray_path, atm_field, scattering_species, spectral_propmat_agenda, jac_targets, pext_scaling);
     const Size np = ray_path.size();
     const Size nf = frequency.size();
 
-    std::vector<StokvecVector> attenuated(np, StokvecVector(nf));
-    std::vector<StokvecVector> unattenuated(np, StokvecVector(nf));
-    std::vector<StokvecVector> gas_ext(np, StokvecVector(nf));
-    std::vector<StokvecVector> particle_ext(np, StokvecVector(nf));
-    std::vector<Muelmat>       cumulative(nf, Muelmat::id());
-    std::vector<MuelmatMatrix> cumulative_jac(nf, MuelmatMatrix(np, nq, Muelmat{0.0}));
+    std::vector<StokvecVector>              attenuated(np, StokvecVector(nf));
+    std::vector<StokvecVector>              unattenuated(np, StokvecVector(nf));
+    std::vector<StokvecVector>              gas_ext(np, StokvecVector(nf));
+    std::vector<StokvecVector>              particle_ext(np, StokvecVector(nf));
+    std::vector<Muelmat>                    outgoing_transmission(nf, Muelmat::id());
+    std::vector<Muelmat>                    return_transmission(nf, Muelmat::id());
+    std::vector<MuelmatMatrix>              outgoing_transmission_jac(nf, MuelmatMatrix(np, nq, Muelmat{0.0}));
+    std::vector<MuelmatMatrix>              return_transmission_jac(nf, MuelmatMatrix(np, nq, Muelmat{0.0}));
     std::vector<std::vector<StokvecVector>> attenuated_jac(
         np * nq, std::vector<StokvecVector>(np, StokvecVector(nf, Stokvec{0.0})));
 
@@ -287,45 +360,71 @@ RadarResult radar_forward(const Workspace&                       ws,
       if (ip > 0) {
         const Numeric ds = path::distance(ray_path[ip - 1].pos, ray_path[ip].pos, surf_field.ellipsoid);
         for (Size iv = 0; iv < nf; ++iv) {
-          const Muelmat previous = cumulative[iv];
-          const rtepack::tran segment(optical.extinction[ip - 1][iv], optical.extinction[ip][iv], ds);
-          const Muelmat transmission = segment();
+          const Muelmat       previous_outgoing = outgoing_transmission[iv];
+          const Muelmat       previous_return   = return_transmission[iv];
+          const rtepack::tran outgoing_segment(
+              optical.outgoing_extinction[ip - 1][iv], optical.outgoing_extinction[ip][iv], ds);
+          const rtepack::tran return_segment(
+              optical.return_extinction[ip][iv], optical.return_extinction[ip - 1][iv], ds);
+          const Muelmat outgoing_segment_transmission = outgoing_segment();
+          const Muelmat return_segment_transmission   = return_segment();
           for (Size jp = 0; jp < np; ++jp)
-            for (Size iq = 0; iq < nq; ++iq)
-              cumulative_jac[iv][jp, iq] = transmission * cumulative_jac[iv][jp, iq];
+            for (Size iq = 0; iq < nq; ++iq) {
+              outgoing_transmission_jac[iv][jp, iq] =
+                  outgoing_segment_transmission * outgoing_transmission_jac[iv][jp, iq];
+              return_transmission_jac[iv][jp, iq] = return_transmission_jac[iv][jp, iq] * return_segment_transmission;
+            }
           for (Size iq = 0; iq < nq; ++iq) {
-            cumulative_jac[iv][ip - 1, iq] +=
-                segment.deriv(transmission,
-                              optical.extinction[ip - 1][iv],
-                              optical.extinction[ip][iv],
-                              optical.extinction_jac[ip - 1][iq, iv],
-                              ds,
-                              0.0) * previous;
-            cumulative_jac[iv][ip, iq] +=
-                segment.deriv(transmission,
-                              optical.extinction[ip - 1][iv],
-                              optical.extinction[ip][iv],
-                              optical.extinction_jac[ip][iq, iv],
-                              ds,
-                              0.0) * previous;
+            outgoing_transmission_jac[iv][ip - 1, iq] +=
+                outgoing_segment.deriv(outgoing_segment_transmission,
+                                       optical.outgoing_extinction[ip - 1][iv],
+                                       optical.outgoing_extinction[ip][iv],
+                                       optical.outgoing_extinction_jac[ip - 1][iq, iv],
+                                       ds,
+                                       0.0) *
+                previous_outgoing;
+            outgoing_transmission_jac[iv][ip, iq] += outgoing_segment.deriv(outgoing_segment_transmission,
+                                                                            optical.outgoing_extinction[ip - 1][iv],
+                                                                            optical.outgoing_extinction[ip][iv],
+                                                                            optical.outgoing_extinction_jac[ip][iq, iv],
+                                                                            ds,
+                                                                            0.0) *
+                                                     previous_outgoing;
+            return_transmission_jac[iv][ip - 1, iq] +=
+                previous_return * return_segment.deriv(return_segment_transmission,
+                                                       optical.return_extinction[ip][iv],
+                                                       optical.return_extinction[ip - 1][iv],
+                                                       optical.return_extinction_jac[ip - 1][iq, iv],
+                                                       ds,
+                                                       0.0);
+            return_transmission_jac[iv][ip, iq] +=
+                previous_return * return_segment.deriv(return_segment_transmission,
+                                                       optical.return_extinction[ip][iv],
+                                                       optical.return_extinction[ip - 1][iv],
+                                                       optical.return_extinction_jac[ip][iq, iv],
+                                                       ds,
+                                                       0.0);
           }
-          cumulative[iv] = transmission * previous;
+          outgoing_transmission[iv] = outgoing_segment_transmission * previous_outgoing;
+          return_transmission[iv]   = previous_return * return_segment_transmission;
         }
       }
       for (Size iv = 0; iv < nf; ++iv) {
         unattenuated[ip][iv] = optical.backscatter[ip][iv] * transmitted;
-        attenuated[ip][iv]   = cumulative[iv] * (optical.backscatter[ip][iv] * (cumulative[iv] * transmitted));
+        attenuated[ip][iv]   = rtepack::radar_return(
+            return_transmission[iv], optical.backscatter[ip][iv], outgoing_transmission[iv], transmitted);
         gas_ext[ip][iv]      = Stokvec{optical.gas_extinction[ip][iv].A(), 0.0, 0.0, 0.0};
         particle_ext[ip][iv] = Stokvec{pext_scaling * optical.particle_extinction[ip][iv].A(), 0.0, 0.0, 0.0};
-        const Stokvec incoming  = cumulative[iv] * transmitted;
-        const Stokvec scattered = optical.backscatter[ip][iv] * incoming;
         for (Size jp = 0; jp < np; ++jp) {
           for (Size iq = 0; iq < nq; ++iq) {
-            const Muelmat& dtrans = cumulative_jac[iv][jp, iq];
-            Stokvec derivative = dtrans * scattered +
-                                 cumulative[iv] * (optical.backscatter[ip][iv] * (dtrans * transmitted));
-            if (jp == ip)
-              derivative += cumulative[iv] * (optical.backscatter_jac[ip][iq, iv] * incoming);
+            const Muelmat dbackscatter = jp == ip ? optical.backscatter_jac[ip][iq, iv] : Muelmat{0.0};
+            const Stokvec derivative   = rtepack::radar_return_derivative(return_transmission[iv],
+                                                                          return_transmission_jac[iv][jp, iq],
+                                                                          optical.backscatter[ip][iv],
+                                                                          dbackscatter,
+                                                                          outgoing_transmission[iv],
+                                                                          outgoing_transmission_jac[iv][jp, iq],
+                                                                          transmitted);
             attenuated_jac[jp * nq + iq][ip][iv] = derivative;
           }
         }
@@ -341,12 +440,12 @@ RadarResult radar_forward(const Workspace&                       ws,
       const auto& obsel = sensor[iy];
       if (not obsel.same_freqs(frequency)) continue;
 
-      StokvecVector bin_signal(nf, Stokvec{0.0});
-      StokvecVector bin_backscatter(nf, Stokvec{0.0});
-      StokvecVector bin_gas(nf, Stokvec{0.0});
-      StokvecVector bin_particle(nf, Stokvec{0.0});
+      StokvecVector              bin_signal(nf, Stokvec{0.0});
+      StokvecVector              bin_backscatter(nf, Stokvec{0.0});
+      StokvecVector              bin_gas(nf, Stokvec{0.0});
+      StokvecVector              bin_particle(nf, Stokvec{0.0});
       std::vector<StokvecVector> bin_jac(np * nq, StokvecVector(nf, Stokvec{0.0}));
-      bool          inside = false;
+      bool                       inside = false;
       for (Size iv = 0; iv < nf; ++iv) {
         std::vector<Stokvec> a(np), b(np), g(np), p(np);
         for (Size ip = 0; ip < np; ++ip) {
@@ -368,10 +467,8 @@ RadarResult radar_forward(const Workspace&                       ws,
           for (Size jp = 0; jp < np; ++jp) {
             for (Size iq = 0; iq < nq; ++iq) {
               std::vector<Stokvec> derivative(np);
-              for (Size kp = 0; kp < np; ++kp)
-                derivative[kp] = attenuated_jac[jp * nq + iq][kp][iv];
-              bin_jac[jp * nq + iq][iv] =
-                  factor * *bin_average(coordinate, derivative, limits[iy, 0], limits[iy, 1]);
+              for (Size kp = 0; kp < np; ++kp) derivative[kp] = attenuated_jac[jp * nq + iq][kp][iv];
+              bin_jac[jp * nq + iq][iv] = factor * *bin_average(coordinate, derivative, limits[iy, 0], limits[iy, 1]);
             }
           }
         }
@@ -428,12 +525,12 @@ RadarResult radar_forward(const Workspace&                       ws,
     for (Size iy = 0; iy < ny; ++iy) {
       if (std::isnan(out.measurement[iy])) continue;
       if (out.measurement[iy] <= ze_min) {
-        out.measurement[iy] = dbze_min;
+        out.measurement[iy]     = dbze_min;
         out.jacobian[iy, joker] = 0.0;
       } else {
-        const Numeric factor = 10.0 / (std::log(10.0) * out.measurement[iy]);
+        const Numeric factor     = 10.0 / (std::log(10.0) * out.measurement[iy]);
         out.jacobian[iy, joker] *= factor;
-        out.measurement[iy] = 10.0 * std::log10(out.measurement[iy]);
+        out.measurement[iy]      = 10.0 * std::log10(out.measurement[iy]);
       }
     }
     for (Size ia = 0; ia < aux_vars.size(); ++ia) {
@@ -602,5 +699,198 @@ void measurement_vecFromRadarSingleScattering(const Workspace&                ws
   Vector state(nx, 0.0);
   for (const auto& target : jac_targets.atm) target.update_state(state, atm_field);
   for (const auto& target : jac_targets.atm) target.update_jac(measurement_jac, state, atm_field);
+}
+ARTS_METHOD_ERROR_CATCH
+
+void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
+                                          Vector&                         model_state_vec,
+                                          Vector&                         measurement_vec_fit,
+                                          Matrix&                         measurement_jac,
+                                          AtmField&                       atm_field,
+                                          const Vector&                   measurement_vec,
+                                          const ArrayOfSensorObsel&       measurement_sensor,
+                                          const Matrix&                   radar_range_limits,
+                                          const JacobianTargets&          jac_targets,
+                                          const SurfaceField&             surf_field,
+                                          const ArrayOfScatteringSpecies& scattering_species,
+                                          const Agenda&                   ray_path_observer_agenda,
+                                          const Agenda&                   spectral_propmat_agenda,
+                                          const Stokvec&                  transmitted_stokes,
+                                          const String&                   range_mode_string,
+                                          const String&                   unit,
+                                          const Numeric&                  ze_tref,
+                                          const Numeric&                  k2,
+                                          const Numeric&                  dbze_min,
+                                          const Numeric&                  pext_scaling,
+                                          const Numeric&                  measurement_noise_floor,
+                                          const Numeric&                  state_min,
+                                          const Numeric&                  state_max,
+                                          const Numeric&                  max_step,
+                                          const Numeric&                  tolerance,
+                                          const Index&                    max_iterations,
+                                          const Index&                    max_sweeps) try {
+  ARTS_TIME_REPORT
+  const Size ny = measurement_sensor.size();
+  const Size nx = jac_targets.x_size();
+  ARTS_USER_ERROR_IF(measurement_vec.size() != ny,
+                     "measurement_vec must have one value per radar observation: expected {}, got {}",
+                     ny,
+                     measurement_vec.size())
+  ARTS_USER_ERROR_IF(radar_range_limits.nrows() != static_cast<Index>(ny) or radar_range_limits.ncols() != 2,
+                     "radar_range_limits must have shape [{}, 2], got {:B,}",
+                     ny,
+                     radar_range_limits.shape())
+  ARTS_USER_ERROR_IF(nx == 0 or jac_targets.atm.empty(),
+                     "Radar onion peeling requires at least one finalized atmospheric Jacobian target")
+  ARTS_USER_ERROR_IF(not jac_targets.surf.empty() or not jac_targets.subsurf.empty() or not jac_targets.line.empty() or
+                         not jac_targets.sensor.empty() or not jac_targets.error.empty(),
+                     "Radar onion peeling currently changes atmospheric state coordinates only")
+  ARTS_USER_ERROR_IF(state_min > state_max, "state_min ({}) exceeds state_max ({})", state_min, state_max)
+  ARTS_USER_ERROR_IF(max_step <= 0.0, "max_step must be positive, got {}", max_step)
+  ARTS_USER_ERROR_IF(tolerance <= 0.0, "tolerance must be positive, got {}", tolerance)
+  ARTS_USER_ERROR_IF(max_iterations < 1, "max_iterations must be positive, got {}", max_iterations)
+  ARTS_USER_ERROR_IF(max_sweeps < 1, "max_sweeps must be positive, got {}", max_sweeps)
+
+  // The state is deliberately obtained and applied through the normal target
+  // transformations.  The peeled profile is therefore an ordinary ARTS model
+  // state and can be passed directly to OEM (including transformed targets).
+  model_state_vec.resize(nx);
+  model_state_vec = 0.0;
+  for (const auto& target : jac_targets.atm) target.update_state(model_state_vec, atm_field);
+
+  const auto calculate = [&]() {
+    Matrix radar_aux;
+    measurement_vecFromRadarSingleScattering(ws,
+                                             measurement_vec_fit,
+                                             measurement_jac,
+                                             radar_aux,
+                                             measurement_sensor,
+                                             radar_range_limits,
+                                             jac_targets,
+                                             atm_field,
+                                             surf_field,
+                                             scattering_species,
+                                             ray_path_observer_agenda,
+                                             spectral_propmat_agenda,
+                                             transmitted_stokes,
+                                             range_mode_string,
+                                             unit,
+                                             ze_tref,
+                                             k2,
+                                             dbze_min,
+                                             pext_scaling,
+                                             {});
+  };
+
+  calculate();
+
+  // Onion order is distance from the sensor.  Distance and round-trip time
+  // already increase away from it.  For altitude gates, use the altitude of
+  // the observation geometry so both downward- and upward-looking radars are
+  // ordered correctly.  This ordering is local to every sensor geometry;
+  // interleaving independent profiles is harmless because their Jacobian
+  // blocks have zero cross-sensitivity.
+  std::vector<Size> order(ny);
+  std::iota(order.begin(), order.end(), Size{0});
+  const RadarRangeMode coordinate_mode = range_mode(range_mode_string, radar_range_limits);
+  const auto           distance_key    = [&](const Size iy) {
+    const Numeric center = std::midpoint(radar_range_limits[iy, 0], radar_range_limits[iy, 1]);
+    if (coordinate_mode != RadarRangeMode::Altitude) return center;
+    const auto& poslos = measurement_sensor[iy].poslos_grid();
+    ARTS_USER_ERROR_IF(poslos.empty(), "Radar observation {} has no position/LOS geometry", iy)
+    return std::abs(center - poslos.front().pos[0]);
+  };
+  std::stable_sort(
+      order.begin(), order.end(), [&](const Size a, const Size b) { return distance_key(a) < distance_key(b); });
+
+  std::vector<bool>                  peeled(nx, false);
+  std::vector<std::pair<Size, Size>> gate_state;
+  for (const Size iy : order) {
+    if (not std::isfinite(measurement_vec[iy]) or measurement_vec[iy] <= measurement_noise_floor) continue;
+
+    // Associate this range gate with its strongest not-yet-retrieved local
+    // atmospheric state sensitivity.  This uses the same mapped Jacobian as
+    // OEM and avoids imposing a legacy pressure-grid or two-species layout.
+    Size    ix_best = nx;
+    Numeric best    = 0.0;
+    for (Size ix = 0; ix < nx; ++ix) {
+      const Numeric sensitivity = std::abs(measurement_jac[iy, ix]);
+      if (not peeled[ix] and std::isfinite(sensitivity) and sensitivity > best) {
+        best    = sensitivity;
+        ix_best = ix;
+      }
+    }
+    if (ix_best == nx) continue;
+
+    bool converged = false;
+    for (Index iteration = 0; iteration < max_iterations; ++iteration) {
+      const Numeric residual = measurement_vec[iy] - measurement_vec_fit[iy];
+      if (std::abs(residual) <= tolerance * std::max(Numeric{1e-30}, std::abs(measurement_vec[iy]))) {
+        converged = true;
+        break;
+      }
+
+      const Numeric derivative = measurement_jac[iy, ix_best];
+      ARTS_USER_ERROR_IF(not std::isfinite(derivative) or derivative == 0.0,
+                         "Radar onion peeling encountered a zero/non-finite derivative for gate {} and state {}",
+                         iy,
+                         ix_best)
+      Numeric step             = residual / derivative;
+      step                     = std::clamp(step, -max_step, max_step);
+      model_state_vec[ix_best] = std::clamp(model_state_vec[ix_best] + step, state_min, state_max);
+      for (const auto& target : jac_targets.atm) target.update_model(atm_field, model_state_vec);
+      calculate();
+    }
+    if (not converged) {
+      const Numeric residual = measurement_vec[iy] - measurement_vec_fit[iy];
+      converged = std::abs(residual) <= tolerance * std::max(Numeric{1e-30}, std::abs(measurement_vec[iy]));
+    }
+    ARTS_USER_ERROR_IF(not converged,
+                       "Radar onion peeling did not converge for gate {} (observed {}, fitted {}) after {} iterations",
+                       iy,
+                       measurement_vec[iy],
+                       measurement_vec_fit[iy],
+                       max_iterations)
+    peeled[ix_best] = true;
+    gate_state.emplace_back(iy, ix_best);
+  }
+
+  // GeodeticField3 interpolation means adjacent model-state coordinates can
+  // weakly affect a gate already visited.  Repeated outward sweeps are the
+  // continuous-grid counterpart of ARTS2's layer-by-layer peeling and recover
+  // mutual consistency without replacing the analytical Jacobian by a table.
+  auto fit_is_converged = [&]() {
+    return std::ranges::all_of(gate_state, [&](const auto& pair) {
+      const Size    iy       = pair.first;
+      const Numeric residual = measurement_vec[iy] - measurement_vec_fit[iy];
+      return std::abs(residual) <= tolerance * std::max(Numeric{1e-30}, std::abs(measurement_vec[iy]));
+    });
+  };
+  bool all_converged = fit_is_converged();
+  for (Index sweep = 1; sweep < max_sweeps and not all_converged; ++sweep) {
+    for (const auto [iy, ix] : gate_state) {
+      for (Index iteration = 0; iteration < max_iterations; ++iteration) {
+        const Numeric residual = measurement_vec[iy] - measurement_vec_fit[iy];
+        if (std::abs(residual) <= tolerance * std::max(Numeric{1e-30}, std::abs(measurement_vec[iy]))) break;
+        const Numeric derivative = measurement_jac[iy, ix];
+        ARTS_USER_ERROR_IF(not std::isfinite(derivative) or derivative == 0.0,
+                           "Radar onion peeling encountered a zero/non-finite derivative for gate {} and state {}",
+                           iy,
+                           ix)
+        Numeric step        = std::clamp(residual / derivative, -max_step, max_step);
+        model_state_vec[ix] = std::clamp(model_state_vec[ix] + step, state_min, state_max);
+        for (const auto& target : jac_targets.atm) target.update_model(atm_field, model_state_vec);
+        calculate();
+      }
+    }
+    all_converged = fit_is_converged();
+  }
+  ARTS_USER_ERROR_IF(
+      not all_converged, "Radar onion peeling did not produce a mutually consistent fit after {} sweeps", max_sweeps)
+
+  // Ensure the returned field, fit, and Jacobian all represent precisely the
+  // returned state, ready for a subsequent OEM calculation.
+  for (const auto& target : jac_targets.atm) target.update_model(atm_field, model_state_vec);
+  calculate();
 }
 ARTS_METHOD_ERROR_CATCH

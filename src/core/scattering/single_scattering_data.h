@@ -308,15 +308,22 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
   SingleScatteringData<Numeric, Format::ARO, Representation::Gridded> to_lab_frame(
       const ScatteringDataGrids &grids) const {
     if constexpr (format == Format::ARO) { return regrid(grids); }
-    auto new_pm  = phase_matrix.transform([&grids](const auto &pm) {
-      return pm.to_lab_frame(grids.za_inc_grid, grids.aa_scat_grid, grids.za_scat_grid).regrid(grids);
+    // Interpolate the compact TRO quantities before expanding them.  The
+    // laboratory-frame grids are then already exact, avoiding both redundant
+    // work and degenerate singleton-grid interpolation at zenith/nadir.
+    const ScatteringDataGrids tf_grids(grids.t_grid, grids.f_grid);
+    auto                      new_pm = phase_matrix.transform([&](const auto &pm) {
+      // TRO's zenith grid is a scattering-angle grid, not the laboratory
+      // output-zenith grid.  Preserve it while interpolating T/f.
+      const ScatteringDataGrids tro_grids(grids.t_grid, grids.f_grid, pm.get_za_scat_grid());
+      return pm.regrid(tro_grids).to_lab_frame(grids.za_inc_grid, grids.aa_scat_grid, grids.za_scat_grid);
     });
-    auto new_em  = extinction_matrix.to_lab_frame(grids.za_inc_grid);
-    auto new_av  = absorption_vector.to_lab_frame(grids.za_inc_grid);
+    auto                      new_em = extinction_matrix.regrid(tf_grids).to_lab_frame(grids.za_inc_grid);
+    auto                      new_av = absorption_vector.regrid(tf_grids).to_lab_frame(grids.za_inc_grid);
     auto new_bsm = BackscatterMatrixData<Numeric, Format::ARO>(backscatter_matrix, grids.za_inc_grid);
     auto new_fsm = ForwardscatterMatrixData<Numeric, Format::ARO>(forwardscatter_matrix, grids.za_inc_grid);
     return SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>(
-        properties, new_pm, new_em.regrid(grids), new_av.regrid(grids), new_bsm, new_fsm);
+        properties, new_pm, new_em, new_av, new_bsm, new_fsm);
   }
 
   std::optional<ParticleProperties>                    properties;

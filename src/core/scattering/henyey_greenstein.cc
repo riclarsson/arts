@@ -63,34 +63,34 @@ HenyeyGreensteinScatterer::get_bulk_scattering_properties_tro_gridded(
 
 BulkScatteringProperties<Format::TRO, Representation::Gridded>
 HenyeyGreensteinScatterer::get_bulk_scattering_properties_tro_gridded_derivative(
-    const AtmPoint& atm_point,
-    const Vector& f_grid,
+    const AtmPoint&                  atm_point,
+    const Vector&                    f_grid,
     std::shared_ptr<ZenithAngleGrid> zenith_angle_grid,
-    const AtmKeyVal& target) const {
+    const AtmKeyVal&                 target) const {
   const auto* lookup = ext_ssa_callback.f.target<ExtinctionSSALookup>();
   ARTS_USER_ERROR_IF(not lookup,
                      "Analytical derivatives of a HenyeyGreensteinScatterer require its "
                      "extinction/SSA atmospheric-field constructor, not an arbitrary callback")
 
-  auto t_grid     = std::make_shared<Vector>(Vector{0.0});
-  auto f_grid_ptr = std::make_shared<Vector>(f_grid);
-  PhaseMatrixData<Numeric, Format::TRO, Representation::Gridded> phase{t_grid, f_grid_ptr, zenith_angle_grid};
+  auto                                                                t_grid = std::make_shared<Vector>(Vector{0.0});
+  auto                                                                f_grid_ptr = std::make_shared<Vector>(f_grid);
+  PhaseMatrixData<Numeric, Format::TRO, Representation::Gridded>      phase{t_grid, f_grid_ptr, zenith_angle_grid};
   ExtinctionMatrixData<Numeric, Format::TRO, Representation::Gridded> extinction{t_grid, f_grid_ptr};
   AbsorptionVectorData<Numeric, Format::TRO, Representation::Gridded> absorption{t_grid, f_grid_ptr};
 
-  const bool d_ext = target == AtmKeyVal{lookup->extinction_field};
-  const bool d_ssa = target == AtmKeyVal{lookup->ssa_field};
+  const bool d_ext  = target == AtmKeyVal{lookup->extinction_field};
+  const bool d_ssa  = target == AtmKeyVal{lookup->ssa_field};
   const auto angles = grid_vector(*zenith_angle_grid);
   for (Size iv = 0; iv < f_grid.size(); ++iv) {
     const auto [ext, ssa] = ext_ssa_callback(f_grid[iv], atm_point);
-    const Numeric dscat = d_ext ? ssa : (d_ssa ? ext : 0.0);
-    extinction[0, iv, 0] = d_ext ? 1.0 : 0.0;
-    absorption[0, iv, 0] = d_ext ? 1.0 - ssa : (d_ssa ? -ext : 0.0);
-    const Numeric g2 = g * g;
+    const Numeric dscat   = d_ext ? ssa : (d_ssa ? ext : 0.0);
+    extinction[0, iv, 0]  = d_ext ? 1.0 : 0.0;
+    absorption[0, iv, 0]  = d_ext ? 1.0 - ssa : (d_ssa ? -ext : 0.0);
+    const Numeric g2      = g * g;
     for (Size ia = 0; ia < angles.size(); ++ia) {
-      const Numeric p = dscat * (1.0 - g2) /
-                        (4.0 * Constant::pi *
-                         std::pow(1.0 + g2 - 2.0 * g * std::cos(Conversion::deg2rad(angles[ia])), 1.5));
+      const Numeric p =
+          dscat * (1.0 - g2) /
+          (4.0 * Constant::pi * std::pow(1.0 + g2 - 2.0 * g * std::cos(Conversion::deg2rad(angles[ia])), 1.5));
       phase[0, iv, ia, 0] = p;
       phase[0, iv, ia, 2] = p;
       phase[0, iv, ia, 3] = p;
@@ -138,6 +138,21 @@ HenyeyGreensteinScatterer::get_bulk_scattering_properties_aro_gridded(
   auto scattering_angles =
       std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(nlinspace(0.0, 180.0, 181)));
   return get_bulk_scattering_properties_tro_gridded(atm_point, f_grid, scattering_angles)
+      .to_lab_frame(
+          std::make_shared<Vector>(za_inc_grid), std::make_shared<Vector>(delta_aa_grid), std::move(za_scat_grid));
+}
+
+BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Gridded>
+HenyeyGreensteinScatterer::get_bulk_scattering_properties_aro_gridded_derivative(
+    const AtmPoint&                              atm_point,
+    const Vector&                                f_grid,
+    const Vector&                                za_inc_grid,
+    const Vector&                                delta_aa_grid,
+    std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid,
+    const AtmKeyVal&                             target) const {
+  auto scattering_angles =
+      std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(nlinspace(0.0, 180.0, 181)));
+  return get_bulk_scattering_properties_tro_gridded_derivative(atm_point, f_grid, std::move(scattering_angles), target)
       .to_lab_frame(
           std::make_shared<Vector>(za_inc_grid), std::make_shared<Vector>(delta_aa_grid), std::move(za_scat_grid));
 }

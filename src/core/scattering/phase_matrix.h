@@ -611,23 +611,42 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::TRO,
     PhaseMatrixDataLabFrame result(t_grid_, f_grid_, za_inc_grid, delta_aa_grid, za_scat_grid_new);
 
     for (Size i_za_inc = 0; i_za_inc < za_inc_grid->size(); ++i_za_inc) {
-      GridPos angle_interp;
       for (Size i_delta_aa = 0; i_delta_aa < delta_aa_grid->size(); ++i_delta_aa) {
         for (Index i_za_scat = 0; i_za_scat < grid_size(*za_scat_grid_new); ++i_za_scat) {
           std::array<Scalar, 5> coeffs = detail::rotation_coefficients(
               0.0, (*za_inc_grid)[i_za_inc], (*delta_aa_grid)[i_delta_aa], grid_vector(*za_scat_grid_new)[i_za_scat]);
 
           // On the fly interpolation of stokes components and expansion.
-          Scalar scat_angle = Conversion::rad2deg(std::get<0>(coeffs));
-          gridpos(angle_interp, grid_vector(*za_scat_grid_), scat_angle, 1e99);
+          Scalar     scat_angle    = Conversion::rad2deg(std::get<0>(coeffs));
+          const auto source_angles = grid_vector(*za_scat_grid_);
+          Index      angle0;
+          Index      angle1;
+          Scalar     weight0;
+          Scalar     weight1;
+          if (n_za_scat_ == 1 or scat_angle <= source_angles.front()) {
+            angle0 = angle1 = 0;
+            weight0         = 1.0;
+            weight1         = 0.0;
+          } else if (scat_angle >= source_angles.back()) {
+            angle0 = angle1 = n_za_scat_ - 1;
+            weight0         = 1.0;
+            weight1         = 0.0;
+          } else {
+            const auto upper = std::ranges::upper_bound(source_angles, scat_angle);
+            angle1           = static_cast<Index>(upper - source_angles.begin());
+            angle0           = angle1 - 1;
+            weight1          = (scat_angle - source_angles[angle0]) / (source_angles[angle1] - source_angles[angle0]);
+            weight0          = 1.0 - weight1;
+          }
 
           Tensor3 scat_mat_interpd(n_temps_, n_freqs_, 4);
           Vector  pm_comps(n_stokes_coeffs);
           for (Index i_t = 0; i_t < n_temps_; ++i_t) {
             for (Index i_f = 0; i_f < n_freqs_; ++i_f) {
               for (Index i_s = 0; i_s < n_stokes_coeffs; ++i_s) {
-                pm_comps[i_s] = (angle_interp.fd[1] * this->operator[](i_t, i_f, angle_interp.idx, i_s) +
-                                 angle_interp.fd[0] * this->operator[](i_t, i_f, angle_interp.idx + 1, i_s));
+                pm_comps[i_s] = 0.0;
+                if (weight0 > 0.0) pm_comps[i_s] += weight0 * this->operator[](i_t, i_f, angle0, i_s);
+                if (weight1 > 0.0) pm_comps[i_s] += weight1 * this->operator[](i_t, i_f, angle1, i_s);
               }
               detail::expand_and_transform<Scalar>(result[i_t, i_f, i_za_inc, i_delta_aa, i_za_scat, joker],
                                                    pm_comps,
@@ -730,46 +749,44 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::TRO,
     auto            coeffs_this = get_const_coeff_vector_view();
     auto            coeffs_res  = result.get_coeff_vector_view();
     for (Index i_t = 0; i_t < static_cast<Index>(weights.t_grid_weights.size()); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t  = weights.t_grid_weights[i_t];
+      Numeric     w_t_l = gp_t.fd[1];
+      Numeric     w_t_r = gp_t.fd[0];
+      const Index it0   = std::clamp<Index>(gp_t.idx, 0, n_temps_ - 1);
+      const Index it1   = std::min(it0 + 1, n_temps_ - 1);
       for (Index i_f = 0; i_f < static_cast<Index>(weights.f_grid_weights.size()); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
+        GridPos     gp_f  = weights.f_grid_weights[i_f];
+        Numeric     w_f_l = gp_f.fd[1];
+        Numeric     w_f_r = gp_f.fd[0];
+        const Index if0   = std::clamp<Index>(gp_f.idx, 0, n_freqs_ - 1);
+        const Index if1   = std::min(if0 + 1, n_freqs_ - 1);
         for (Index i_za_scat = 0; i_za_scat < static_cast<Index>(weights.za_scat_grid_weights.size()); ++i_za_scat) {
-          GridPos gp_za_scat  = weights.za_scat_grid_weights[i_za_scat];
-          Numeric w_za_scat_l = gp_za_scat.fd[1];
-          Numeric w_za_scat_r = gp_za_scat.fd[0];
+          GridPos     gp_za_scat  = weights.za_scat_grid_weights[i_za_scat];
+          Numeric     w_za_scat_l = gp_za_scat.fd[1];
+          Numeric     w_za_scat_r = gp_za_scat.fd[0];
+          const Index iza0        = std::clamp<Index>(gp_za_scat.idx, 0, n_za_scat_ - 1);
+          const Index iza1        = std::min(iza0 + 1, n_za_scat_ - 1);
 
           coeffs_res[i_t, i_f, i_za_scat].setZero();
 
           if (w_t_l > 0.0) {
             if (w_f_l > 0.0) {
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_l * w_f_l * w_za_scat_l * coeffs_this[gp_t.idx, gp_f.idx, gp_za_scat.idx];
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_l * w_f_l * w_za_scat_r * coeffs_this[gp_t.idx, gp_f.idx, gp_za_scat.idx + 1];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_l * w_f_l * w_za_scat_l * coeffs_this[it0, if0, iza0];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_l * w_f_l * w_za_scat_r * coeffs_this[it0, if0, iza1];
             }
             if (w_f_r > 0.0) {
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_l * w_f_r * w_za_scat_l * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_scat.idx];
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_l * w_f_r * w_za_scat_r * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_scat.idx + 1];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_l * w_f_r * w_za_scat_l * coeffs_this[it0, if1, iza0];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_l * w_f_r * w_za_scat_r * coeffs_this[it0, if1, iza1];
             }
           }
           if (w_t_r > 0.0) {
             if (w_f_l > 0.0) {
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_r * w_f_l * w_za_scat_l * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_scat.idx];
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_r * w_f_l * w_za_scat_r * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_scat.idx + 1];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_r * w_f_l * w_za_scat_l * coeffs_this[it1, if0, iza0];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_r * w_f_l * w_za_scat_r * coeffs_this[it1, if0, iza1];
             }
             if (w_f_r > 0.0) {
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_r * w_f_r * w_za_scat_l * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_scat.idx];
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_r * w_f_r * w_za_scat_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_scat.idx + 1];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_r * w_f_r * w_za_scat_l * coeffs_this[it1, if1, iza0];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_r * w_f_r * w_za_scat_r * coeffs_this[it1, if1, iza1];
             }
           }
         }
@@ -1166,6 +1183,12 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
         reinterpret_cast<const CoeffVector *>(this->data_handle()),
         std::array<Index, 5>{this->extent(0), this->extent(1), this->extent(2), this->extent(3), this->extent(4)})};
   }
+
+  std::shared_ptr<const Vector>          get_t_grid() const { return t_grid_; }
+  std::shared_ptr<const Vector>          get_f_grid() const { return f_grid_; }
+  std::shared_ptr<const Vector>          get_za_inc_grid() const { return za_inc_grid_; }
+  std::shared_ptr<const Vector>          get_delta_aa_grid() const { return delta_aa_grid_; }
+  std::shared_ptr<const ZenithAngleGrid> get_za_scat_grid() const { return za_scat_grid_; }
 
   PhaseMatrixData &operator=(const matpack::data_t<Scalar, 6> &data) {
     ARTS_USER_ERROR_IF(data.shape()[0] != n_temps_,
