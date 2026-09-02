@@ -43,5 +43,8 @@ def recurse(path):
 path = pyarts.arts.globals.data.arts_source_dir
 if len(path) != 0:
     print(f"arts source found at {path} - commenceing test run")
-    recurse(path)
+    subs = ["tests", "examples", "doc", "python", 'src', 'testdata']
+    paths = [os.path.join(path, sub) for sub in subs]
+    for p in paths:
+        recurse(p)
     print("All XML files read successfully!")
