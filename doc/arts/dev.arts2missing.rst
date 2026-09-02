@@ -97,21 +97,6 @@ existing reflectance agenda.  The surviving ``ENABLE_FASTEM`` configure and
 link hooks are legacy integration residue; they do not provide this interface
 or an ARTS 3 implementation.
 
-Microwave gas refractivity
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**Status: Missing.**  The selected ARTS 2 ``TestRefractPlanets`` check
-exercises both the Earth-specific and general microwave gas refractivity
-models (``GasMicrowavesEarth`` and ``GasMicrowavesGeneral``).  ARTS 3 has the
-refractive ray-path machinery and a tested Harvey-98 visible/near-infrared
-water/steam refractive-index model, but no implementation of these microwave
-dry/moist-gas formulae was found.
-
-Port the supported formulae as propagation-property inputs to the common ARTS
-3 path model; do not restore atmosphere-dimensional modes or the ARTS 2
-``refr_index_air_agenda`` setup interface.  Add Earth and non-Earth reference
-cases, including a geometric-path comparison.
-
 Heating-rate diagnostic
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -186,8 +171,7 @@ transmission path through particles.  ARTS 3 can compose
 ``spectral_tramat_pathFromPath``, and
 ``spectral_radCumulativeTransmission``.  No current test composes those pieces
 into a passive-transmission regression.  Add a geometric-path particle test
-now, without reintroducing cloudbox state.  Exact parity with the ARTS 2 case
-also depends on the missing microwave gas refractivity model recorded above.
+now, without reintroducing cloudbox state.
 
 Absorption-only particle radiative transfer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

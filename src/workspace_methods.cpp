@@ -2605,6 +2605,102 @@ This is only for LTE lines in Voigt.
                                                "single_dispersion_jac"},
                                     .in     = {"jac_targets"}};
 
+  wsm_data["single_dispersionAddGasMicrowavesEarth"] = {
+      .desc =
+          R"--(Add microwave gas refractivity for an Earth-like atmosphere.
+
+This is the non-dispersive Bevis et al. (1994) model used by ARTS 2.  It
+depends on pressure, temperature, and the H2O volume-mixing ratio in
+*atm_point*.  H2O is optional and a missing H2O entry gives the dry-air value.
+
+The added value is :math:`n-1`, matching the convention consumed by
+*ray_point_back_propagation_agenda* with its ``RefractiveStepwise`` option.
+The expression is
+
+.. math::
+
+  n - 1 = \frac{k_1 (P-e) + (k_2 + k_3/T)e}{T},
+
+where :math:`e` is the water-vapour partial pressure.  The default coefficients
+are adjusted for pressure in Pa.
+
+This method contributes refractivity only.  It does not add absorption to
+*single_propmat* or derivatives to *single_dispersion_jac*.
+  )--",
+      .author    = {"Patrick Eriksson", "Richard Larsson"},
+      .out       = {"single_dispersion"},
+      .in        = {"single_dispersion", "atm_point"},
+      .gin       = {"k1", "k2", "k3"},
+      .gin_type  = {"Numeric", "Numeric", "Numeric"},
+      .gin_value = {Numeric{77.6e-8}, Numeric{70.4e-8}, Numeric{3.739e-3}},
+      .gin_desc  = {"Dry-air coefficient [K/Pa]",
+                    "Water-vapour coefficient [K/Pa]",
+                    "Water-vapour coefficient [K^2/Pa]"},
+  };
+
+  wsm_data["single_dispersionAddGasMicrowavesGeneral"] = {
+      .desc =
+          R"--(Add microwave gas refractivity for a planetary atmosphere.
+
+This is the non-dispersive Newell and Baird (1965) mixture model used by
+ARTS 2.  It supports N2, O2, CO2, H2, He, and H2O.  Every species is optional:
+only supported species present in *atm_point* contribute.  Their VMRs are
+normalized by the sum of the supported VMRs that are present.  If none are
+present, the method adds zero refractivity.
+
+Reference refractivities are scaled from 273.15 K and 760 Torr to the pressure
+and temperature in *atm_point*.  The added value is :math:`n-1`, matching the
+convention consumed by *ray_point_back_propagation_agenda* with its
+``RefractiveStepwise`` option.
+
+This method contributes refractivity only.  It does not add absorption to
+*single_propmat* or derivatives to *single_dispersion_jac*.
+  )--",
+      .author = {"Jana Mendrok", "Richard Larsson"},
+      .out    = {"single_dispersion"},
+      .in     = {"single_dispersion", "atm_point"},
+  };
+
+  wsm_data["single_propmat_agendaSetGasMicrowavesEarth"] = {
+      .desc =
+          R"--(Configure *single_propmat_agenda* for Earth microwave gas refraction.
+
+The agenda initializes all single-frequency propagation quantities and adds
+the Earth microwave gas refractivity.  Pair it with
+``ray_point_back_propagation_agendaSet(option="RefractiveStepwise")`` and a
+frequency-dependent propagation method such as
+*spectral_radClearskyEmissionFrequencyDependentPropagation*.
+
+The resulting agenda contains no absorption model.  Build a custom
+*single_propmat_agenda* when absorption and refraction are both needed.
+  )--",
+      .author    = {"Patrick Eriksson", "Richard Larsson"},
+      .out       = {"single_propmat_agenda"},
+      .gin       = {"k1", "k2", "k3"},
+      .gin_type  = {"Numeric", "Numeric", "Numeric"},
+      .gin_value = {Numeric{77.6e-8}, Numeric{70.4e-8}, Numeric{3.739e-3}},
+      .gin_desc  = {"Dry-air coefficient [K/Pa]",
+                    "Water-vapour coefficient [K/Pa]",
+                    "Water-vapour coefficient [K^2/Pa]"},
+  };
+
+  wsm_data["single_propmat_agendaSetGasMicrowavesGeneral"] = {
+      .desc =
+          R"--(Configure *single_propmat_agenda* for planetary microwave gas refraction.
+
+The agenda initializes all single-frequency propagation quantities and adds
+the general microwave gas-mixture refractivity.  Pair it with
+``ray_point_back_propagation_agendaSet(option="RefractiveStepwise")`` and a
+frequency-dependent propagation method such as
+*spectral_radClearskyEmissionFrequencyDependentPropagation*.
+
+The resulting agenda contains no absorption model.  Build a custom
+*single_propmat_agenda* when absorption and refraction are both needed.
+  )--",
+      .author = {"Jana Mendrok", "Richard Larsson"},
+      .out    = {"single_propmat_agenda"},
+  };
+
   wsm_data["single_dispersionAddWaterVisibleNIRHarvey98"] = {
       .desc =
           R"--(Add the Harvey et al. (1998) water/steam refractivity to *single_dispersion*.
