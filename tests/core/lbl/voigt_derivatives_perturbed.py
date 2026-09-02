@@ -1,672 +1,520 @@
-import pyarts3 as pyarts
+"""Finite-difference tests for LTE Voigt atmospheric and line derivatives."""
+
+import os
+
 import numpy as np
-from copy import deepcopy as copy
+import pyarts3 as pyarts
 
-# FIXME:
-if 0:
-    class Setting:
-        def __init__(self, pressure, zeeman, frange):
-            self.pressure = pressure
-            self.zeeman = zeeman
-            self.freq_grid = frange
 
-        def __repr__(self):
-            return f"Setting(pressure={self.pressure}, zeeman={self.zeeman}, freq_grid=[{self.freq_grid[0]}, ..., {self.freq_grid[-1]}])"
+LINE_F0 = 118750348044.712
+PLOT = "ARTS_HEADLESS" not in os.environ
 
-        def apply(self, ws, il):
-            ws.atm_point.pressure = self.pressure
-            ws.abs_bands[0].data.lines[il].z.on = self.zeeman
-            ws.freq_grid = self.freq_grid
-            ws.abs_bandsSetZeeman(
-                species="O2-66",
-                fmin=50474199538.7676-1e6,
-                fmax=50474199538.7676+1e6,
-                on=self.zeeman,
-            )
+PLOT_CASES = {
+    ("temperature", "spectral_propmatAddLines", "VP_LTE"),
+    ("pressure with line cutoff", "spectral_propmatMemoryIntensiveAddVoigtLTE", "VP_LTE"),
+    ("line f0", "spectral_propmatAddLines", "VP_LTE_MIRROR"),
+    ("AIR line shape G0 X0", "spectral_propmatMemoryIntensiveAddVoigtLTE", "VP_LTE"),
+    ("absent normalized broadener VMR", "spectral_propmatMemoryIntensiveAddVoigtLTE", "VP_LTE"),
+}
+PLOT_FIGURES = []
 
-        def title(self, title):
-            return (
-                f"{title}; "
-                f"pressure: {self.pressure}; "
-                f"zeeman: {self.zeeman}; "
-                f"freq_grid {self.freq_grid[0]}-{self.freq_grid[-1]}; "
-            )
 
-    def plot_data(f, dx, dx_perturbed, title, setting):
-        import matplotlib.pyplot as plt
+def plot_derivative(name, implementation, lineshape, frequency, analytic, expected):
+    if not PLOT or (name, implementation, lineshape) not in PLOT_CASES:
+        return
 
-        plt.figure(1, figsize=(8, 8))
-        plt.plot(f / 1e9, dx)
-        plt.plot(f / 1e9, dx_perturbed, ":")
-        plt.title(setting.title(title))
-        plt.show()
+    import matplotlib.pyplot as plt
 
-    def assert_similarity(f, dx, dx_perturbed, title, setting):
-        assert np.allclose(
-            dx, dx_perturbed, rtol=1e-4, atol=1e-7
-        ), f"""
-    {setting.title(title)}:
-    
-        {dx}
-    
-        {dx_perturbed}
-    """
-
-    def plot_then_assert(f, dx, dx_perturbed, title, setting):
-        plot_data(f, dx, dx_perturbed, title, setting)
-        assert_similarity(f, dx, dx_perturbed, title, setting)
-
-    def pass_fn(*args):
-        pass
-
-    compare_fn = assert_similarity
-
-    lc = 50474199538.7676
-    f1 = np.linspace(-2e6, 2e6, 10) + lc  # around the line
-    f2 = np.linspace(40e9, 70e9, 10)  # around the band
-
-    settings = [
-        Setting(p, z, f) for p in [1e5, 1e0] for z in [False, True] for f in [f1, f2]
+    components = ("A", "B", "C", "D", "U", "V", "W")
+    analytic = np.asarray(analytic)
+    expected = np.asarray(expected)
+    active = [
+        i
+        for i in range(analytic.shape[1])
+        if np.any(analytic[:, i] != 0.0) or np.any(expected[:, i] != 0.0)
     ]
 
-    ws = pyarts.Workspace()
+    figure, axes = plt.subplots(2, 1, figsize=(10, 7), sharex=True)
+    for i in active:
+        (line,) = axes[0].plot(
+            frequency / 1e9,
+            analytic[:, i],
+            "-",
+            label=f"{components[i]} analytic",
+            zorder=1,
+        )
+        axes[0].plot(
+            frequency / 1e9,
+            expected[:, i],
+            "--",
+            label=f"{components[i]} finite difference",
+            zorder=2,
+        )
+        axes[1].plot(
+            frequency / 1e9,
+            analytic[:, i] - expected[:, i],
+            color=line.get_color(),
+            label=components[i],
+        )
+    axes[0].set_ylabel("Derivative")
+    axes[0].legend(ncols=2)
+    axes[1].set_xlabel("Frequency [GHz]")
+    axes[1].set_ylabel("Analytic - finite difference")
+    axes[1].legend()
+    figure.suptitle(f"{name}: {implementation}, {lineshape}")
+    figure.tight_layout()
+    PLOT_FIGURES.append(figure)
 
+
+def workspace(lineshape="VP_LTE", zeeman=False, cutoff=False):
+    ws = pyarts.Workspace()
     ws.abs_speciesSet(species=["O2-66"])
     ws.ReadCatalogData()
-    bandkey = "O2-66 ElecStateLabel X X Lambda 0 0 S 1 1 v 0 0"
-    il = 95
-    ws.abs_bandsSelectFrequencyByBand(fmax=120e9)
-    ws.abs_bandsKeepID(id=bandkey)
+    ws.abs_bandsSelectFrequencyByLine(fmin=118.74e9, fmax=118.76e9)
+    # Cover both the Doppler core and pressure-broadened wings.  In a core-only
+    # grid, number-density and Lorentz-width pressure effects nearly cancel.
+    ws.freq_grid = np.linspace(-3e9, 3e9, 81) + LINE_F0
+    ws.atm_point.temperature = 280.0
+    ws.atm_point.pressure = 1e5
+    ws.atm_point["O2"] = 0.21
+    ws.atm_point["O2-66"] = 0.995
+    ws.select_species = "O2"
+    ws.ray_point = pyarts.arts.PropagationPathPoint()
+    ws.ray_point.los = [180.0, 0.0]
+    band = next(iter(ws.abs_bands))
+    ws.abs_bands[band].lineshape = lineshape
+    if cutoff:
+        ws.abs_bands[band].cutoff = "ByLine"
+        ws.abs_bands[band].cutoff_value = 1e9
+    line = ws.abs_bands[band].lines[0]
+    species = pyarts.arts.SpeciesEnum("O2")
+    species_model = line.ls.single_models[species]
+    for parameter in ("D0", "G", "DV"):
+        species_model[parameter] = pyarts.arts.TemperatureModel("T0", [0.0])
+    line.ls.single_models[species] = species_model
+    if zeeman:
+        ws.abs_bandsSetZeeman(species="O2-66", fmin=118.74e9, fmax=118.76e9)
+        ws.WignerInit()
+        ws.atm_point.mag = [30e-6, 20e-6, 10e-6]
+    return ws
 
-    # Write some data to fields that does not exist
-    x = pyarts.arts.TemperatureModel("T0")
-    ws.abs_bands[0].data.lines[il].ls.single_models[0]["D0"] = x
-    ws.abs_bands[0].data.lines[il].ls.single_models[0]["DV"] = x
-    ws.abs_bands[0].data.lines[il].ls.single_models[0]["G"] = x
-    ws.abs_bands[0].data.lines[il].ls.single_models[1]["D0"] = x
-    ws.abs_bands[0].data.lines[il].ls.single_models[1]["DV"] = x
-    ws.abs_bands[0].data.lines[il].ls.single_models[1]["G"] = x
 
-    assert np.allclose(ws.abs_bands[0].data.lines[il].f0, lc), (
-        "Line has changed, test is broken! "
-        + f"lc should be set to {ws.abs_bands[0].data.lines[il].f0}"
+def calculate(ws, implementation):
+    ws.spectral_propmatInit()
+    getattr(ws, implementation)(no_negative_absorption=False)
+    return np.array(ws.spectral_propmat)
+
+
+def check(
+    name,
+    implementation,
+    add_target,
+    get_value,
+    set_value,
+    step,
+    lineshape="VP_LTE",
+    tolerance=5e-3,
+    zeeman=False,
+    cutoff=False,
+):
+    ws = workspace(lineshape, zeeman, cutoff)
+    ws.jac_targetsInit()
+    add_target(ws)
+    calculate(ws, implementation)
+    analytic = np.array(ws.spectral_propmat_jac)[0]
+
+    original = get_value(ws)
+    set_value(ws, original + step)
+    plus = calculate(ws, implementation)
+    set_value(ws, original - step)
+    minus = calculate(ws, implementation)
+    set_value(ws, original)
+    expected = (plus - minus) / (2.0 * step)
+
+    plot_derivative(
+        name,
+        implementation,
+        lineshape,
+        np.asarray(ws.freq_grid),
+        analytic,
+        expected,
     )
 
-    ws.WignerInit(symbol_type=3)
-
-    ws.jac_targets = pyarts.arts.JacobianTargets()
-    ws.atm_pointInit()
-    ws.atm_point.temperature = 295  # At room temperature
-    ws.atm_point[pyarts.arts.SpeciesEnum("Oxygen")] = (
-        0.21  # At 21% atmospheric Oxygen
+    error = np.linalg.norm(analytic - expected)
+    relative_error = error / max(np.linalg.norm(expected), 1e-300)
+    assert relative_error < tolerance, (
+        f"{name} using {implementation}/{lineshape}: relative finite-difference "
+        f"error {relative_error:.3e} exceeds {tolerance:.3e}; analytic norm "
+        f"{np.linalg.norm(analytic):.3e}, expected norm {np.linalg.norm(expected):.3e}"
     )
-    ws.atm_point.mag = [40e-6, 20e-6, 10e-6]
-    ws.ray_point
 
-    for setting in settings:
-        print(setting.title("Running test"))
-        setting.apply(ws, il)
 
-        ws.jac_targetsInit()
-        ws.jac_targetsAddSpeciesIsotopologueRatio(species="O2-66")
-        ws.jac_targetsAddSpeciesVMR(species="O2")
-        ws.jac_targetsAddTemperature()
-        ws.jac_targetsAddWindField(component="u")
-        ws.jac_targetsAddLineParameter(
-            id=bandkey, line_index=il, parameter="f0"
+IMPLEMENTATIONS = (
+    "spectral_propmatAddLines",
+    "spectral_propmatAddVoigtLTE",
+    "spectral_propmatMemoryIntensiveAddVoigtLTE",
+)
+
+ATMOSPHERIC_TARGETS = (
+    (
+        "temperature",
+        lambda ws: ws.jac_targetsAddTemperature(),
+        lambda ws: ws.atm_point.temperature,
+        lambda ws, value: setattr(ws.atm_point, "temperature", value),
+        1e-2,
+    ),
+    (
+        "pressure",
+        lambda ws: ws.jac_targetsAddPressure(),
+        lambda ws: ws.atm_point.pressure,
+        lambda ws, value: setattr(ws.atm_point, "pressure", value),
+        1.0,
+    ),
+    (
+        "absorber VMR",
+        lambda ws: ws.jac_targetsAddSpeciesVMR(species="O2"),
+        lambda ws: ws.atm_point["O2"],
+        lambda ws, value: ws.atm_point.__setitem__("O2", value),
+        1e-5,
+    ),
+    (
+        "isotopologue ratio",
+        lambda ws: ws.jac_targetsAddSpeciesIsotopologueRatio(species="O2-66"),
+        lambda ws: ws.atm_point["O2-66"],
+        lambda ws, value: ws.atm_point.__setitem__("O2-66", value),
+        1e-5,
+    ),
+    (
+        "frequency/wind",
+        lambda ws: ws.jac_targetsAddWindField(component="u"),
+        lambda ws: np.array(ws.freq_grid),
+        lambda ws, value: setattr(ws, "freq_grid", value),
+        10.0,
+    ),
+)
+
+for implementation in IMPLEMENTATIONS:
+    for target in ATMOSPHERIC_TARGETS:
+        check(target[0], implementation, *target[1:])
+
+# The mirrored profile has its own implementation and must not regress separately.
+for target in ATMOSPHERIC_TARGETS:
+    check(
+        target[0],
+        "spectral_propmatAddLines",
+        *target[1:],
+        lineshape="VP_LTE_MIRROR",
+    )
+
+# Pressure derivatives have separate cutoff paths in each implementation.
+for implementation in IMPLEMENTATIONS:
+    check(
+        "pressure with line cutoff",
+        implementation,
+        *ATMOSPHERIC_TARGETS[1][1:],
+        cutoff=True,
+    )
+check(
+    "pressure with line cutoff",
+    "spectral_propmatAddLines",
+    *ATMOSPHERIC_TARGETS[1][1:],
+    lineshape="VP_LTE_MIRROR",
+    cutoff=True,
+)
+
+
+def set_magnetic_component(ws, component, value):
+    mag = np.array(ws.atm_point.mag)
+    mag[component] = value
+    ws.atm_point.mag = mag
+
+
+for implementation in IMPLEMENTATIONS:
+    check(
+        "magnetic field u",
+        implementation,
+        lambda ws: ws.jac_targetsAddMagneticField(component="u"),
+        lambda ws: ws.atm_point.mag[0],
+        lambda ws, value: set_magnetic_component(ws, 0, value),
+        1e-8,
+        tolerance=1e-1,
+        zeeman=True,
+    )
+
+check(
+    "magnetic field u",
+    "spectral_propmatAddLines",
+    lambda ws: ws.jac_targetsAddMagneticField(component="u"),
+    lambda ws: ws.atm_point.mag[0],
+    lambda ws, value: set_magnetic_component(ws, 0, value),
+    1e-8,
+    lineshape="VP_LTE_MIRROR",
+    tolerance=1e-1,
+    zeeman=True,
+)
+
+
+def band(ws):
+    return next(iter(ws.abs_bands))
+
+
+def expect_runtime_error(name, callback):
+    try:
+        callback()
+    except RuntimeError:
+        return
+    raise AssertionError(f"{name}: expected RuntimeError")
+
+
+invalid = workspace()
+invalid.jac_targetsInit()
+expect_runtime_error(
+    "negative line index",
+    lambda: invalid.jac_targetsAddLineParameter(
+        band=band(invalid), line=-1, parameter="f0"
+    ),
+)
+expect_runtime_error(
+    "unused line parameter",
+    lambda: invalid.jac_targetsAddLineParameter(
+        band=band(invalid), line=0, parameter="unused"
+    ),
+)
+expect_runtime_error(
+    "negative line-shape line index",
+    lambda: invalid.jac_targetsAddLineShapeParameter(
+        band=band(invalid),
+        line=-1,
+        species="O2",
+        parameter="G0",
+        coefficient="X0",
+    ),
+)
+expect_runtime_error(
+    "unused line-shape parameter",
+    lambda: invalid.jac_targetsAddLineShapeParameter(
+        band=band(invalid),
+        line=0,
+        species="O2",
+        parameter="unused",
+        coefficient="X0",
+    ),
+)
+expect_runtime_error(
+    "unused line-shape coefficient",
+    lambda: invalid.jac_targetsAddLineShapeParameter(
+        band=band(invalid),
+        line=0,
+        species="O2",
+        parameter="G0",
+        coefficient="unused",
+    ),
+)
+
+
+# Matrix scaling must use global target positions, even when line and
+# atmospheric targets are interleaved.
+mixed = workspace()
+mixed.jac_targetsInit()
+mixed.jac_targetsAddLineParameter(band=band(mixed), line=0, parameter="f0")
+mixed.jac_targetsAddPressure()
+mixed.jac_targetsAddWindField(component="u")
+calculate(mixed, "spectral_propmatMemoryIntensiveAddVoigtLTE")
+mixed_jac = np.array(mixed.spectral_propmat_jac)
+for position, add_target in enumerate(
+    (
+        lambda ws: ws.jac_targetsAddLineParameter(
+            band=band(ws), line=0, parameter="f0"
+        ),
+        lambda ws: ws.jac_targetsAddPressure(),
+        lambda ws: ws.jac_targetsAddWindField(component="u"),
+    )
+):
+    single = workspace()
+    single.jac_targetsInit()
+    add_target(single)
+    calculate(single, "spectral_propmatMemoryIntensiveAddVoigtLTE")
+    np.testing.assert_allclose(
+        mixed_jac[position],
+        single.spectral_propmat_jac[0],
+        err_msg=f"mixed target position {position}",
+    )
+
+for parameter, step, tolerance in (
+    ("f0", 10.0, 5e-3),
+    ("e0", 1e-24, 1e-6),
+    ("a", 1e-5, 1e-6),
+):
+    for implementation in IMPLEMENTATIONS:
+        check(
+            f"line {parameter}",
+            implementation,
+            lambda ws, parameter=parameter: ws.jac_targetsAddLineParameter(
+                band=band(ws), line=0, parameter=parameter
+            ),
+            lambda ws, parameter=parameter: getattr(
+                ws.abs_bands[band(ws)].lines[0], parameter
+            ),
+            lambda ws, value, parameter=parameter: setattr(
+                ws.abs_bands[band(ws)].lines[0], parameter, value
+            ),
+            step,
+            tolerance=tolerance,
         )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey, line_index=il, parameter="e0"
+    check(
+        f"line {parameter}",
+        "spectral_propmatAddLines",
+        lambda ws, parameter=parameter: ws.jac_targetsAddLineParameter(
+            band=band(ws), line=0, parameter=parameter
+        ),
+        lambda ws, parameter=parameter: getattr(
+            ws.abs_bands[band(ws)].lines[0], parameter
+        ),
+        lambda ws, value, parameter=parameter: setattr(
+            ws.abs_bands[band(ws)].lines[0], parameter, value
+        ),
+        step,
+        lineshape="VP_LTE_MIRROR",
+        tolerance=tolerance,
+    )
+
+
+def shape_model(ws, parameter, species="O2"):
+    line = ws.abs_bands[band(ws)].lines[0]
+    return line.ls.single_models[pyarts.arts.SpeciesEnum(species)][parameter]
+
+
+def set_shape_coefficient(ws, parameter, coefficient, value, species="O2"):
+    line = ws.abs_bands[band(ws)].lines[0]
+    species = pyarts.arts.SpeciesEnum(species)
+    species_model = line.ls.single_models[species]
+    model = species_model[parameter]
+    data = model.data
+    data[coefficient] = value
+    model.data = data
+    species_model[parameter] = model
+    line.ls.single_models[species] = species_model
+
+
+for parameter, coefficient, step, tolerance in (
+    ("G0", 0, 1e-2, 5e-3),
+    ("D0", 0, 1e-3, 3e-2),
+    ("Y", 0, 1e-10, 5e-3),
+    ("G", 0, 1e-12, 5e-3),
+    ("DV", 0, 1e-6, 3e-2),
+):
+    for implementation in IMPLEMENTATIONS:
+        check(
+            f"line shape {parameter} X{coefficient}",
+            implementation,
+            lambda ws, parameter=parameter, coefficient=coefficient: ws.jac_targetsAddLineShapeParameter(
+                band=band(ws),
+                line=0,
+                species="O2",
+                parameter=parameter,
+                coefficient=f"X{coefficient}",
+            ),
+            lambda ws, parameter=parameter, coefficient=coefficient: shape_model(
+                ws, parameter
+            ).data[coefficient],
+            lambda ws, value, parameter=parameter, coefficient=coefficient: set_shape_coefficient(
+                ws, parameter, coefficient, value
+            ),
+            step,
+            tolerance=tolerance,
         )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey, line_index=il, parameter="a"
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
+    check(
+        f"line shape {parameter} X{coefficient}",
+        "spectral_propmatAddLines",
+        lambda ws, parameter=parameter, coefficient=coefficient: ws.jac_targetsAddLineShapeParameter(
+            band=band(ws),
+            line=0,
+            species="O2",
+            parameter=parameter,
+            coefficient=f"X{coefficient}",
+        ),
+        lambda ws, parameter=parameter, coefficient=coefficient: shape_model(
+            ws, parameter
+        ).data[coefficient],
+        lambda ws, value, parameter=parameter, coefficient=coefficient: set_shape_coefficient(
+            ws, parameter, coefficient, value
+        ),
+        step,
+        lineshape="VP_LTE_MIRROR",
+        tolerance=tolerance,
+    )
+
+# The broadener selector must not silently fall back to the absorbing species.
+for implementation in IMPLEMENTATIONS:
+    check(
+        "AIR line shape G0 X0",
+        implementation,
+        lambda ws: ws.jac_targetsAddLineShapeParameter(
+            band=band(ws),
+            line=0,
+            species="AIR",
             parameter="G0",
-            species="O2",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="G0",
-            species="Bath",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="Y",
-            species="O2",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="Y",
-            species="Bath",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="D0",
-            species="O2",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="D0",
-            species="Bath",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="DV",
-            species="O2",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="DV",
-            species="Bath",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="G",
-            species="O2",
-        )
-        ws.jac_targetsAddLineParameter(
-            id=bandkey,
-            line_index=il,
-            parameter="G",
-            species="Bath",
+            coefficient="X0",
+        ),
+        lambda ws: shape_model(ws, "G0", "AIR").data[0],
+        lambda ws, value: set_shape_coefficient(ws, "G0", 0, value, "AIR"),
+        1e-2,
+    )
+
+# Exercise every non-X0 coefficient through the new typed target interface.
+for coefficient in (1, 2, 3):
+    for implementation in IMPLEMENTATIONS:
+        check(
+            f"O2 line shape Y X{coefficient}",
+            implementation,
+            lambda ws, coefficient=coefficient: ws.jac_targetsAddLineShapeParameter(
+                band=band(ws),
+                line=0,
+                species="O2",
+                parameter="Y",
+                coefficient=f"X{coefficient}",
+            ),
+            lambda ws, coefficient=coefficient: shape_model(ws, "Y").data[
+                coefficient
+            ],
+            lambda ws, value, coefficient=coefficient: set_shape_coefficient(
+                ws, "Y", coefficient, value
+            ),
+            1e-12,
         )
 
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
 
-        dpm = ws.spectral_propmat_jac * 1.0
-        pm = ws.spectral_propmat * 1.0
-        ws.jac_targetsInit()
-
-        # ISOTOPOLOGUE RATIO
-        d = 0.0001
-        key = pyarts.arts.SpeciesIsotope("O2-66")
-        ws.atm_point[key] += d
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.atm_point[key] -= d
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid,
-            dpm[0][:, 0],
-            dpm_dX[:, 0],
-            "Isotopologue ratio",
-            setting,
-        )
-
-        # VMR
-        d = 0.00001
-        key = pyarts.arts.SpeciesEnum("O2")
-        ws.atm_point[key] += d
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.atm_point[key] -= d
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(ws.freq_grid, dpm[1][:, 0], dpm_dX[:, 0], "VMR", setting)
-
-        # Temperature
-        d = 1e-6
-        key = pyarts.arts.AtmKey.t
-        ws.atm_point[key] += d
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.atm_point[key] -= d
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[2][:, 0], dpm_dX[:, 0], "Temperature", setting
-        )
-
-        # Frequency
-        d = 1e3
-        orig = ws.freq_grid * 1.0
-        ws.freq_grid = orig + d
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.freq_grid = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[3][:, 0], dpm_dX[:, 0], "Frequency", setting
-        )
-
-        # line center
-        d = 1e3
-        orig = ws.abs_bands[0].data.lines[il].f0 * 1.0
-        ws.abs_bands[0].data.lines[il].f0 += d
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].f0 = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[4][:, 0], dpm_dX[:, 0], "Line center", setting
-        )
-
-        # lower state energy
-        d = 1e-26
-        orig = ws.abs_bands[0].data.lines[il].e0 * 1.0
-        ws.abs_bands[0].data.lines[il].e0 += d
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].e0 = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid,
-            dpm[5][:, 0],
-            dpm_dX[:, 0],
-            "Lower state energy",
-            setting,
-        )
-
-        # einstein coefficient
-        d = 1e-14
-        orig = ws.abs_bands[0].data.lines[il].a * 1.0
-        ws.abs_bands[0].data.lines[il].a += d
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].a = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid,
-            dpm[6][:, 0],
-            dpm_dX[:, 0],
-            "Einstein coefficient",
-            setting,
-        )
-
-        # O2 G0 X0
-        d = 1e-1
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[0]["G0"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["G0"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["G0"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[7][:, 0], dpm_dX[:, 0], "O2 G0 X0", setting
-        )
-
-        # O2 G0 X1
-        d = 1e-4
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[0]["G0"]
-        data = copy(orig.data)
-        data[1] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["G0"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["G0"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[8][:, 0], dpm_dX[:, 0], "O2 G0 X1", setting
-        )
-
-        # Bath G0 X0
-        d = 1e-3
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["G0"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["G0"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["G0"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[9][:, 0], dpm_dX[:, 0], "Bath G0 X0", setting
-        )
-
-        # Bath G0 X1
-        d = 1e-3
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["G0"]
-        data = copy(orig.data)
-        data[1] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["G0"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["G0"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[10][:, 0], dpm_dX[:, 0], "Bath G0 X1", setting
-        )
-
-        # O2 Y X0
-        d = 1e-10
-        orig = copy(ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"])
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[11][:, 0], dpm_dX[:, 0], "O2 Y X0", setting
-        )
-
-        # O2 Y X1
-        d = 1e-10
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"]
-        data = copy(orig.data)
-        data[1] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[12][:, 0], dpm_dX[:, 0], "O2 Y X1", setting
-        )
-
-        # O2 Y X2
-        d = 1e-10
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"]
-        data = copy(orig.data)
-        data[2] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[13][:, 0], dpm_dX[:, 0], "O2 Y X2", setting
-        )
-
-        # O2 Y X3
-        d = 1e-10
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"]
-        data = copy(orig.data)
-        data[3] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["Y"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[14][:, 0], dpm_dX[:, 0], "O2 Y X3", setting
-        )
-
-        # Bath Y X0
-        d = 1e-10
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[15][:, 0], dpm_dX[:, 0], "Bath Y X0", setting
-        )
-
-        # Bath Y X1
-        d = 1e-10
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"]
-        data = copy(orig.data)
-        data[1] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[16][:, 0], dpm_dX[:, 0], "Bath Y X1", setting
-        )
-
-        # O2 Y X2
-        d = 1e-10
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"]
-        data = copy(orig.data)
-        data[2] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[17][:, 0], dpm_dX[:, 0], "Bath Y X2", setting
-        )
-
-        # O2 Y X3
-        d = 1e-10
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"]
-        data = copy(orig.data)
-        data[3] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["Y"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[18][:, 0], dpm_dX[:, 0], "Bath Y X3", setting
-        )
-
-        # O2 D0 X0
-        d = 1e-3
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[0]["D0"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["D0"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["D0"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[19][:, 0], dpm_dX[:, 0], "O2 D0 X0", setting
-        )
-
-        # Bath D0 X0
-        d = 1e-3
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["D0"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["D0"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["D0"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[20][:, 0], dpm_dX[:, 0], "Bath D0 X0", setting
-        )
-
-        # O2 DV X0
-        d = 1e-1 / ws.atm_point.pressure
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[0]["DV"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["DV"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["DV"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[21][:, 0], dpm_dX[:, 0], "O2 DV X0", setting
-        )
-
-        # Bath DV X0
-        d = 1e4 / ws.atm_point.pressure**2
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["DV"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["DV"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["DV"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[22][:, 0], dpm_dX[:, 0], "Bath DV X0", setting
-        )
-
-        # O2 G X0
-        d = 1e-3
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[0]["G"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["G"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[0]["G"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[23][:, 0], dpm_dX[:, 0], "O2 G X0", setting
-        )
-
-        # Bath G X0
-        d = 1
-        orig = ws.abs_bands[0].data.lines[il].ls.single_models[1]["G"]
-        data = copy(orig.data)
-        data[0] += d
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["G"] = (
-            pyarts.arts.TemperatureModel(orig.type, data)
-        )
-
-        ws.spectral_propmatInit()
-        ws.spectral_propmatAddLines(no_negative_absorption=False)
-
-        pm_d = ws.spectral_propmat * 1.0
-        ws.abs_bands[0].data.lines[il].ls.single_models[1]["G"] = orig
-
-        dpm_dX = (pm_d - pm) / d
-        compare_fn(
-            ws.freq_grid, dpm[24][:, 0], dpm_dX[:, 0], "Bath G X0", setting
-        )
+def add_normalized_optional_broadener_target(ws):
+    line = ws.abs_bands[band(ws)].lines[0]
+    models = line.ls.single_models
+    del models[pyarts.arts.SpeciesEnum("AIR")]
+    co2 = pyarts.arts.LineShapeSpeciesModel(
+        models[pyarts.arts.SpeciesEnum("O2")]
+    )
+    g0 = co2["G0"]
+    data = g0.data
+    data[0] *= 1.1
+    g0.data = data
+    co2["G0"] = g0
+    models[pyarts.arts.SpeciesEnum("CO2")] = co2
+    line.ls.single_models = models
+    ws.jac_targetsAddSpeciesVMR(species="CO2")
+
+
+# Without AIR/Bath, broadener mixing is normalized by the sum of the provided
+# VMRs.  CO2 is deliberately absent from AtmPoint at the linearization point.
+for implementation in IMPLEMENTATIONS:
+    check(
+        "absent normalized broadener VMR",
+        implementation,
+        add_normalized_optional_broadener_target,
+        lambda ws: 0.0,
+        lambda ws, value: ws.atm_point.__setitem__("CO2", value),
+        1e-6,
+        tolerance=1e-2,
+    )
+
+if PLOT_FIGURES:
+    import matplotlib.pyplot as plt
+
+    plt.show()

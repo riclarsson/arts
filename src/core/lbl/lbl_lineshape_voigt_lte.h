@@ -352,6 +352,14 @@ struct ComputeData {
                     const AtmPoint&          atm,
                     const ZeemanPolarization pol);
 
+  //! Sets dshape and dscl and ds and dz
+  void dp_core_calc(const SpeciesIsotope&    spec,
+                    const band_shape&        shp,
+                    const band_data&         bnd,
+                    const ConstVectorView&   f_grid,
+                    const AtmPoint&          atm,
+                    const ZeemanPolarization pol);
+
   //! Sets dshape and dscl
   void df_core_calc(const band_shape& shp, const band_data& bnd, const ConstVectorView& f_grid, const AtmPoint& atm);
 

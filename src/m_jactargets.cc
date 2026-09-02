@@ -208,6 +208,38 @@ void jac_targetsAddSpeciesIsotopologueRatio(JacobianTargets&      jac_targets,
   jac_targets.emplace_back(AtmKeyVal{species}, d);
 }
 
+void jac_targetsAddLineParameter(JacobianTargets&          jac_targets,
+                                 const QuantumIdentifier&  band,
+                                 const Index&              line,
+                                 const LineByLineVariable& parameter,
+                                 const Numeric&            d) {
+  ARTS_TIME_REPORT
+
+  ARTS_USER_ERROR_IF(line < 0, "Line index must be non-negative, got {}", line)
+  ARTS_USER_ERROR_IF(parameter == LineByLineVariable::unused, "A line parameter must be selected")
+
+  jac_targets.emplace_back(LblLineKey{.band = band, .line = static_cast<Size>(line), .var = parameter}, d);
+}
+
+void jac_targetsAddLineShapeParameter(JacobianTargets&                 jac_targets,
+                                      const QuantumIdentifier&         band,
+                                      const Index&                     line,
+                                      const SpeciesEnum&               species,
+                                      const LineShapeModelVariable&    parameter,
+                                      const LineShapeModelCoefficient& coefficient,
+                                      const Numeric&                   d) {
+  ARTS_TIME_REPORT
+
+  ARTS_USER_ERROR_IF(line < 0, "Line index must be non-negative, got {}", line)
+  ARTS_USER_ERROR_IF(parameter == LineShapeModelVariable::unused, "A line-shape parameter must be selected")
+  ARTS_USER_ERROR_IF(coefficient == LineShapeModelCoefficient::unused, "A line-shape coefficient must be selected")
+
+  jac_targets.emplace_back(
+      LblLineKey{
+          .band = band, .line = static_cast<Size>(line), .spec = species, .ls_var = parameter, .ls_coeff = coefficient},
+      d);
+}
+
 void jac_targetsAddSensorFrequencyPolyOffset(JacobianTargets&          jac_targets,
                                              const ArrayOfSensorObsel& measurement_sensor,
                                              const Numeric&            d,

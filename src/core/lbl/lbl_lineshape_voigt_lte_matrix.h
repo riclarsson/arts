@@ -23,8 +23,12 @@ void prepare(Matrix&                                mat,
              const std::span<const flat_band_data>& bands,
              const ZeemanPolarization&              pol);
 
-void str_scale(
-    ComplexMatrixView a, const AtmPoint& atm, const ConstVectorView& fs, const std::vector<bool>& df, const Size it);
+void str_scale(ComplexMatrixView        a,
+               const AtmPoint&          atm,
+               const ConstVectorView&   fs,
+               const std::vector<bool>& df,
+               const Size               it,
+               const Size               ip);
 
 void sumup(ComplexMatrixView a, const ConstMatrixView& mat, const ConstVectorView& f, const std::vector<bool>& df);
 

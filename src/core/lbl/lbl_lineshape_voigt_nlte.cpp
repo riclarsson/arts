@@ -48,30 +48,51 @@ std::pair<Numeric, Numeric> line_strength_calc(const Numeric            inv_gd,
 
 std::pair<Numeric, Numeric> dline_strength_calc_dT(
     const Numeric inv_gd, const Numeric f0, const QuantumIdentifier& qid, const line& line, const AtmPoint& atm) {
-  using Constant::h, Constant::inv_sqrt_pi;
-  using Math::pow2, Math::pow3;
+  using Constant::c, Constant::h, Constant::inv_sqrt_pi;
 
   const Numeric ru = atm[qid.upper()];
   const Numeric rl = atm[qid.lower()];
 
-  const Numeric     k      = line.nlte_k(ru, rl);
-  const Numeric     e      = line.nlte_e(ru);
-  const Numeric     f      = line.f0;
-  constexpr Numeric kB     = Constant::k;
-  const Numeric     T      = atm.temperature;
-  const Numeric     inv_b  = -std::expm1(h * f / (kB * T)) / (f * f * f);
-  const Numeric     dinv_b = -h * exp(f * h / (T * k)) / (T * T * f * f * k);
+  const Numeric k       = line.nlte_k(ru, rl);
+  const Numeric e       = line.nlte_e(ru);
+  const Numeric f       = line.f0;
+  const Numeric T       = atm.temperature;
+  const Numeric hf_kT   = h * f / (Constant::k * T);
+  const Numeric expm1_x = std::expm1(hf_kT);
+  const Numeric B       = Math::pow3(f) / expm1_x;
+  const Numeric dB_dT   = B * hf_kT * std::exp(hf_kT) / (T * expm1_x);
 
-  const Numeric dD0 = line.ls.dD0_dT(atm);
+  const Numeric dln_inv_gd = -0.5 / T - line.ls.dD0_dT(atm) / f0;
+  const Numeric pref       = inv_sqrt_pi * inv_gd * atm[qid.isot] * atm[qid.isot.spec];
 
-  const Numeric dinv_gd = inv_gd * (2 * T * dD0 + f0) / (2 * T * f0);
+  return {pref * k * dln_inv_gd, 2 * h * pref / (c * c) * ((e - k * B) * dln_inv_gd - k * dB_dT)};
+}
 
-  const Numeric r = atm[qid.isot];
-  const Numeric x = atm[qid.isot.spec];
+std::pair<Numeric, Numeric> dline_strength_calc_dlevel(const Numeric                 inv_gd,
+                                                       const QuantumIdentifier&      qid,
+                                                       const line&                   line,
+                                                       const AtmPoint&               atm,
+                                                       const QuantumLevelIdentifier& level) {
+  using Constant::c, Constant::h, Constant::inv_sqrt_pi;
 
-  //! Missing factor is c^2 f / 8pi
-  return {inv_sqrt_pi * dinv_gd * r * x * k,
-          inv_sqrt_pi * inv_gd * r * x * e * dinv_b + inv_sqrt_pi * dinv_gd * r * x * (e * inv_b - k)};
+  const Numeric f    = line.f0;
+  const Numeric B    = Math::pow3(f) / std::expm1(h * f / (Constant::k * atm.temperature));
+  const Numeric r    = atm[qid.isot];
+  const Numeric x    = atm[qid.isot.spec];
+  const Numeric pref = inv_sqrt_pi * inv_gd * r * x;
+
+  Numeric dk = 0.0;
+  Numeric de = 0.0;
+  if (level == qid.upper()) {
+    dk += line.dnlte_k_dru();
+    de += line.dnlte_e_dru();
+  }
+  if (level == qid.lower()) {
+    dk += line.dnlte_k_drl();
+    de += line.dnlte_e_drl();
+  }
+
+  return {pref * dk, 2 * h * pref * (de - dk * B) / (c * c)};
 }
 
 Numeric line_center_calc(const line& line, const AtmPoint& atm) { return line.f0 + line.ls.D0(atm); }
@@ -511,6 +532,172 @@ void ComputeData::dt_core_calc(const QuantumIdentifier& qid,
   }
 }
 
+namespace {
+void finish_generic_derivative(ComputeData&           data,
+                               const band_shape&      shape,
+                               const band_data&       band,
+                               const ConstVectorView& f_grid) {
+  if (band.cutoff.type != LineByLineCutoffType::None) {
+    shape.dT(data.dcut, data.dk, data.de_ratio, data.dz, data.dz_fac);
+    std::transform(f_grid.begin(), f_grid.end(), data.dshape.begin(), [&data, &shape](Numeric f) {
+      return shape.dT(data.dcut, data.dk, data.de_ratio, data.dz, data.dz_fac, f);
+    });
+  } else {
+    std::transform(f_grid.begin(), f_grid.end(), data.dshape.begin(), [&data, &shape](Numeric f) {
+      return shape.dT(data.dk, data.de_ratio, data.dz, data.dz_fac, f);
+    });
+  }
+}
+
+void clear_generic_derivative(ComputeData& data) {
+  data.dk       = 0.0;
+  data.de_ratio = 0.0;
+  data.dz       = 0.0;
+  data.dz_fac   = 0.0;
+}
+}  // namespace
+
+void ComputeData::dp_core_calc(const band_shape&      shp,
+                               const band_data&       bnd,
+                               const ConstVectorView& f_grid,
+                               const AtmPoint&        atm) {
+  std::transform(scl.begin(), scl.end(), dscl.begin(), [P = atm.pressure](auto x) { return x / P; });
+  clear_generic_derivative(*this);
+
+  for (Size i = 0; i < pos.size(); ++i) {
+    const auto&   line  = bnd.lines[pos[i].line];
+    const Numeric df0   = line.ls.dD0_dP(atm);
+    const Numeric ratio = -df0 / shp.lines[i].f0;
+    dk[i]               = shp.lines[i].k * ratio;
+    de_ratio[i]         = shp.lines[i].e_ratio * ratio;
+    dz[i]               = shp.lines[i].inv_gd * Complex{-df0, line.ls.dG0_dP(atm)};
+    dz_fac[i]           = ratio;
+  }
+
+  finish_generic_derivative(*this, shp, bnd, f_grid);
+}
+
+void ComputeData::dVMR_core_calc(const QuantumIdentifier& qid,
+                                 const band_shape&        shp,
+                                 const band_data&         bnd,
+                                 const ConstVectorView&   f_grid,
+                                 const AtmPoint&          atm,
+                                 const SpeciesEnum        species) {
+  clear_generic_derivative(*this);
+  const Numeric direct = species == qid.isot.spec ? 1.0 / atm[species] : 0.0;
+
+  for (Size i = 0; i < pos.size(); ++i) {
+    const auto&   line  = bnd.lines[pos[i].line];
+    const Numeric df0   = line.ls.dD0_dVMR(atm, species);
+    const Numeric ratio = direct - df0 / shp.lines[i].f0;
+    dk[i]               = shp.lines[i].k * ratio;
+    de_ratio[i]         = shp.lines[i].e_ratio * ratio;
+    dz[i]               = shp.lines[i].inv_gd * Complex{-df0, line.ls.dG0_dVMR(atm, species)};
+    dz_fac[i]           = -df0 / shp.lines[i].f0;
+  }
+
+  finish_generic_derivative(*this, shp, bnd, f_grid);
+}
+
+void ComputeData::disot_core_calc(const QuantumIdentifier& qid,
+                                  const band_shape&        shp,
+                                  const band_data&         bnd,
+                                  const ConstVectorView&   f_grid,
+                                  const AtmPoint&          atm,
+                                  const SpeciesIsotope&    species) {
+  clear_generic_derivative(*this);
+  if (species == qid.isot) {
+    const Numeric ratio = 1.0 / atm[species];
+    for (Size i = 0; i < pos.size(); ++i) {
+      dk[i]       = shp.lines[i].k * ratio;
+      de_ratio[i] = shp.lines[i].e_ratio * ratio;
+    }
+  }
+  finish_generic_derivative(*this, shp, bnd, f_grid);
+}
+
+void ComputeData::dlevel_core_calc(const QuantumIdentifier&      qid,
+                                   const band_shape&             shp,
+                                   const band_data&              bnd,
+                                   const ConstVectorView&        f_grid,
+                                   const AtmPoint&               atm,
+                                   const QuantumLevelIdentifier& level,
+                                   const ZeemanPolarization      pol) {
+  clear_generic_derivative(*this);
+  for (Size i = 0; i < pos.size(); ++i) {
+    const auto& line      = bnd.lines[pos[i].line];
+    const auto [dki, dei] = dline_strength_calc_dlevel(shp.lines[i].inv_gd, qid, line, atm, level);
+    const Numeric strength =
+        pos[i].iz == std::numeric_limits<Size>::max() ? 1.0 : line.z.Strength(line.qn, pol, pos[i].iz);
+    dk[i]       = strength * dki;
+    de_ratio[i] = strength * dei;
+  }
+  finish_generic_derivative(*this, shp, bnd, f_grid);
+}
+
+void ComputeData::dline_core_calc(const QuantumIdentifier& qid,
+                                  const band_shape&        shp,
+                                  const band_data&         bnd,
+                                  const ConstVectorView&   f_grid,
+                                  const AtmPoint&          atm,
+                                  const line_key&          key,
+                                  const ZeemanPolarization pol) {
+  clear_generic_derivative(*this);
+
+  for (Size i = 0; i < pos.size(); ++i) {
+    if (pos[i].line != key.line) continue;
+    const auto& line = bnd.lines[pos[i].line];
+    const auto& lshp = shp.lines[i];
+
+    switch (key.var) {
+      case LineByLineVariable::a:
+        dk[i]       = lshp.k / line.a;
+        de_ratio[i] = lshp.e_ratio / line.a;
+        break;
+      case LineByLineVariable::e0: break;
+      case LineByLineVariable::f0: {
+        const Numeric f     = line.f0;
+        const Numeric q     = Constant::h / (Constant::k * atm.temperature);
+        const Numeric ex    = std::exp(q * f);
+        const Numeric em1   = std::expm1(q * f);
+        const Numeric B     = Math::pow3(f) / em1;
+        const Numeric dB    = B * (3.0 / f - q * ex / em1);
+        const Numeric ru    = atm[qid.upper()];
+        const Numeric rl    = atm[qid.lower()];
+        const Numeric kval  = line.nlte_k(ru, rl);
+        const Numeric eval  = line.nlte_e(ru);
+        const Numeric dkval = -3.0 * kval / f;
+        const Numeric strength =
+            pos[i].iz == std::numeric_limits<Size>::max() ? 1.0 : line.z.Strength(line.qn, pol, pos[i].iz);
+        const Numeric pref  = strength * Constant::inv_sqrt_pi * lshp.inv_gd * atm[qid.isot] * atm[qid.isot.spec];
+        const Numeric dpref = -pref / lshp.f0;
+        dk[i]               = dpref * kval + pref * dkval;
+        de_ratio[i] =
+            2 * Constant::h / Math::pow2(Constant::c) * (dpref * (eval - kval * B) - pref * (dkval * B + kval * dB));
+        dz[i]     = -lshp.inv_gd;
+        dz_fac[i] = -1.0 / lshp.f0;
+      } break;
+      case LineByLineVariable::unused: break;
+    }
+
+    switch (key.ls_var) {
+      case LineShapeModelVariable::G0:
+        dz[i] = Complex{0.0, lshp.inv_gd * line.ls.dG0_dX(atm, key.spec, key.ls_coeff)};
+        break;
+      case LineShapeModelVariable::D0: {
+        const Numeric d = line.ls.dD0_dX(atm, key.spec, key.ls_coeff);
+        dk[i]           = -lshp.k * d / lshp.f0;
+        de_ratio[i]     = -lshp.e_ratio * d / lshp.f0;
+        dz[i]           = -lshp.inv_gd * d;
+        dz_fac[i]       = -d / lshp.f0;
+      } break;
+      default: break;
+    }
+  }
+
+  finish_generic_derivative(*this, shp, bnd, f_grid);
+}
+
 //! Sets dshape and dscl
 void ComputeData::df_core_calc(const band_shape&      shp,
                                const band_data&       bnd,
@@ -603,76 +790,78 @@ void ComputeData::dmag_w_core_calc(const band_shape&        shp,
 }
 
 namespace {
-/*
-void compute_derivative(PropmatVectorView dpm,
-                        StokvecVectorView dsv,
-                        ComputeData& com_data,
-                        const ConstVectorView& f_grid,
+void compute_derivative(PropmatVectorView        dpm,
+                        StokvecVectorView        dsv,
+                        ComputeData&             com_data,
+                        const ConstVectorView&   f_grid,
                         const QuantumIdentifier& qid,
-                        const band_shape& shape,
-                        const band_data& bnd,
-                        const AtmPoint& atm,
+                        const band_shape&        shape,
+                        const band_data&         bnd,
+                        const AtmPoint&          atm,
                         const ZeemanPolarization pol,
-                        const AtmKey& key) {
+                        const AtmKey&            key) {
   using enum AtmKey;
   switch (key) {
     case t:
       com_data.dt_core_calc(qid, shape, bnd, f_grid, atm, pol);
       for (Size i = 0; i < f_grid.size(); i++) {
-        dpm[i] += zeeman::scale(com_data.npm,
-                                com_data.dscl[i] * com_data.shape[i].first +
-                                    com_data.scl[i] * com_data.dshape[i].first);
-        const auto dsv_pm =
-            zeeman::scale(com_data.npm,
-                          com_data.dscl[i] * com_data.shape[i].second +
-                              com_data.scl[i] * com_data.dshape[i].second);
+        dpm[i] += zeeman::scale(
+            com_data.npm, com_data.dscl[i] * com_data.shape[i].first + com_data.scl[i] * com_data.dshape[i].first);
+        const auto dsv_pm = zeeman::scale(
+            com_data.npm, com_data.dscl[i] * com_data.shape[i].second + com_data.scl[i] * com_data.dshape[i].second);
         dsv[i] += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
       }
       break;
-    case p: ARTS_USER_ERROR("Not implemented, pressure derivative"); break;
+    case p:
+      com_data.dp_core_calc(shape, bnd, f_grid, atm);
+      for (Size i = 0; i < f_grid.size(); i++) {
+        dpm[i] += zeeman::scale(
+            com_data.npm, com_data.dscl[i] * com_data.shape[i].first + com_data.scl[i] * com_data.dshape[i].first);
+        const auto dsv_pm = zeeman::scale(
+            com_data.npm, com_data.dscl[i] * com_data.shape[i].second + com_data.scl[i] * com_data.dshape[i].second);
+        dsv[i] += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
+      }
+      break;
     case mag_u:
       com_data.dmag_u_core_calc(shape, bnd, f_grid, atm, pol);
       for (Size i = 0; i < f_grid.size(); i++) {
-        dpm[i] += zeeman::scale(com_data.npm,
-                                com_data.dnpm_du,
-                                com_data.scl[i] * com_data.shape[i].first,
-                                com_data.scl[i] * com_data.dshape[i].first);
-        const auto dsv_pm =
-            zeeman::scale(com_data.npm,
-                          com_data.dnpm_du,
-                          com_data.scl[i] * com_data.shape[i].second,
-                          com_data.scl[i] * com_data.dshape[i].second);
-        dsv[i] += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
+        dpm[i]            += zeeman::scale(com_data.npm,
+                                           com_data.dnpm_du,
+                                           com_data.scl[i] * com_data.shape[i].first,
+                                           com_data.scl[i] * com_data.dshape[i].first);
+        const auto dsv_pm  = zeeman::scale(com_data.npm,
+                                           com_data.dnpm_du,
+                                           com_data.scl[i] * com_data.shape[i].second,
+                                           com_data.scl[i] * com_data.dshape[i].second);
+        dsv[i]            += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
       }
       break;
     case mag_v:
       com_data.dmag_v_core_calc(shape, bnd, f_grid, atm, pol);
       for (Size i = 0; i < f_grid.size(); i++) {
-        dpm[i] += zeeman::scale(com_data.npm,
-                                com_data.dnpm_dv,
-                                com_data.scl[i] * com_data.shape[i].first,
-                                com_data.scl[i] * com_data.dshape[i].first);
-        const auto dsv_pm =
-            zeeman::scale(com_data.npm,
-                          com_data.dnpm_dv,
-                          com_data.scl[i] * com_data.shape[i].second,
-                          com_data.scl[i] * com_data.dshape[i].second);
-        dsv[i] += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
+        dpm[i]            += zeeman::scale(com_data.npm,
+                                           com_data.dnpm_dv,
+                                           com_data.scl[i] * com_data.shape[i].first,
+                                           com_data.scl[i] * com_data.dshape[i].first);
+        const auto dsv_pm  = zeeman::scale(com_data.npm,
+                                           com_data.dnpm_dv,
+                                           com_data.scl[i] * com_data.shape[i].second,
+                                           com_data.scl[i] * com_data.dshape[i].second);
+        dsv[i]            += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
       }
       break;
     case mag_w:
       com_data.dmag_w_core_calc(shape, bnd, f_grid, atm, pol);
       for (Size i = 0; i < f_grid.size(); i++) {
-        dpm[i] += zeeman::scale(com_data.npm,
-                                com_data.dnpm_dw,
-                                com_data.scl[i] * com_data.shape[i].first,
-                                com_data.scl[i] * com_data.dshape[i].first);
-        const auto dsv_pm =
-            zeeman::scale(com_data.npm,
-                          com_data.dnpm_dw,
-                          com_data.scl[i] * com_data.shape[i].second,
-                          com_data.scl[i] * com_data.dshape[i].second);
-        dsv[i] += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
+        dpm[i]            += zeeman::scale(com_data.npm,
+                                           com_data.dnpm_dw,
+                                           com_data.scl[i] * com_data.shape[i].first,
+                                           com_data.scl[i] * com_data.dshape[i].first);
+        const auto dsv_pm  = zeeman::scale(com_data.npm,
+                                           com_data.dnpm_dw,
+                                           com_data.scl[i] * com_data.shape[i].second,
+                                           com_data.scl[i] * com_data.dshape[i].second);
+        dsv[i]            += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
       }
       break;
     case wind_u:
@@ -680,30 +869,81 @@ void compute_derivative(PropmatVectorView dpm,
     case wind_w:
       com_data.df_core_calc(shape, bnd, f_grid, atm);
       for (Size i = 0; i < f_grid.size(); i++) {
-        dpm[i] += zeeman::scale(com_data.npm,
-                                com_data.dscl[i] * com_data.shape[i].first +
-                                    com_data.scl[i] * com_data.dshape[i].first);
-        const auto dsv_pm =
-            zeeman::scale(com_data.npm,
-                          com_data.dscl[i] * com_data.shape[i].second +
-                              com_data.scl[i] * com_data.dshape[i].second);
+        dpm[i] += zeeman::scale(
+            com_data.npm, com_data.dscl[i] * com_data.shape[i].first + com_data.scl[i] * com_data.dshape[i].first);
+        const auto dsv_pm = zeeman::scale(
+            com_data.npm, com_data.dscl[i] * com_data.shape[i].second + com_data.scl[i] * com_data.dshape[i].second);
         dsv[i] += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
       }
       break;
   }
 }
 
-void compute_derivative(PropmatVectorView,
-                        StokvecVectorView,
-                        ComputeData&,
-                        const ConstVectorView&,
+void add_shape_derivative(PropmatVectorView      dpm,
+                          StokvecVectorView      dsv,
+                          const ComputeData&     data,
+                          const ConstVectorView& f_grid) {
+  for (Size i = 0; i < f_grid.size(); ++i) {
+    dpm[i]            += zeeman::scale(data.npm, data.scl[i] * data.dshape[i].first);
+    const auto dsv_pm  = zeeman::scale(data.npm, data.scl[i] * data.dshape[i].second);
+    dsv[i]            += {dsv_pm.A(), dsv_pm.B(), dsv_pm.C(), dsv_pm.D()};
+  }
+}
+
+void compute_derivative(PropmatVectorView        dpm,
+                        StokvecVectorView        dsv,
+                        ComputeData&             data,
+                        const ConstVectorView&   f_grid,
                         const QuantumIdentifier& qid,
-                        const band_shape&,
-                        const band_data&,
-                        const AtmPoint&,
+                        const band_shape&        shape,
+                        const band_data&         band,
+                        const AtmPoint&          atm,
                         const ZeemanPolarization,
-                        const SpeciesIsotope& deriv_spec) {
-  ARTS_USER_ERROR_IF(deriv_spec == qid.isot, "Not supported")
+                        const SpeciesIsotope& species) {
+  data.disot_core_calc(qid, shape, band, f_grid, atm, species);
+  add_shape_derivative(dpm, dsv, data, f_grid);
+}
+
+void compute_derivative(PropmatVectorView        dpm,
+                        StokvecVectorView        dsv,
+                        ComputeData&             data,
+                        const ConstVectorView&   f_grid,
+                        const QuantumIdentifier& qid,
+                        const band_shape&        shape,
+                        const band_data&         band,
+                        const AtmPoint&          atm,
+                        const ZeemanPolarization,
+                        const SpeciesEnum& species) {
+  data.dVMR_core_calc(qid, shape, band, f_grid, atm, species);
+  add_shape_derivative(dpm, dsv, data, f_grid);
+}
+
+void compute_derivative(PropmatVectorView             dpm,
+                        StokvecVectorView             dsv,
+                        ComputeData&                  data,
+                        const ConstVectorView&        f_grid,
+                        const QuantumIdentifier&      qid,
+                        const band_shape&             shape,
+                        const band_data&              band,
+                        const AtmPoint&               atm,
+                        const ZeemanPolarization      pol,
+                        const QuantumLevelIdentifier& level) {
+  data.dlevel_core_calc(qid, shape, band, f_grid, atm, level, pol);
+  add_shape_derivative(dpm, dsv, data, f_grid);
+}
+
+void compute_derivative(PropmatVectorView        dpm,
+                        StokvecVectorView        dsv,
+                        ComputeData&             data,
+                        const ConstVectorView&   f_grid,
+                        const QuantumIdentifier& qid,
+                        const band_shape&        shape,
+                        const band_data&         band,
+                        const AtmPoint&          atm,
+                        const ZeemanPolarization pol,
+                        const line_key&          key) {
+  data.dline_core_calc(qid, shape, band, f_grid, atm, key, pol);
+  add_shape_derivative(dpm, dsv, data, f_grid);
 }
 
 void compute_derivative(PropmatVectorView,
@@ -711,33 +951,6 @@ void compute_derivative(PropmatVectorView,
                         ComputeData&,
                         const ConstVectorView&,
                         const QuantumIdentifier&,
-                        const band_shape&,
-                        const band_data&,
-                        const AtmPoint&,
-                        const ZeemanPolarization,
-                        const SpeciesEnum&) {
-  ARTS_USER_ERROR("Not supported")
-}
-
-void compute_derivative(PropmatVectorView,
-                        StokvecVectorView,
-                        ComputeData&,
-                        const ConstVectorView&,
-                        const QuantumIdentifier&,
-                        const band_shape&,
-                        const band_data&,
-                        const AtmPoint&,
-                        const ZeemanPolarization,
-                        const line_key&) {
-  ARTS_USER_ERROR("Not supported")
-}
-*/
-
-void compute_derivative(PropmatVectorView,
-                        StokvecVectorView,
-                        ComputeData&,
-                        const ConstVectorView&,
-                        const SpeciesIsotope&,
                         const band_shape&,
                         const band_data&,
                         const AtmPoint&,
@@ -769,9 +982,8 @@ void calculate(PropmatVectorView        pm_,
   const Size nf = f_grid.size();
   if (nf == 0) return;
 
-  const SpeciesIsotope spec = bnd_qid.isot;
-  const Numeric        fmin = f_grid.front();
-  const Numeric        fmax = f_grid.back();
+  const Numeric fmin = f_grid.front();
+  const Numeric fmax = f_grid.back();
 
   assert(jac_targets.target_count() == static_cast<Size>(dpm.nrows()) and
          f_grid_.size() == static_cast<Size>(dpm.ncols()));
@@ -804,7 +1016,7 @@ void calculate(PropmatVectorView        pm_,
                              dsv[atm_target.target_pos, f_range],
                              com_data,
                              f_grid,
-                             spec,
+                             bnd_qid,
                              shape,
                              bnd,
                              atm,
@@ -820,7 +1032,7 @@ void calculate(PropmatVectorView        pm_,
                          dsv[line_target.target_pos, f_range],
                          com_data,
                          f_grid,
-                         spec,
+                         bnd_qid,
                          shape,
                          bnd,
                          atm,

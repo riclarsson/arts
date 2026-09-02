@@ -137,19 +137,16 @@ Active coverage gaps
 These are not all missing implementations.  They are cases where the first
 audit cannot yet make a defensible parity claim.
 
-Line-by-line derivatives
-~~~~~~~~~~~~~~~~~~~~~~~~
+ECS line-by-line derivatives
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Status: Coverage gap, high priority.**
-``tests/core/lbl/voigt_derivatives_perturbed.py`` is registered as a CTest, but
-its substantive body is currently below ``if 0`` and does not run.  The
-Jacobian comparisons in ``voigt_lte_pure.py`` and ``voigt_lte_mem.py`` are also
-commented out.  ARTS 2 has active shape-derivative and VMR-derivative checks.
-
-Re-enable or replace these tests with small finite-difference cases that cover
-temperature, species amount, wind, magnetic field, line center/strength, and
-the supported line-shape parameters.  A test that imports successfully while
-executing no assertions must not count as port evidence.
+**Status: Missing; design deferred.**  LTE Voigt, mirrored LTE Voigt, and
+line-NLTE derivatives now have active finite-difference coverage for their
+supported atmospheric, spectroscopic-line, and line-shape targets.  ECS
+derivatives remain intentionally outside that implementation: an ECS target
+must also account for the ECS parameter set, and its derivative representation
+should be designed before adding a partial interface.  Do not treat the
+non-ECS derivative support as evidence that ECS derivatives are complete.
 
 CIA derivatives
 ~~~~~~~~~~~~~~~

@@ -789,16 +789,19 @@ spectral_dispersion_jac: {:B,}
                      spectral_propmat_jac.shape(),
                      spectral_dispersion_jac.shape());
 
-  const auto [df, it] = [m, &jac_targets]() {
+  const auto [df, it, ip] = [m, &jac_targets]() {
     std::vector<bool> v(m, false);
     Size              it = 0;
+    Size              ip = 0;
 
-    for (Size i = 0; i < jac_targets.atm.size(); i++) {
-      v[i] = Atm::is_wind(jac_targets.atm[i].type);
-      if (Atm::is_temperature(jac_targets.atm[i].type)) it = i + 1;
+    for (const auto& target : jac_targets.atm) {
+      const Size pos = target.target_pos;
+      v[pos]         = Atm::is_wind(target.type);
+      if (Atm::is_temperature(target.type)) it = pos + 1;
+      if (target.type == AtmKeyVal{AtmKey::p}) ip = pos + 1;
     }
 
-    return std::pair{v, it};
+    return std::tuple{v, it, ip};
   }();
 
   const auto types = lbl::get_cutoff_types_and_values(abs_bands);
@@ -828,7 +831,7 @@ spectral_dispersion_jac: {:B,}
         matrix::sumup(res, data, f_grid, df);
       }
 
-      matrix::str_scale(res, atm_point, f_grid, df, it);
+      matrix::str_scale(res, atm_point, f_grid, df, it, ip);
 
       const Propmat npm = lbl::zeeman::norm_view(pol, atm_point.mag, path_point.los);
 
@@ -880,7 +883,8 @@ spectral_dispersion_jac: {:B,}
             atm_target.type);
       }
 
-      for (Size j = jac_targets.atm.size(); j < m; j++) {
+      for (const auto& line_target : jac_targets.line) {
+        const Size j = line_target.target_pos;
         for (Size i = 0; i < n; i++) {
           auto v                         = res[i];
           spectral_propmat_jac[j, i]    += lbl::zeeman::scale(npm, v[j + 1]);

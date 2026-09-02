@@ -3283,6 +3283,51 @@ See *SpeciesIsotope* for valid ``species``
   };
   wsm_data["RetrievalAddSpeciesIsotopologueRatio"] = jac2ret("jac_targetsAddSpeciesIsotopologueRatio");
 
+  wsm_data["jac_targetsAddLineParameter"] = {
+      .desc      = R"--(Add a spectroscopic line parameter to *jac_targets*.
+
+The target selects one line in an *AbsorptionBands* band and one of its
+fundamental parameters, such as line center, lower-state energy, or Einstein
+coefficient.  The line index is zero-based.
+  )--",
+      .author    = {"Richard Larsson"},
+      .out       = {"jac_targets"},
+      .in        = {"jac_targets"},
+      .gin       = {"band", "line", "parameter", "d"},
+      .gin_type  = {"QuantumIdentifier", "Index", "LineByLineVariable", "Numeric"},
+      .gin_value = {std::nullopt, std::nullopt, std::nullopt, Numeric{0.0}},
+      .gin_desc  = {"Band containing the line",
+                    "Zero-based line index",
+                    "Line parameter",
+                    "Perturbation used by numerical derivative consumers"},
+  };
+
+  wsm_data["jac_targetsAddLineShapeParameter"] = {
+      .desc      = R"--(Add a line-shape model coefficient to *jac_targets*.
+
+The target selects a broadening species, line-shape parameter, and temperature
+model coefficient for one line in an *AbsorptionBands* band.  The line index is
+zero-based.
+  )--",
+      .author    = {"Richard Larsson"},
+      .out       = {"jac_targets"},
+      .in        = {"jac_targets"},
+      .gin       = {"band", "line", "species", "parameter", "coefficient", "d"},
+      .gin_type  = {"QuantumIdentifier",
+                    "Index",
+                    "SpeciesEnum",
+                    "LineShapeModelVariable",
+                    "LineShapeModelCoefficient",
+                    "Numeric"},
+      .gin_value = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, Numeric{0.0}},
+      .gin_desc  = {"Band containing the line",
+                    "Zero-based line index",
+                    "Broadening species",
+                    "Line-shape parameter",
+                    "Temperature-model coefficient",
+                    "Perturbation used by numerical derivative consumers"},
+  };
+
   wsm_data["abs_bandsReadHITRAN"] = {
       .desc =
           R"--(Reads HITRAN data from a file.
