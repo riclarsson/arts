@@ -36,6 +36,16 @@ void py_jac(py::module_& m) try {
       "x_start", &Jacobian::SurfaceTarget::x_start, "Start index of target in state vector\n\n.. :class:`Index`");
   surf.def_ro("x_size", &Jacobian::SurfaceTarget::x_size, "Size of target in state vector\n\n.. :class:`Index`");
 
+  py::class_<Jacobian::SubsurfaceTarget> subsurf(m, "JacobianSubsurfaceTarget");
+  generic_interface(subsurf);
+  subsurf.doc() = "Subsurface target";
+  subsurf.def_ro("type", &Jacobian::SubsurfaceTarget::type, "Type of target\n\n.. :class:`SubsurfaceKeyVal`");
+  subsurf.def_ro("d", &Jacobian::SubsurfaceTarget::d, "Perturbation magnitude\n\n.. :class:`Numeric`");
+  subsurf.def_ro("target_pos", &Jacobian::SubsurfaceTarget::target_pos, "Target position\n\n.. :class:`Index`");
+  subsurf.def_ro(
+      "x_start", &Jacobian::SubsurfaceTarget::x_start, "Start index of target in state vector\n\n.. :class:`Index`");
+  subsurf.def_ro("x_size", &Jacobian::SubsurfaceTarget::x_size, "Size of target in state vector\n\n.. :class:`Index`");
+
   py::class_<Jacobian::LineTarget> line(m, "JacobianLineTarget");
   generic_interface(line);
   line.doc() = "Line target";
@@ -64,19 +74,164 @@ void py_jac(py::module_& m) try {
       "x_start", &Jacobian::ErrorTarget::x_start, "Start index of target in state vector\n\n.. :class:`Index`");
   error.def_ro("x_size", &Jacobian::ErrorTarget::x_size, "Size of target in state vector\n\n.. :class:`Index`");
 
-  auto atm_targets     = py::bind_vector<std::vector<Jacobian::AtmTarget>>(m, "ArrayOfAtmTargets");
-  atm_targets.doc()    = "List of atmospheric targets";
-  auto surf_targets    = py::bind_vector<std::vector<Jacobian::SurfaceTarget>>(m, "ArrayOfSurfaceTarget");
+  const auto python_callable = [](py::object fn) {
+    if (not PyCallable_Check(fn.ptr())) throw py::type_error("Jacobian transformation must be callable or None");
+    return std::shared_ptr<py::object>(new py::object(std::move(fn)), [](py::object* ptr) {
+      if (py::is_alive()) {
+        py::gil_scoped_acquire guard;
+        delete ptr;
+      } else {
+        ptr->release();
+        delete ptr;
+      }
+    });
+  };
+
+  const auto bind_transformations = [python_callable]<typename Target, typename Context>(py::class_<Target>& target,
+                                                                                         std::type_identity<Context>) {
+    target.def_prop_rw(
+        "transform_state",
+        [](const Target& self) -> py::object {
+          if (not self.transform_state) return py::none();
+          if constexpr (std::same_as<Context, ConstVectorView>) {
+            return py::cpp_function(
+                [fn = self.transform_state](const Vector& state, const Vector& context) { return fn(state, context); });
+          } else {
+            return py::cpp_function([fn = self.transform_state](const Vector& state, const Context& context) {
+              return fn(state, context);
+            });
+          }
+        },
+        [python_callable](Target& self, py::object fn) {
+          if (fn.is_none()) {
+            self.transform_state = {};
+            return;
+          }
+          auto callable        = python_callable(std::move(fn));
+          self.transform_state = [callable = std::move(callable)](ConstVectorView state,
+                                                                  const Context&  context) -> Vector {
+            py::gil_scoped_acquire guard;
+            py::object             pycontext;
+            if constexpr (std::same_as<Context, ConstVectorView>) {
+              pycontext = py::cast(Vector{context});
+            } else {
+              pycontext = py::cast(&context, py::rv_policy::reference);
+            }
+            py::object result = (*callable)(Vector{state}, std::move(pycontext));
+            return py::cast<Vector>(py::type<Vector>()(result));
+          };
+        },
+        R"doc(Transform native target values into the model state.
+
+The callable signature is ``(native_state, context) -> model_state``.  The
+context is the complete field or data object that owns the target.)doc");
+    target.def_prop_rw(
+        "inverse_state",
+        [](const Target& self) -> py::object {
+          if (not self.inverse_state) return py::none();
+          if constexpr (std::same_as<Context, ConstVectorView>) {
+            return py::cpp_function(
+                [fn = self.inverse_state](const Vector& state, const Vector& context) { return fn(state, context); });
+          } else {
+            return py::cpp_function(
+                [fn = self.inverse_state](const Vector& state, const Context& context) { return fn(state, context); });
+          }
+        },
+        [python_callable](Target& self, py::object fn) {
+          if (fn.is_none()) {
+            self.inverse_state = {};
+            return;
+          }
+          auto callable      = python_callable(std::move(fn));
+          self.inverse_state = [callable = std::move(callable)](ConstVectorView state,
+                                                                const Context&  context) -> Vector {
+            py::gil_scoped_acquire guard;
+            py::object             pycontext;
+            if constexpr (std::same_as<Context, ConstVectorView>) {
+              pycontext = py::cast(Vector{context});
+            } else {
+              pycontext = py::cast(&context, py::rv_policy::reference);
+            }
+            py::object result = (*callable)(Vector{state}, std::move(pycontext));
+            return py::cast<Vector>(py::type<Vector>()(result));
+          };
+        },
+        R"doc(Transform model-state values back into native target values.
+
+The callable signature is ``(model_state, context) -> native_state``.  The
+context is the complete field or data object that owns the target.)doc");
+    target.def_prop_rw(
+        "inverse_jacobian",
+        [](const Target& self) -> py::object {
+          if (not self.inverse_jacobian) return py::none();
+          if constexpr (std::same_as<Context, ConstVectorView>) {
+            return py::cpp_function(
+                [fn = self.inverse_jacobian](const Matrix& jacobian, const Vector& state, const Vector& context) {
+                  return fn(jacobian, state, context);
+                });
+          } else {
+            return py::cpp_function(
+                [fn = self.inverse_jacobian](const Matrix& jacobian, const Vector& state, const Context& context) {
+                  return fn(jacobian, state, context);
+                });
+          }
+        },
+        [python_callable](Target& self, py::object fn) {
+          if (fn.is_none()) {
+            self.inverse_jacobian = {};
+            return;
+          }
+          auto callable         = python_callable(std::move(fn));
+          self.inverse_jacobian = [callable = std::move(callable)](ConstMatrixView jacobian,
+                                                                   ConstVectorView state,
+                                                                   const Context&  context) -> Matrix {
+            py::gil_scoped_acquire guard;
+            py::object             pycontext;
+            if constexpr (std::same_as<Context, ConstVectorView>) {
+              pycontext = py::cast(Vector{context});
+            } else {
+              pycontext = py::cast(&context, py::rv_policy::reference);
+            }
+            py::object result = (*callable)(Matrix{jacobian}, Vector{state}, std::move(pycontext));
+            return py::cast<Matrix>(py::type<Matrix>()(result));
+          };
+        },
+        R"doc(Transform a native-unit Jacobian into model-state units.
+
+The callable signature is ``(jacobian, model_state, context) -> jacobian`` and
+must apply the derivative of ``inverse_state`` with respect to the model
+state.)doc");
+  };
+
+  bind_transformations(atm, std::type_identity<AtmField>{});
+  bind_transformations(surf, std::type_identity<SurfaceField>{});
+  bind_transformations(subsurf, std::type_identity<SubsurfaceField>{});
+  bind_transformations(line, std::type_identity<AbsorptionBands>{});
+  bind_transformations(sensor, std::type_identity<ArrayOfSensorObsel>{});
+  bind_transformations(error, std::type_identity<ConstVectorView>{});
+
+  auto atm_targets =
+      py::bind_vector<std::vector<Jacobian::AtmTarget>, py::rv_policy::reference_internal>(m, "ArrayOfAtmTargets");
+  atm_targets.doc() = "List of atmospheric targets";
+  auto surf_targets = py::bind_vector<std::vector<Jacobian::SurfaceTarget>, py::rv_policy::reference_internal>(
+      m, "ArrayOfSurfaceTarget");
   surf_targets.doc()   = "List of surface targets";
-  auto line_targets    = py::bind_vector<std::vector<Jacobian::LineTarget>>(m, "ArrayOfLineTarget");
-  line_targets.doc()   = "List of line targets";
-  auto sensor_targets  = py::bind_vector<std::vector<Jacobian::SensorTarget>>(m, "ArrayOfSensorTarget");
+  auto subsurf_targets = py::bind_vector<std::vector<Jacobian::SubsurfaceTarget>, py::rv_policy::reference_internal>(
+      m, "ArrayOfSubsurfaceTarget");
+  subsurf_targets.doc() = "List of subsurface targets";
+  auto line_targets =
+      py::bind_vector<std::vector<Jacobian::LineTarget>, py::rv_policy::reference_internal>(m, "ArrayOfLineTarget");
+  line_targets.doc() = "List of line targets";
+  auto sensor_targets =
+      py::bind_vector<std::vector<Jacobian::SensorTarget>, py::rv_policy::reference_internal>(m, "ArrayOfSensorTarget");
   sensor_targets.doc() = "List of sensor targets";
-  auto error_targets   = py::bind_vector<std::vector<Jacobian::ErrorTarget>>(m, "ArrayOfErrorTarget");
-  error_targets.doc()  = "List of error targets";
+  auto error_targets =
+      py::bind_vector<std::vector<Jacobian::ErrorTarget>, py::rv_policy::reference_internal>(m, "ArrayOfErrorTarget");
+  error_targets.doc() = "List of error targets";
 
   generic_interface(atm_targets);
   generic_interface(surf_targets);
+  generic_interface(subsurf_targets);
   generic_interface(line_targets);
   generic_interface(sensor_targets);
   generic_interface(error_targets);

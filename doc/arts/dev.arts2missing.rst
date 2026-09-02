@@ -45,7 +45,7 @@ Initial audit snapshot
 This first snapshot was made on 2026-09-02 from ARTS 3 branch ``ai-port`` at
 ``566654276`` and an ARTS 2.6.18 source/build tree.
 
-* The configured ARTS 3 build registers 189 CTests: 30 Python examples, 127
+* The configured ARTS 3 build registers 190 CTests: 30 Python examples, 128
   Python regression tests, and 32 C++ tests.
 * The configured ARTS 2 build registers 201 CTests.  Many are paired
   ``ctlfile.*`` and ``converted.*`` executions of the same case and must not be
