@@ -124,7 +124,9 @@ void py_jac(py::module_& m) try {
         R"doc(Transform native target values into the model state.
 
 The callable signature is ``(native_state, context) -> model_state``.  The
-context is the complete field or data object that owns the target.)doc");
+context is the complete field or data object that owns the target.
+
+.. :class:`~collections.abc.Callable`)doc");
     target.def_prop_rw(
         "inverse_state",
         [](const Target& self) -> py::object {
@@ -159,7 +161,9 @@ context is the complete field or data object that owns the target.)doc");
         R"doc(Transform model-state values back into native target values.
 
 The callable signature is ``(model_state, context) -> native_state``.  The
-context is the complete field or data object that owns the target.)doc");
+context is the complete field or data object that owns the target.
+
+.. :class:`~collections.abc.Callable`)doc");
     target.def_prop_rw(
         "inverse_jacobian",
         [](const Target& self) -> py::object {
@@ -200,7 +204,9 @@ context is the complete field or data object that owns the target.)doc");
 
 The callable signature is ``(jacobian, model_state, context) -> jacobian`` and
 must apply the derivative of ``inverse_state`` with respect to the model
-state.)doc");
+state.
+
+.. :class:`~collections.abc.Callable`)doc");
   };
 
   bind_transformations(atm, std::type_identity<AtmField>{});

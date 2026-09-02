@@ -19,17 +19,17 @@ namespace Python {
 void py_surf(py::module_ &m) try {
   auto tessem = py::class_<TessemNN>(m, "TessemNN");
   tessem.def(py::init<>())
-      .def_rw("nb_inputs", &TessemNN::nb_inputs)
-      .def_rw("nb_outputs", &TessemNN::nb_outputs)
-      .def_rw("nb_cache", &TessemNN::nb_cache)
-      .def_rw("b1", &TessemNN::b1)
-      .def_rw("b2", &TessemNN::b2)
-      .def_rw("w1", &TessemNN::w1)
-      .def_rw("w2", &TessemNN::w2)
-      .def_rw("x_min", &TessemNN::x_min)
-      .def_rw("x_max", &TessemNN::x_max)
-      .def_rw("y_min", &TessemNN::y_min)
-      .def_rw("y_max", &TessemNN::y_max)
+      .def_rw("nb_inputs", &TessemNN::nb_inputs, "Number of neural-network inputs\n\n.. :class:`Index`")
+      .def_rw("nb_outputs", &TessemNN::nb_outputs, "Number of neural-network outputs\n\n.. :class:`Index`")
+      .def_rw("nb_cache", &TessemNN::nb_cache, "Number of hidden neural-network nodes\n\n.. :class:`Index`")
+      .def_rw("b1", &TessemNN::b1, "Hidden-layer biases\n\n.. :class:`Vector`")
+      .def_rw("b2", &TessemNN::b2, "Output-layer biases\n\n.. :class:`Vector`")
+      .def_rw("w1", &TessemNN::w1, "Hidden-layer weights\n\n.. :class:`Matrix`")
+      .def_rw("w2", &TessemNN::w2, "Output-layer weights\n\n.. :class:`Matrix`")
+      .def_rw("x_min", &TessemNN::x_min, "Minimum values used to scale the inputs\n\n.. :class:`Vector`")
+      .def_rw("x_max", &TessemNN::x_max, "Maximum values used to scale the inputs\n\n.. :class:`Vector`")
+      .def_rw("y_min", &TessemNN::y_min, "Minimum values used to scale the outputs\n\n.. :class:`Vector`")
+      .def_rw("y_max", &TessemNN::y_max, "Maximum values used to scale the outputs\n\n.. :class:`Vector`")
       .def(
           "__call__",
           [](const TessemNN &self, const Vector &input) { return tessem_emissivity(self, input); },
@@ -48,14 +48,14 @@ void py_surf(py::module_ &m) try {
 
   auto telsem = py::class_<TelsemAtlas>(m, "TelsemAtlas");
   telsem.def(py::init<>())
-      .def_ro("ndat", &TelsemAtlas::ndat)
-      .def_ro("nchan", &TelsemAtlas::nchan)
-      .def_ro("name", &TelsemAtlas::name)
-      .def_ro("month", &TelsemAtlas::month)
-      .def_ro("dlat", &TelsemAtlas::dlat)
-      .def("contains", &TelsemAtlas::contains, "cell_number"_a)
-      .def("cell_number", &TelsemAtlas::calc_cellnum, "lat"_a, "lon"_a)
-      .def("coordinates", &TelsemAtlas::get_coordinates, "cell_number"_a)
+      .def_ro("ndat", &TelsemAtlas::ndat, "Number of populated atlas cells\n\n.. :class:`Index`")
+      .def_ro("nchan", &TelsemAtlas::nchan, "Number of atlas channels\n\n.. :class:`Index`")
+      .def_ro("name", &TelsemAtlas::name, "Atlas name\n\n.. :class:`String`")
+      .def_ro("month", &TelsemAtlas::month, "Atlas month\n\n.. :class:`Index`")
+      .def_ro("dlat", &TelsemAtlas::dlat, "Atlas latitude resolution [degrees]\n\n.. :class:`Numeric`")
+      .def("contains", &TelsemAtlas::contains, "cell_number"_a, "Check whether an atlas cell contains data")
+      .def("cell_number", &TelsemAtlas::calc_cellnum, "lat"_a, "lon"_a, "Return the atlas cell number at a position")
+      .def("coordinates", &TelsemAtlas::get_coordinates, "cell_number"_a, "Return the coordinates of an atlas cell")
       .def("emissivity",
            &TelsemAtlas::emissivity,
            "lat"_a,
