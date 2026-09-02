@@ -24,3 +24,5 @@ and how to use existing features.
    dev.doc
    dev.xml
    dev.species
+   dev.arts2missing
+   dev.arts2notintended

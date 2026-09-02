@@ -180,10 +180,23 @@ matching :math:`f` and :math:`f^{-1}`, as well as a way to compute
 the partial derivative of :math:`f^{-1}` with regards to
 :math:`\vec{x}`.
 
-We provide several such solutions built-in to ARTS
-as listed below but it is possible to specify these
-directly from python by simply providing the three
-operators above.
+ARTS provides several such solutions built in, as listed below.  Custom
+transformations can be assigned directly to any Jacobian target from Python by
+providing its three operators:
+
+.. code-block:: python
+
+  target = ws.jac_targets.atm[-1]
+  target.transform_state = lambda t, field: A @ (t - b)
+  target.inverse_state = lambda x, field: A_inv @ x + b
+  target.inverse_jacobian = lambda J, x, field: J @ A_inv
+
+Here ``field`` is the complete owning field or data object, allowing mappings
+that need information beyond the target itself.  Each callable must return a
+vector or matrix with the same shape as the target block.  The example supports
+a general invertible affine transformation; ``A`` need not be diagonal or
+orthogonal.  The same interface can express bounded and other reversible
+functional transformations.
 
 Relative retrievals
 ^^^^^^^^^^^^^^^^^^^
