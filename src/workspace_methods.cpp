@@ -2449,6 +2449,59 @@ The reflectance matrix is
       .in     = {"freq_grid", "surf_field", "ray_point", "jac_targets"},
   };
 
+  wsm_data["TessemNNReadAscii"] = {
+      .desc = R"--(Read an original TESSEM2 neural-network parameter file.)--",
+      .author = {"The ARTS developers"},
+      .gout = {"tessem_nn"},
+      .gout_type = {"TessemNN"},
+      .gout_desc = {"The loaded TESSEM neural network."},
+      .gin = {"filename"},
+      .gin_type = {"String"},
+      .gin_value = {std::nullopt},
+      .gin_desc = {"Path to a TESSEM2 ASCII neural-network file."},
+  };
+
+  wsm_data["TelsemAtlasReadAscii"] = {
+      .desc = R"--(Read one original TELSEM2 monthly atlas file.)--",
+      .author = {"The ARTS developers"},
+      .out = {"telsem_atlas"},
+      .gin = {"filename", "month"},
+      .gin_type = {"String", "Index"},
+      .gin_value = {std::nullopt, Index{0}},
+      .gin_desc = {"Path to a TELSEM2 ASCII atlas file.", "Month represented by the atlas (0 if unspecified)."},
+  };
+
+  wsm_data["spectral_surf_reflTessem"] = {
+      .desc = R"--(Compute polarized specular ocean reflectance with TESSEM2.
+
+The method reads surface temperature from the canonical ``t`` entry and the
+properties ``"wind speed"`` [m/s] and ``"salinity"`` [kg/kg] from
+*surf_field*.  Spatially varying fields and surface Jacobian targets for all
+three inputs are supported.  Kirchhoff-consistent emission is supplied by the
+closed-surface agenda used by *spectral_radSurfaceReflectance*.
+)--",
+      .author = {"The ARTS developers"},
+      .out = {"spectral_surf_refl", "spectral_surf_refl_jac"},
+      .in = {"freq_grid", "surf_field", "ray_point", "jac_targets", "tessem_neth", "tessem_netv"},
+  };
+
+  wsm_data["spectral_surf_reflTelsem"] = {
+      .desc = R"--(Compute polarized specular land reflectance with TELSEM2.
+
+The atlas selects the surface emissivity from the ray point's latitude and
+longitude and interpolates it in frequency and incidence angle.  Set
+``max_distance`` to a positive angular distance in degrees to permit nearest
+land-cell lookup; the default requires the requested cell to exist.
+)--",
+      .author = {"The ARTS developers"},
+      .out = {"spectral_surf_refl", "spectral_surf_refl_jac"},
+      .in = {"freq_grid", "surf_field", "ray_point", "jac_targets", "telsem_atlas"},
+      .gin = {"max_distance"},
+      .gin_type = {"Numeric"},
+      .gin_value = {Numeric{-1}},
+      .gin_desc = {"Maximum nearest-atlas-cell distance [degrees], or a negative value to disable nearest lookup."},
+  };
+
   wsm_data["spectral_propmat_jacWindFix"] = {
       .desc   = R"--(Fix for the wind field derivative.
 

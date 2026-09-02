@@ -211,6 +211,8 @@ add_library(artsworkspace STATIC
   m_subsurface.cc
   m_sun.cc
   m_surface.cc
+  m_telsem.cc
+  m_tessem.cc
   m_tramat.cc
   m_wigner.cc
   sun_methods.cc

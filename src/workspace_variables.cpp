@@ -699,6 +699,21 @@ For more information, see :doc:`user.surf_field`.
       .type = "SurfaceField",
   };
 
+  wsv_data["tessem_neth"] = {
+      .desc = R"--(TESSEM neural network for horizontal-polarization emissivity.)--",
+      .type = "TessemNN",
+  };
+
+  wsv_data["tessem_netv"] = {
+      .desc = R"--(TESSEM neural network for vertical-polarization emissivity.)--",
+      .type = "TessemNN",
+  };
+
+  wsv_data["telsem_atlas"] = {
+      .desc = R"--(TELSEM monthly land-surface emissivity atlas.)--",
+      .type = "TelsemAtlas",
+  };
+
   //! Subsurface
 
   wsv_data["subsurf_field"] = {

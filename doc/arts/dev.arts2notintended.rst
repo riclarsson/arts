@@ -233,14 +233,13 @@ their presence.
 Stale optional-feature hooks
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The current tree still contains ``ENABLE_RT4``, ``ENABLE_FASTEM``, and
-``ENABLE_TMATRIX`` configure definitions, conditional link clauses for the
-three libraries, and a T-matrix enum value in
+The current tree still contains ``ENABLE_RT4`` and ``ENABLE_TMATRIX``
+configure definitions, conditional link clauses for the two libraries, and a
+T-matrix enum value in
 ``src/core/scattering/optproperties.h``.  No corresponding ARTS 3
 implementations were found in this audit.  These hooks are stale build/API
-residue, not evidence that the capabilities are supported or intentional
-parts of the new design.  Remove them when safe, or reconnect them only as
-part of an explicitly accepted ARTS 3-native port.
+residue, not evidence that the capabilities are already supported.  Remove
+them when safe, or reconnect them only as part of an ARTS 3-native port.
 
 Open questions, not design decisions
 ------------------------------------

@@ -342,6 +342,25 @@ A surface field effectively holds two things:
 )--",
   };
 
+  wsg_data["TessemNN"] = {
+      .file = "surf.h",
+      .desc = R"--(A TESSEM2 neural-network model.
+
+The horizontal- and vertical-polarization networks are stored separately.
+Use *TessemNNReadAscii* to read the original TESSEM ASCII parameter files.
+)--",
+  };
+
+  wsg_data["TelsemAtlas"] = {
+      .file = "surf.h",
+      .desc = R"--(A TELSEM2 monthly land-surface emissivity atlas.
+
+The atlas stores its cells and the data needed by the TELSEM frequency and
+incidence-angle interpolation model.  Use *TelsemAtlasReadAscii* to read an
+original TELSEM atlas file.
+)--",
+  };
+
   wsg_data["SubsurfaceField"] = {
       .file = "subsurf.h",
       .desc =

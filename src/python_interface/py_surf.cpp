@@ -17,6 +17,65 @@
 
 namespace Python {
 void py_surf(py::module_ &m) try {
+  auto tessem = py::class_<TessemNN>(m, "TessemNN");
+  tessem.def(py::init<>())
+      .def_rw("nb_inputs", &TessemNN::nb_inputs)
+      .def_rw("nb_outputs", &TessemNN::nb_outputs)
+      .def_rw("nb_cache", &TessemNN::nb_cache)
+      .def_rw("b1", &TessemNN::b1)
+      .def_rw("b2", &TessemNN::b2)
+      .def_rw("w1", &TessemNN::w1)
+      .def_rw("w2", &TessemNN::w2)
+      .def_rw("x_min", &TessemNN::x_min)
+      .def_rw("x_max", &TessemNN::x_max)
+      .def_rw("y_min", &TessemNN::y_min)
+      .def_rw("y_max", &TessemNN::y_max)
+      .def(
+          "__call__",
+          [](const TessemNN &self, const Vector &input) { return tessem_emissivity(self, input); },
+          "input"_a,
+          "Evaluate the neural network")
+      .def_static(
+          "from_ascii",
+          [](const String &filename) {
+            TessemNN out;
+            tessem_read_ascii(filename, out);
+            return out;
+          },
+          "filename"_a,
+          "Read an original TESSEM2 neural-network parameter file");
+  generic_interface(tessem);
+
+  auto telsem = py::class_<TelsemAtlas>(m, "TelsemAtlas");
+  telsem.def(py::init<>())
+      .def_ro("ndat", &TelsemAtlas::ndat)
+      .def_ro("nchan", &TelsemAtlas::nchan)
+      .def_ro("name", &TelsemAtlas::name)
+      .def_ro("month", &TelsemAtlas::month)
+      .def_ro("dlat", &TelsemAtlas::dlat)
+      .def("contains", &TelsemAtlas::contains, "cell_number"_a)
+      .def("cell_number", &TelsemAtlas::calc_cellnum, "lat"_a, "lon"_a)
+      .def("coordinates", &TelsemAtlas::get_coordinates, "cell_number"_a)
+      .def("emissivity",
+           &TelsemAtlas::emissivity,
+           "lat"_a,
+           "lon"_a,
+           "incidence_angle"_a,
+           "frequency"_a,
+           "max_distance"_a = -1,
+           "Evaluate vertical and horizontal emissivity")
+      .def_static(
+          "from_ascii",
+          [](const String &filename, Index month) {
+            TelsemAtlas out;
+            telsem_read_ascii(filename, out, month);
+            return out;
+          },
+          "filename"_a,
+          "month"_a = 0,
+          "Read an original TELSEM2 monthly atlas file");
+  generic_interface(telsem);
+
   py::class_<Surf::Data> surfdata(m, "SurfaceData");
   surfdata.def(py::init_implicit<GeodeticField2>())
       .def(py::init_implicit<Numeric>())

@@ -31,10 +31,6 @@ Status terms
   The ARTS 2 operation is suitable for Python.  Decide whether a maintained
   recipe/helper is needed; do not automatically recreate a workspace method.
 
-**Present/replaced**
-  The capability is implemented or intentionally represented differently.
-  These entries are retained briefly to prevent duplicate porting work.
-
 **Deferred**
   The configured test inventories did not exercise the feature.  A later
   method-, data-, and optional-build audit must classify it.
@@ -84,21 +80,22 @@ the ARTS 3 atmospheric-field and scattering-species models.  It must not
 restore the formal ARTS 2 cloudbox, global spatial grids, or global
 ``stokes_dim`` workspace variable merely to preserve the old setup sequence.
 
-Empirical surface emissivity models
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FASTEM surface model
+~~~~~~~~~~~~~~~~~~~~
 
-**Status: Missing.**  The configured ARTS 2 suite registers and passes
-``TestTessem``, which exercises the TESSEM neural-network data reader and
-emissivity evaluation.  ARTS 3 contains no TESSEM implementation or equivalent
-regression.  Flat Fresnel, scalar, Lambertian, and blackbody surface support is
-not a replacement for an empirical ocean emissivity model.
+**Status: Missing; ARTS 3 surface-boundary design required.**  FASTEM is an
+intended ARTS 3 capability, but the current surface interface cannot represent
+the complete model.  FASTEM can provide separate emissivity and reflectivity
+and includes an atmospheric-transmittance correction, whereas the existing
+closed-surface reflectance path applies Kirchhoff consistency and has no
+explicit atmospheric dependency.
 
-The ARTS 2 source also contains TELSEM and optional FASTEM paths.  They were not
-part of the configured ARTS 2 CTest baseline, but the narrow source audit found
-no ARTS 3 implementation for them either.  Before porting, decide which models
-and data are still scientifically supported and redistributable.  Add each
-accepted model as a separately testable capability rather than reviving the
-ARTS 2 surface-workspace-variable layout.
+Design a surface-boundary contract that represents emission, reflection, and
+the required atmospheric coupling explicitly.  The implementation must not
+silently discard FASTEM outputs or weaken the consistency guarantees of the
+existing reflectance agenda.  The surviving ``ENABLE_FASTEM`` configure and
+link hooks are legacy integration residue; they do not provide this interface
+or an ARTS 3 implementation.
 
 Microwave gas refractivity
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -129,17 +126,6 @@ method or recipe.
 The missing final calculation is well suited to Python.  Prefer a documented,
 unit-aware recipe with an ARTS 2 reference regression unless a C++ kernel is
 needed for performance or for use inside an agenda.
-
-Independent Beam Approximation workflow
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**Status: Python decision/replaced orchestration.**  ARTS 2
-``iyIndependentBeamApproximation`` samples a path into a one-dimensional
-atmosphere and invokes a radiance agenda.  ARTS 3 field sampling and ordinary
-Python can express that workflow without a distinct numerical solver.  Add a
-maintained recipe and parity test if the workflow remains useful; classify a
-native implementation gap only if a concrete performance or parallel-execution
-requirement cannot be met that way.
 
 Confirmed gaps with unresolved port intent
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -311,45 +297,6 @@ sufficient:
   Decide whether stable recipes are needed instead of adding compatibility
   workspace methods.
 
-Capabilities already accounted for
-----------------------------------
-
-The following mappings were found in the initial test audit.  They should not
-be treated as missing solely because ARTS 2 and ARTS 3 use different test or
-method names.
-
-* Particle-size distributions: ARTS 2 ``TestPsds`` is represented directly by
-  ``tests/core/scat/psd_arts2.py`` and by the new scattering-species examples.
-* Passive Monte Carlo: the general and polarized cases are represented by
-  ``mc_general.py``, ``mc_general_arts2.py``, and ``mc_sensor.py``.
-* Active radar: single scattering, Jacobians, Monte Carlo radar, and onion
-  peeling have dedicated tests under ``tests/core/scat``.
-* Gas scattering: generic/isotropic and Rayleigh behavior is covered by
-  ``tests/core/scat/gas_scattering.py``.
-* Sensor construction: general sensor builders, heterodyne responses, multiple
-  sensor frequency grids, and predefined sensors have ARTS 3 tests.
-* Surface and subsurface radiative transfer: blackbody, scalar and Fresnel
-  reflection Jacobians, nonspecular surfaces, visible surfaces, and subsurface
-  coupling have tests under ``tests/core/surf``.
-* Clear-sky spectroscopy: CIA values, cross-section fits, lookup tables,
-  predefined models, ECS line mixing, NLTE, wind, Faraday/Zeeman effects, and
-  isotopologue handling all have ARTS 3 implementation evidence.  The direct
-  parity and derivative qualifications above still apply.
-* OEM and common target scaling: full and multiparameter OEM tests and the
-  absolute/log/relative/log-relative/RH target families are present.
-* Custom target transformations: every Jacobian target exposes its forward,
-  inverse, and inverse-Jacobian operators to Python.  Together they support
-  general invertible affine transforms and custom reversible functional
-  transforms while retaining access to the owning field or data object.
-* Spectral fields and fluxes: pseudo-2D flux profiles, path-field fluxes,
-  DISORT radiance/flux fields, and Python flux recipes are present.  Only the
-  final heating-rate diagnostic remains classified above.
-* Geometry and refraction: ARTS 3 tests and examples exercise the always-3D
-  path representation, planetary geometry, refracted paths, and Harvey-98
-  visible/near-infrared water/steam refractivity.  ARTS 2 1-D and 2-D
-  workspace modes are deliberately not mapped one for one; the microwave gas
-  model gap is recorded above.
-
 Deferred beyond this first pass
 -------------------------------
 
@@ -372,9 +319,12 @@ A later audit should compare:
 Updating this page
 ------------------
 
-For each change, record the ARTS 2 capability and evidence, the ARTS 3
-replacement and evidence, the applicable ARTS 3 design constraint, and the
-remaining action.  A port is complete only when the result is usable through a
-supported C++ or Python interface and an active regression checks meaningful
-physics or numerics.  If Python orchestration is sufficient, add a test and
-documentation or a recipe; do not recreate the ARTS 2 scripting language.
+This page is only a backlog of work that remains.  Remove an entry as soon as
+its implementation and required coverage are complete; do not retain completed
+features as historical status records.  For each remaining entry, record the
+ARTS 2 capability and evidence, the applicable ARTS 3 design constraint, and
+the remaining action.  A port is complete only when the result is usable
+through a supported C++ or Python interface and an active regression checks
+meaningful physics or numerics.  If Python orchestration is sufficient, add a
+test and documentation or a recipe; do not recreate the ARTS 2 scripting
+language.

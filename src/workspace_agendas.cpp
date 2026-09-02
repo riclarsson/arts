@@ -392,7 +392,7 @@ it does a lot of unnecessary checks and operations that are not always needed.
 )--",
       .output             = {"spectral_surf_refl", "spectral_surf_refl_jac"},
       .input              = {"freq_grid", "surf_field", "ray_point", "jac_targets"},
-      .enum_options       = {"FlatScalar", "FlatRealFresnel"},
+      .enum_options       = {"FlatScalar", "FlatRealFresnel", "Tessem", "Telsem"},
       .output_constraints = {{"spectral_surf_refl.size() == freq_grid.size()",
                               "*spectral_surf_refl* match *freq_grid* size",
                               "spectral_surf_refl.size()",
