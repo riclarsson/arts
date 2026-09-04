@@ -53,8 +53,8 @@ void spectral_surf_reflTelsem(MuelmatVector&              spectral_surf_refl,
   spectral_surf_refl_jac = Muelmat{0.0};
 
   for (Size iv = 0; iv < freq_grid.size(); ++iv) {
-    const auto [ev, eh]    = telsem_atlas.emissivity(lat, lon, angle, freq_grid[iv], max_distance);
-    spectral_surf_refl[iv] = reflectance(ev, eh);
+    const auto emissivity  = telsem_atlas.emissivity(lat, lon, angle, freq_grid[iv], max_distance);
+    spectral_surf_refl[iv] = reflectance(emissivity[0], emissivity[1]);
   }
 }
 ARTS_METHOD_ERROR_CATCH

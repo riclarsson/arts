@@ -49,21 +49,30 @@ void py_surf(py::module_ &m) try {
   auto telsem = py::class_<TelsemAtlas>(m, "TelsemAtlas");
   telsem.def(py::init<>())
       .def_ro("ndat", &TelsemAtlas::ndat, "Number of populated atlas cells\n\n.. :class:`Index`")
-      .def_ro("nchan", &TelsemAtlas::nchan, "Number of atlas channels\n\n.. :class:`Index`")
+      .def_ro_static("nchan", &TelsemAtlas::nchan, "Number of atlas channels\n\n.. :class:`Index`")
       .def_ro("name", &TelsemAtlas::name, "Atlas name\n\n.. :class:`String`")
       .def_ro("month", &TelsemAtlas::month, "Atlas month\n\n.. :class:`Index`")
       .def_ro("dlat", &TelsemAtlas::dlat, "Atlas latitude resolution [degrees]\n\n.. :class:`Numeric`")
       .def("contains", &TelsemAtlas::contains, "cell_number"_a, "Check whether an atlas cell contains data")
       .def("cell_number", &TelsemAtlas::calc_cellnum, "lat"_a, "lon"_a, "Return the atlas cell number at a position")
       .def("coordinates", &TelsemAtlas::get_coordinates, "cell_number"_a, "Return the coordinates of an atlas cell")
-      .def("emissivity",
-           &TelsemAtlas::emissivity,
-           "lat"_a,
-           "lon"_a,
-           "incidence_angle"_a,
-           "frequency"_a,
-           "max_distance"_a = -1,
-           "Evaluate vertical and horizontal emissivity")
+      .def(
+          "emissivity",
+          [](const TelsemAtlas &self,
+             Numeric            lat,
+             Numeric            lon,
+             Numeric            incidence_angle,
+             Numeric            frequency,
+             Numeric            max_distance) {
+            const auto out = self.emissivity(lat, lon, incidence_angle, frequency, max_distance);
+            return std::pair{out[0], out[1]};
+          },
+          "lat"_a,
+          "lon"_a,
+          "incidence_angle"_a,
+          "frequency"_a,
+          "max_distance"_a = -1,
+          "Evaluate vertical and horizontal emissivity")
       .def_static(
           "from_ascii",
           [](const String &filename, Index month) {

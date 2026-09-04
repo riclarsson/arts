@@ -112,13 +112,12 @@ void telsem_read_ascii(std::istream& is, TelsemAtlas& atlas, Index month) {
 
 void TelsemAtlas::read(std::istream& is) {
   name  = "ssmi_mean_emis_climato";
-  nchan = 7;
   dlat  = 0.25;
   is >> ndat;
-  emis.resize(ndat, nchan);
-  emis = NAN;
-  emis_err.resize(ndat, nchan);
-  emis_err = NAN;
+  channel_emissivity.resize(ndat);
+  channel_emissivity = Vector7{NAN, NAN, NAN, NAN, NAN, NAN, NAN};
+  channel_emissivity_error.resize(ndat);
+  channel_emissivity_error = Vector7{NAN, NAN, NAN, NAN, NAN, NAN, NAN};
   classes1.resize(ndat);
   classes1 = -1;
   classes2.resize(ndat);
@@ -146,8 +145,8 @@ void TelsemAtlas::read(std::istream& is) {
     if (class1 > 0 && class2 > 0 && ipos < ndat) {
       ipos++;
       for (Index i = 0; i < nchan; i++) {
-        emis[ipos, i]     = ssmi[i];
-        emis_err[ipos, i] = std::sqrt(ssmi[nchan + i]);
+        channel_emissivity[ipos][i]       = ssmi[i];
+        channel_emissivity_error[ipos][i] = std::sqrt(ssmi[nchan + i]);
       }
       cellnums[ipos] = cellnum;
       classes1[ipos] = class1;
@@ -272,19 +271,19 @@ std::pair<Numeric, Numeric> TelsemAtlas::get_coordinates(Index cellnum) const {
   return {lat, lon};
 }
 
-Vector TelsemAtlas::get_emis_v(Index cellnumber) const {
+Vector3 TelsemAtlas::get_emis_v(Index cellnumber) const {
   ARTS_USER_ERROR_IF(not contains(cellnumber), "The requested TELSEM cell is not in the atlas")
   const Index ind = correspondence[cellnumber];
-  return Vector{emis[ind, 0], emis[ind, 3], emis[ind, 5]};
+  return {channel_emissivity[ind][0], channel_emissivity[ind][3], channel_emissivity[ind][5]};
 }
 
-Vector TelsemAtlas::get_emis_h(Index cellnumber) const {
+Vector3 TelsemAtlas::get_emis_h(Index cellnumber) const {
   ARTS_USER_ERROR_IF(not contains(cellnumber), "The requested TELSEM cell is not in the atlas")
   const Index ind = correspondence[cellnumber];
-  return Vector{emis[ind, 1], emis[ind, 4], emis[ind, 6]};
+  return {channel_emissivity[ind][1], channel_emissivity[ind][4], channel_emissivity[ind][6]};
 }
 
-std::pair<Numeric, Numeric> TelsemAtlas::emissivity(
+Vector2 TelsemAtlas::emissivity(
     Numeric lat, Numeric lon, Numeric incidence_angle, Numeric frequency, Numeric max_distance) const {
   ARTS_USER_ERROR_IF(
       frequency < 5e9 or frequency > 900e9, "TELSEM supports frequencies from 5 to 900 GHz, got {} Hz", frequency)
@@ -356,14 +355,10 @@ Numeric TelsemAtlas::interp_freq2(Numeric emiss19, Numeric emiss37, Numeric emis
   return emiss;
 }
 
-std::pair<Numeric, Numeric> TelsemAtlas::emis_interp(Numeric                theta,
-                                                     Numeric                freq,
-                                                     Index                  class1,
-                                                     Index                  class2,
-                                                     const ConstVectorView& ev,
-                                                     const ConstVectorView& eh) const {
-  Vector emiss_scal_h(3);
-  Vector emiss_scal_v(3);
+Vector2 TelsemAtlas::emis_interp(
+    Numeric theta, Numeric freq, Index class1, Index class2, const Vector3& ev, const Vector3& eh) const {
+  Vector3 emiss_scal_h{};
+  Vector3 emiss_scal_v{};
 
   for (Index i = 0; i < 3; ++i) {
     Numeric e0 =
@@ -402,7 +397,7 @@ std::pair<Numeric, Numeric> TelsemAtlas::emis_interp(Numeric                thet
     emiss_v = 0.5 * (emiss_v + emiss_h);
     emiss_h = emiss_v;
   }
-  return std::make_pair(emiss_v, emiss_h);
+  return {emiss_v, emiss_h};
 }
 
 std::ostream& operator<<(std::ostream& os, const TelsemAtlas& ta) {

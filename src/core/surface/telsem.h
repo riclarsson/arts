@@ -4,35 +4,30 @@
 #include <xml.h>
 
 struct TelsemAtlas {
-  Index                     ndat{};
-  Index                     nchan{};
-  String                    name;
-  Index                     month{};
-  Numeric                   dlat{};
-  matpack::data_t<Index, 1> ncells;
-  matpack::data_t<Index, 1> firstcells;
-  Matrix                    emis;
-  Matrix                    emis_err;
-  Tensor3                   correl;
-  matpack::data_t<Index, 1> classes1;
-  matpack::data_t<Index, 1> classes2;
-  matpack::data_t<Index, 1> cellnums;
-  matpack::data_t<Index, 1> correspondence;
+  Index                       ndat{};
+  static constexpr Index      nchan{7};
+  String                      name;
+  Index                       month{};
+  Numeric                     dlat{};
+  IndexVector                 ncells;
+  IndexVector                 firstcells;
+  matpack::data_t<Vector7, 1> channel_emissivity;
+  matpack::data_t<Vector7, 1> channel_emissivity_error;
+  IndexVector                 classes1;
+  IndexVector                 classes2;
+  IndexVector                 cellnums;
+  IndexVector                 correspondence;
 
   [[nodiscard]] bool                        contains(Index cellnumber) const;
   [[nodiscard]] Index                       calc_cellnum(Numeric lat, Numeric lon) const;
   [[nodiscard]] Index                       calc_cellnum_nearest_neighbor(Numeric lat, Numeric lon) const;
   [[nodiscard]] std::pair<Numeric, Numeric> get_coordinates(Index cellnum) const;
-  [[nodiscard]] std::pair<Numeric, Numeric> emissivity(
+  [[nodiscard]] Vector2                     emissivity(
       Numeric lat, Numeric lon, Numeric incidence_angle, Numeric frequency, Numeric max_distance = -1) const;
-  [[nodiscard]] std::pair<Numeric, Numeric> emis_interp(Numeric                theta,
-                                                        Numeric                freq_ghz,
-                                                        Index                  class1,
-                                                        Index                  class2,
-                                                        const ConstVectorView& ev,
-                                                        const ConstVectorView& eh) const;
-  [[nodiscard]] Vector                      get_emis_v(Index cellnumber) const;
-  [[nodiscard]] Vector                      get_emis_h(Index cellnumber) const;
+  [[nodiscard]] Vector2 emis_interp(
+      Numeric theta, Numeric freq_ghz, Index class1, Index class2, const Vector3& ev, const Vector3& eh) const;
+  [[nodiscard]] Vector3 get_emis_v(Index cellnumber) const;
+  [[nodiscard]] Vector3 get_emis_h(Index cellnumber) const;
 
   void read(std::istream& is);
   void equare();
