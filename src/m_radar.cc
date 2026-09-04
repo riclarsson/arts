@@ -197,7 +197,7 @@ OpticalProfile optical_profile(const Workspace&                   ws,
   return out;
 }
 
-enum class RadarRangeMode { Altitude, Distance, RoundTripTime };
+enum class RadarRangeMode : char { Altitude, Distance, RoundTripTime };
 
 RadarRangeMode range_mode(const String& mode, const Matrix& limits) {
   if (mode == "Altitude") return RadarRangeMode::Altitude;
@@ -312,7 +312,9 @@ RadarResult radar_forward(const Workspace&                       ws,
                           const JacobianTargets&                 jac_targets) {
   const Size        ny = sensor.size();
   const Size        nq = jac_targets.target_count();
-  RadarResult       out{Vector(ny, 0.0), Matrix(ny, jac_targets.x_size(), 0.0), Matrix(aux_vars.size(), ny, 0.0)};
+  RadarResult       out{.measurement = Vector(ny, 0.0),
+                        .jacobian    = Matrix(ny, jac_targets.x_size(), 0.0),
+                        .auxiliary   = Matrix(aux_vars.size(), ny, 0.0)};
   std::vector<bool> seen(ny, false);
   Vector            scalar_weight_sum(ny, 0.0);
 
@@ -554,7 +556,7 @@ void measurement_sensorAddSimpleRadar(ArrayOfSensorObsel&    measurement_sensor,
   Matrix     new_limits(old_n + nnew, 2);
   if (old_n) new_limits[Range(0, old_n), joker] = radar_range_limits;
 
-  auto poslos = std::make_shared<const SensorPosLosVector>(SensorPosLosVector{SensorPosLos{pos, los}});
+  auto poslos = std::make_shared<const SensorPosLosVector>(SensorPosLosVector{SensorPosLos{.pos = pos, .los = los}});
   measurement_sensor.reserve(old_n + nnew);
   measurement_sensor_meta.reserve(measurement_sensor_meta.size() + freq_grid.size());
 
@@ -774,7 +776,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
   // interleaving independent profiles is harmless because their Jacobian
   // blocks have zero cross-sensitivity.
   std::vector<Size> order(ny);
-  std::iota(order.begin(), order.end(), Size{0});
+  stdr::iota(order, Size{0});
   const RadarRangeMode coordinate_mode = range_mode(range_mode_string, radar_range_limits);
   const auto           distance_key    = [&](const Size iy) {
     const Numeric center = std::midpoint(radar_range_limits[iy, 0], radar_range_limits[iy, 1]);
@@ -783,8 +785,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
     ARTS_USER_ERROR_IF(poslos.empty(), "Radar observation {} has no position/LOS geometry", iy)
     return std::abs(center - poslos.front().pos[0]);
   };
-  std::stable_sort(
-      order.begin(), order.end(), [&](const Size a, const Size b) { return distance_key(a) < distance_key(b); });
+  stdr::stable_sort(order, [&](const Size a, const Size b) { return distance_key(a) < distance_key(b); });
 
   std::vector<bool>                  peeled(nx, false);
   std::vector<std::pair<Size, Size>> gate_state;
