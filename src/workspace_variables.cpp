@@ -208,15 +208,15 @@ When Bath is selected, all species are used.  Otherwise, this variable should co
   };
 
   wsv_data["radar_signal"] = {
-      .desc = R"--(Monte Carlo radar return with dimensions range-bin by Stokes component.
+      .desc = R"--(Monte Carlo radar return with one Stokes vector per range bin.
 )--",
-      .type = "Matrix",
+      .type = "StokvecVector",
   };
 
   wsv_data["radar_error"] = {
-      .desc = R"--(Standard error of *radar_signal* with identical dimensions.
+      .desc = R"--(Component-wise standard error of *radar_signal* for each range bin.
 )--",
-      .type = "Matrix",
+      .type = "StokvecVector",
   };
 
   wsv_data["radar_range_limits"] = {

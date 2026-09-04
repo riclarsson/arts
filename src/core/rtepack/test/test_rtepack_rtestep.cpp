@@ -32,8 +32,8 @@ bool test_current_rte_emission() {
   tramat.P       = rtepack::muelmat::id();
   tramat.dT      = rtepack::muelmat::constant(0.0);
   tramat.dL      = rtepack::muelmat::constant(0.0);
-  tramat.T[0, 1] = transmission;
-  tramat.L[0, 1] = evolution;
+  tramat.T[0, 1] = rtepack::muelmat{transmission};
+  tramat.L[0, 1] = rtepack::muelmat{evolution};
 
   SourceVector source;
   source.J.resize(1, 2);
@@ -77,8 +77,8 @@ bool test_legacy_rte_emission() {
     Js[i] = rtepack::stokvec{};
     dJs[i].resize(1, 1);
   }
-  Ts[1][0] = transmission;
-  Ls[1][0] = evolution;
+  Ts[1][0] = rtepack::muelmat{transmission};
+  Ls[1][0] = rtepack::muelmat{evolution};
 
   const rtepack::stokvec observer_deriv{2.0, 3.0, 5.0, 7.0};
   const rtepack::stokvec background_deriv{11.0, 13.0, 17.0, 19.0};

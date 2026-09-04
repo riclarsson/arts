@@ -356,7 +356,7 @@ bool test_exponential() {
   // exp(-720 I + 719 N), N^2=I in the leading 2x2 block, has a finite
   // transmitted mode exp(-1) even though exp(-720) underflows on some
   // platforms.  Check exp, expm1, and phi_1 against their analytic modes.
-  const Propmat       extreme_generator{-720.0, 719.0};
+  const Propmat       extreme_generator{-720.0, 719.0, 0.0, 0.0, 0.0, 0.0, 0.0};
   const rtepack::tran extreme_tr{-extreme_generator, -extreme_generator, 1.0};
   const Numeric       exp_plus            = std::exp(-1.0);
   const Numeric       exp_minus           = std::exp(-1439.0);
@@ -417,7 +417,7 @@ bool test_exponential() {
   // intentionally far beyond the point where exp(a) and cosh(x) can be
   // formed separately.
   constexpr Numeric   huge_depth = 1e12;
-  const Propmat       huge_generator{-huge_depth, huge_depth - 1.0};
+  const Propmat       huge_generator{-huge_depth, huge_depth - 1.0, 0.0, 0.0, 0.0, 0.0, 0.0};
   const rtepack::tran huge_tr{-huge_generator, -huge_generator, 1.0};
   const Numeric       huge_fast_mode = std::exp(-1.0);
   const Numeric       huge_slow_phi  = -std::expm1(-2.0 * huge_depth + 1.0) / (2.0 * huge_depth - 1.0);
@@ -458,7 +458,7 @@ bool test_exponential() {
   // when both terms are O(depth) but their surviving eigenvalue is -10.
   // Applying the perturbation between projectors retains this gap directly.
   constexpr Numeric   finite_gap = 10.0;
-  const Propmat       gap_generator{-huge_depth, huge_depth - finite_gap};
+  const Propmat       gap_generator{-huge_depth, huge_depth - finite_gap, 0.0, 0.0, 0.0, 0.0, 0.0};
   const rtepack::tran gap_tr{-gap_generator, -gap_generator, 1.0};
   const Muelmat       gap_exp  = gap_tr();
   const Muelmat       gap_phi  = gap_tr.linsrc();
@@ -492,7 +492,7 @@ bool test_exponential() {
   // component couples the +x and -x real modes to the repeated a mode.  The
   // divided-difference reference is analytic and independent of rtepack's
   // Cayley-Hamilton derivative coefficients.
-  const Propmat near_real_noncommuting_direction{0.0, 0.0, 1.0};
+  const Propmat near_real_noncommuting_direction{0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0};
   const Numeric real_separation  = huge_depth - 1.0;
   const Numeric phi_at_fast      = phi1_scalar_reference(-1.0);
   const Numeric phi_at_center    = phi1_scalar_reference(-huge_depth);
@@ -545,7 +545,7 @@ bool test_exponential() {
   }
 
   constexpr Numeric eigenvalue = 0.25;
-  const Propmat     dichroism_generator{0.0, eigenvalue};
+  const Propmat     dichroism_generator{0.0, eigenvalue, 0.0, 0.0, 0.0, 0.0, 0.0};
   const Numeric     ch = std::cosh(eigenvalue);
   const Numeric     sh = std::sinh(eigenvalue);
   const Muelmat     dichroism_reference{ch, sh, 0, 0, sh, ch, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
@@ -554,7 +554,7 @@ bool test_exponential() {
     return false;
   }
 
-  const Propmat rotation_generator{0.0, 0.0, 0.0, 0.0, eigenvalue};
+  const Propmat rotation_generator{0.0, 0.0, 0.0, 0.0, eigenvalue, 0.0, 0.0};
   const Numeric co = std::cos(eigenvalue);
   const Numeric si = std::sin(eigenvalue);
   const Muelmat rotation_reference{1, 0, 0, 0, 0, co, si, 0, 0, -si, co, 0, 0, 0, 0, 1};
@@ -991,7 +991,8 @@ bool test_analytical_derivatives() {
     return true;
   };
 
-  if (not check_degenerate_case(Propmat{0.8, 0.2}, Propmat{1.1, -0.15}, "Pure-dichroism") or
+  if (not check_degenerate_case(
+          Propmat{0.8, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0}, Propmat{1.1, -0.15, 0.0, 0.0, 0.0, 0.0, 0.0}, "Pure-dichroism") or
       not check_degenerate_case(Propmat{0.8, 0.0, 0.0, 0.0, 0.2, -0.1, 0.15},
                                 Propmat{1.1, 0.0, 0.0, 0.0, -0.12, 0.18, -0.08},
                                 "Pure-rotation")) {

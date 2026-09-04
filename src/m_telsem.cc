@@ -50,7 +50,7 @@ void spectral_surf_reflTelsem(MuelmatVector&              spectral_surf_refl,
 
   spectral_surf_refl.resize(freq_grid.size());
   spectral_surf_refl_jac.resize(jac_targets.target_count(), freq_grid.size());
-  spectral_surf_refl_jac = 0;
+  spectral_surf_refl_jac = Muelmat{0.0};
 
   for (Size iv = 0; iv < freq_grid.size(); ++iv) {
     const auto [ev, eh]    = telsem_atlas.emissivity(lat, lon, angle, freq_grid[iv], max_distance);

@@ -97,8 +97,8 @@ single_propmat_jac_path: (N, nq) = {:B,}
 
   single_tramat_path.resize(N);
   single_tramat_jac_path.resize(N, 2, nq);
-  single_tramat_path     = 1.0;
-  single_tramat_jac_path = 0.0;
+  single_tramat_path     = Muelmat{1.0};
+  single_tramat_jac_path = Muelmat{0.0};
 
   const Vector ray_path_distance = distance(ray_path, surf_field.ellipsoid);
   Tensor3      ray_path_distance_jacobian(2, N - 1, nq, 0.0);
@@ -210,8 +210,8 @@ single_nlte_srcvec_jac_path: (np, nq) = {:B,}
     const auto  dS = single_nlte_srcvec_jac_path[i];
 
     if (K.is_rotational()) {
-      J  = 0.0;
-      dJ = 0.0;
+      J  = Stokvec{0.0};
+      dJ = Stokvec{0.0};
     } else {
       const auto b    = Stokvec{planck(f, t), 0, 0, 0};
       const auto invK = inv(K);
@@ -691,7 +691,7 @@ void single_radClearskyEmissionPropagation(const Workspace&             ws,
     sumAr += A * path::distance(ray_path.back().pos, ray_path[ray_path.size() - 2].pos, surf_field.ellipsoid);
 
     if (sumAr >= cutoff_tau) {
-      single_rad = planck(frequency_, atm_path.back().temperature);
+      single_rad = Stokvec{planck(frequency_, atm_path.back().temperature)};
       break;
     }
   }

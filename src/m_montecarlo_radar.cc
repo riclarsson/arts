@@ -11,17 +11,14 @@
 #include <limits>
 
 namespace {
-
-Muelmat as_muelmat(const Matrix& x) {
-  ARTS_USER_ERROR_IF(x.nrows() != 4 or x.ncols() != 4, "Expected a 4 by 4 phase matrix, got {:B,}", x.shape())
-  Muelmat out{0.0};
-  for (Index i = 0; i < 4; ++i)
-    for (Index j = 0; j < 4; ++j) out[i, j] = x[i, j];
-  return out;
+Numeric normalized_delta_aa(Numeric aa) {
+  while (aa < -180.0) aa += 360.0;
+  while (aa > 180.0) aa -= 360.0;
+  return aa;
 }
 
 Index range_bin(const AscendingGrid& edges, const Numeric range) {
-  const auto it = std::upper_bound(edges.begin(), edges.end(), range);
+  const auto it = stdr::upper_bound(edges, range);
   if (it == edges.begin() or it == edges.end()) return -1;
   return static_cast<Index>(it - edges.begin() - 1);
 }
@@ -32,7 +29,8 @@ Numeric ze_factor(const Numeric frequency, const Numeric k2) {
 }
 
 struct OpticalPoint {
-  Propmat extinction{};
+  Propmat outgoing_extinction{};
+  Propmat return_extinction{};
   Muelmat backscatter{0.0};
 };
 
@@ -44,15 +42,15 @@ OpticalPoint optical_point(const Workspace&                ws,
                            const Agenda&                   spectral_propmat_agenda) {
   const AscendingGrid freq_grid{frequency};
 
-  PropmatVector gas;
-  StokvecVector src;
-  PropmatMatrix gas_jac;
-  StokvecMatrix src_jac;
+  PropmatVector gas_return;
+  StokvecVector src_return;
+  PropmatMatrix gas_return_jac;
+  StokvecMatrix src_return_jac;
   spectral_propmat_agendaExecute(ws,
-                                 gas,
-                                 src,
-                                 gas_jac,
-                                 src_jac,
+                                 gas_return,
+                                 src_return,
+                                 gas_return_jac,
+                                 src_return_jac,
                                  freq_grid,
                                  Vector3{0.0, 0.0, 0.0},
                                  JacobianTargets{},
@@ -61,26 +59,63 @@ OpticalPoint optical_point(const Workspace&                ws,
                                  atm_point,
                                  spectral_propmat_agenda);
 
-  auto za_grid    = std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{180.0}));
-  const auto bulk = scattering_species.get_bulk_scattering_properties_tro_gridded(atm_point, freq_grid, za_grid);
+  PropagationPathPoint outgoing_point = ray_point;
+  outgoing_point.los                  = path::mirror(ray_point.los);
+  PropmatVector gas_outgoing;
+  StokvecVector src_outgoing;
+  PropmatMatrix gas_outgoing_jac;
+  StokvecMatrix src_outgoing_jac;
+  spectral_propmat_agendaExecute(ws,
+                                 gas_outgoing,
+                                 src_outgoing,
+                                 gas_outgoing_jac,
+                                 src_outgoing_jac,
+                                 freq_grid,
+                                 Vector3{0.0, 0.0, 0.0},
+                                 JacobianTargets{},
+                                 {},
+                                 outgoing_point,
+                                 atm_point,
+                                 spectral_propmat_agenda);
 
-  ARTS_USER_ERROR_IF(not bulk.phase_matrix.has_value(), "MCRadar requires phase matrices from all scattering species")
+  const Vector2 transmit_los = outgoing_point.los;
+  const Vector2 receive_los  = ray_point.los;
+  const auto    at_pole      = [](const Numeric za) { return std::abs(std::sin(za * Constant::pi / 180.0)) < 1e-12; };
+  const Vector  delta_aa{at_pole(transmit_los[0]) or at_pole(receive_los[0])
+                             ? 0.0
+                             : normalized_delta_aa(receive_los[1] - transmit_los[1])};
+  auto          receive_za =
+      std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{receive_los[0]}));
+  const auto bulk_outgoing = scattering_species.get_bulk_scattering_properties_aro_gridded(
+      atm_point, freq_grid, Vector{transmit_los[0]}, delta_aa, receive_za);
+  auto transmit_za =
+      std::make_shared<scattering::ZenithAngleGrid>(scattering::IrregularZenithAngleGrid(Vector{transmit_los[0]}));
+  const auto bulk_return = scattering_species.get_bulk_scattering_properties_aro_gridded(
+      atm_point, freq_grid, Vector{receive_los[0]}, Vector{0.0}, transmit_za);
 
-  const auto& phase   = *bulk.phase_matrix;
-  const auto  compact = phase[0, 0, 0, joker];
+  ARTS_USER_ERROR_IF(not bulk_outgoing.phase_matrix.has_value(),
+                     "MCRadar requires phase matrices from all scattering species")
+
+  const auto phase               = bulk_outgoing.phase_matrix->get_const_coeff_vector_view();
+  const auto outgoing_extinction = bulk_outgoing.extinction_matrix.get_const_coeff_vector_view();
+  const auto return_extinction   = bulk_return.extinction_matrix.get_const_coeff_vector_view();
 
   OpticalPoint out;
-  out.extinction   = gas[0];
-  out.extinction  += Propmat{bulk.extinction_matrix[0, 0, 0]};
-  out.backscatter  = as_muelmat(scattering::expand_phase_matrix(compact));
+  const auto&  outgoing    = outgoing_extinction[0, 0, 0];
+  const auto&  returning   = return_extinction[0, 0, 0];
+  out.outgoing_extinction  = gas_outgoing[0];
+  out.outgoing_extinction += Propmat{outgoing[0], outgoing[1], 0.0, 0.0, 0.0, 0.0, outgoing[2]};
+  out.return_extinction    = gas_return[0];
+  out.return_extinction   += Propmat{returning[0], returning[1], 0.0, 0.0, 0.0, 0.0, returning[2]};
+  out.backscatter          = phase[0, 0, 0, 0, 0];
   return out;
 }
 
 }  // namespace
 
 void MCRadar(const Workspace&                ws,
-             Matrix&                         radar_signal,
-             Matrix&                         radar_error,
+             StokvecVector&                  radar_signal,
+             StokvecVector&                  radar_error,
              const AtmField&                 atm_field,
              const SurfaceField&             surf_field,
              const ArrayOfScatteringSpecies& scattering_species,
@@ -111,11 +146,11 @@ void MCRadar(const Workspace&                ws,
   ARTS_USER_ERROR_IF(k2 <= 0.0, "k2 must be positive")
 
   const Index nbins = static_cast<Index>(range_bins.size()) - 1;
-  radar_signal.resize(nbins, 4);
-  radar_error.resize(nbins, 4);
-  radar_signal = 0.0;
-  radar_error  = 0.0;
-  Matrix squared_sum(nbins, 4, 0.0);
+  radar_signal.resize(nbins);
+  radar_error.resize(nbins);
+  std::fill(radar_signal.begin(), radar_signal.end(), Stokvec{0.0});
+  std::fill(radar_error.begin(), radar_error.end(), Stokvec{0.0});
+  StokvecVector squared_sum(nbins, Stokvec{0.0});
 
   RandomNumberGenerator<> rng(mc_seed);
   // The general RNG avoids reusing seeds process-wide.  A forward model with
@@ -127,10 +162,11 @@ void MCRadar(const Workspace&                ws,
     for (Index j = 0; j < 3; ++j) enu_to_ant[i, j] = ant_to_enu[j, i];
 
   for (Index iter = 0; iter < mc_max_iter; ++iter) {
-    Matrix photon(nbins, 4, 0.0);
+    StokvecVector photon(nbins, Stokvec{0.0});
     const auto [sampled_los, ray_rotation] = mc_antenna.draw_los(rng, ant_to_enu, sensor_los);
     const Numeric antenna_weight           = mc_antenna.return_los(ray_rotation, enu_to_ant);
     const Muelmat tx_rotation              = rotmat_stokes(1.0, 1.0, ant_to_enu, ray_rotation);
+    const Muelmat rx_rotation              = rotmat_stokes(-1.0, 1.0, ray_rotation, ant_to_enu);
     const Stokvec transmitted              = tx_rotation * mc_y_tx;
 
     ArrayOfPropagationPathPoint ray_path;
@@ -140,6 +176,7 @@ void MCRadar(const Workspace&                ws,
     const ArrayOfAtmPoint atm_path  = forward_atm_path(ray_path, atm_field);
     const Vector          distances = path::distance(ray_path, surf_field.ellipsoid);
     Muelmat               outbound  = Muelmat::id();
+    Muelmat               returning = Muelmat::id();
     Numeric               travelled = 0.0;
     OpticalPoint          previous =
         optical_point(ws, frequency, ray_path.front(), atm_path.front(), scattering_species, spectral_propmat_agenda);
@@ -150,30 +187,36 @@ void MCRadar(const Workspace&                ws,
 
       const OpticalPoint current =
           optical_point(ws, frequency, ray_path[ip], atm_path[ip], scattering_species, spectral_propmat_agenda);
-      const Muelmat segment                = rtepack::tran(previous.extinction, current.extinction, ds)();
-      const Muelmat midpoint_transmission  = rtepack::tran(previous.extinction, current.extinction, 0.5 * ds)();
-      const Muelmat to_midpoint            = midpoint_transmission * outbound;
-      travelled                           += 0.5 * ds;
+      const Muelmat outgoing_segment = rtepack::tran(previous.outgoing_extinction, current.outgoing_extinction, ds)();
+      const Muelmat return_segment   = rtepack::tran(current.return_extinction, previous.return_extinction, ds)();
+      const Muelmat outgoing_midpoint =
+          rtepack::tran(previous.outgoing_extinction, current.outgoing_extinction, 0.5 * ds)() * outbound;
+      const Muelmat return_midpoint =
+          returning * rtepack::tran(current.return_extinction, previous.return_extinction, 0.5 * ds)();
+      travelled += 0.5 * ds;
 
       const Index ibin = range_bin(range_bins, travelled);
       if (ibin >= 0) {
-        const Muelmat backscatter  = 0.5 * (previous.backscatter + current.backscatter);
-        const Stokvec contribution = antenna_weight * ds * (to_midpoint * (backscatter * (to_midpoint * transmitted)));
-        for (Index s = 0; s < 4; ++s) photon[ibin, s] += contribution[s];
+        const Muelmat backscatter = 0.5 * (previous.backscatter + current.backscatter);
+        const Stokvec contribution =
+            antenna_weight * ds *
+            (rx_rotation * rtepack::radar_return(return_midpoint, backscatter, outgoing_midpoint, transmitted));
+        photon[ibin] += contribution;
       }
 
       travelled += 0.5 * ds;
       if (travelled >= range_bins.back()) break;
-      outbound = segment * outbound;
-      previous = current;
+      outbound  = outgoing_segment * outbound;
+      returning = returning * return_segment;
+      previous  = current;
     }
 
     for (Index b = 0; b < nbins; ++b) {
       const Numeric width = range_bins[b + 1] - range_bins[b];
       for (Index s = 0; s < 4; ++s) {
-        const Numeric value  = photon[b, s] / width;
-        radar_signal[b, s]  += value;
-        squared_sum[b, s]   += value * value;
+        const Numeric value  = photon[b][s] / width;
+        radar_signal[b][s]  += value;
+        squared_sum[b][s]   += value * value;
       }
     }
   }
@@ -181,10 +224,10 @@ void MCRadar(const Workspace&                ws,
   const Numeric factor = unit == "Ze" ? ze_factor(frequency, k2) / (2.0 * Constant::pi) : 1.0;
   for (Index b = 0; b < nbins; ++b) {
     for (Index s = 0; s < 4; ++s) {
-      const Numeric mean     = radar_signal[b, s] / static_cast<Numeric>(mc_max_iter);
-      const Numeric variance = std::max(0.0, squared_sum[b, s] / static_cast<Numeric>(mc_max_iter) - mean * mean);
-      radar_signal[b, s]     = factor * mean;
-      radar_error[b, s]      = factor * std::sqrt(variance / static_cast<Numeric>(mc_max_iter));
+      const Numeric mean     = radar_signal[b][s] / static_cast<Numeric>(mc_max_iter);
+      const Numeric variance = std::max(0.0, squared_sum[b][s] / static_cast<Numeric>(mc_max_iter) - mean * mean);
+      radar_signal[b][s]     = factor * mean;
+      radar_error[b][s]      = factor * std::sqrt(variance / static_cast<Numeric>(mc_max_iter));
     }
   }
 }

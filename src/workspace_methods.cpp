@@ -6238,11 +6238,11 @@ Neither polarization nor wind calculations are possible with this method.
 
 This ARTS3-native implementation uses *AtmField*, *SurfaceField*,
 *ArrayOfScatteringSpecies*, and *ray_path_observer_agenda*.  Range-bin edges
-are one-way geometric distances in metres.  The output matrices have shape
-``[range bin, Stokes]`` and the error is the standard error of the Monte Carlo
-mean.  The implementation currently supports single scattering
-(``mc_max_scatorder=1``); the argument is retained so higher orders can be
-added without changing the interface.
+are one-way geometric distances in metres.  The outputs contain one
+*Stokvec* per range bin, and the error contains the component-wise standard
+error of the Monte Carlo mean.  The implementation currently supports single
+scattering (``mc_max_scatorder=1``); the argument is retained so higher orders
+can be added without changing the interface.
 )--",
       .author = {"Richard Larsson", "OpenAI Codex"},
       .out    = {"radar_signal", "radar_error"},

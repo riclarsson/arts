@@ -622,10 +622,14 @@ dispersion_jac:       {:B,}
   bool has_zeeman = lbl::voigt::lte::calculate(
       pm, dpm, abs_bands, freq_grid, jac_targets, atm_point, no, species, no_negative_absorption);
 
-  spectral_propmat     += pm.real();
-  spectral_propmat_jac += dpm.real();
-  dispersion           -= pm.imag();
-  dispersion_jac       -= dpm.imag();
+  for (Size i = 0; i < nf; i++) {
+    spectral_propmat[i] += Propmat{pm[i].real()};
+    dispersion[i]       -= pm[i].imag();
+    for (Size j = 0; j < nt; ++j) {
+      spectral_propmat_jac[j, i] += Propmat{dpm[j, i].real()};
+      dispersion_jac[j, i]       -= dpm[j, i].imag();
+    }
+  }
 
   if (has_zeeman) {
     const auto mag = atm_point.mag;
@@ -721,10 +725,14 @@ single_dispersion_jac: {:B,}
   bool has_zeeman = lbl::voigt::lte::calculate(
       pm, dpm, abs_bands, freq_grid, jac_targets, atm_point, no, species, no_negative_absorption);
 
-  spectral_propmat     += pm.real();
-  spectral_propmat_jac += dpm.real();
-  dispersion           -= pm.imag();
-  dispersion_jac       -= dpm.imag();
+  for (Size i = 0; i < pm.size(); i++) {
+    spectral_propmat[i] += Propmat{pm[i].real()};
+    dispersion[i]       -= pm[i].imag();
+    for (Size j = 0; j < nt; ++j) {
+      spectral_propmat_jac[j, i] += Propmat{dpm[j, i].real()};
+      dispersion_jac[j, i]       -= dpm[j, i].imag();
+    }
+  }
 
   if (has_zeeman) {
     const auto mag = atm_point.mag;

@@ -122,7 +122,8 @@ template <> struct std::formatter<MCAntenna> {
   }
 
   template <class FmtContext> FmtContext::iterator format(const MCAntenna& x, FmtContext& ctx) const {
-    return tags.format(ctx, x.atype, x.sigma_za, x.sigma_aa, x.za_grid, x.aa_grid, x.G_lookup);
+    const auto sep = tags.sep();
+    return tags.format(ctx, x.atype, sep, x.sigma_za, sep, x.sigma_aa, sep, x.za_grid, sep, x.aa_grid, sep, x.G_lookup);
   }
 };
 

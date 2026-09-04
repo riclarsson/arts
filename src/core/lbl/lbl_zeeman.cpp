@@ -397,10 +397,10 @@ Propmat norm_view(ZeemanPolarization p, Vector3 mag, Vector2 los) {
   const Numeric         U     = ST2 * std::sin(2 * eta);
   switch (p) {
     using enum ZeemanPolarization;
-    case pi: return {ST2, -Q, U, 0, 0, U, Q};
+    case pi: return {ST2, -Q, U, 0.0, 0.0, U, Q};
     case sm: return {2 - ST2, Q, -U, 2 * CT, -2 * CT, -U, -Q};
     case sp: return {2 - ST2, Q, -U, -2 * CT, 2 * CT, -U, -Q};
-    case no: return {1, 0, 0, 0, 0, 0, 0};
+    case no: return {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
   }
 
   std::unreachable();
@@ -424,10 +424,10 @@ Propmat dnorm_view_du(ZeemanPolarization p, Vector3 mag, Vector2 los) {
 
   switch (p) {
     using enum ZeemanPolarization;
-    case pi: return {dST2, -dQ, dU, 0, 0, dU, dQ};
+    case pi: return {dST2, -dQ, dU, 0.0, 0.0, dU, dQ};
     case sm: return {-dST2, dQ, -dU, 2 * dCT, -2 * dCT, -dU, -dQ};
     case sp: return {-dST2, dQ, -dU, -2 * dCT, 2 * dCT, -dU, -dQ};
-    case no: return {0, 0, 0, 0, 0, 0, 0};
+    case no: return {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
   }
 
   std::unreachable();
@@ -451,10 +451,10 @@ Propmat dnorm_view_dv(ZeemanPolarization p, Vector3 mag, Vector2 los) {
 
   switch (p) {
     using enum ZeemanPolarization;
-    case pi: return {dST2, -dQ, dU, 0, 0, dU, dQ};
+    case pi: return {dST2, -dQ, dU, 0.0, 0.0, dU, dQ};
     case sm: return {-dST2, dQ, -dU, 2 * dCT, -2 * dCT, -dU, -dQ};
     case sp: return {-dST2, dQ, -dU, -2 * dCT, 2 * dCT, -dU, -dQ};
-    case no: return {0, 0, 0, 0, 0, 0, 0};
+    case no: return {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
   }
 
   std::unreachable();
@@ -478,10 +478,10 @@ Propmat dnorm_view_dw(ZeemanPolarization p, Vector3 mag, Vector2 los) {
 
   switch (p) {
     using enum ZeemanPolarization;
-    case pi: return {dST2, -dQ, dU, 0, 0, dU, dQ};
+    case pi: return {dST2, -dQ, dU, 0.0, 0.0, dU, dQ};
     case sm: return {-dST2, dQ, -dU, 2 * dCT, -2 * dCT, -dU, -dQ};
     case sp: return {-dST2, dQ, -dU, -2 * dCT, 2 * dCT, -dU, -dQ};
-    case no: return {0, 0, 0, 0, 0, 0, 0};
+    case no: return {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
   }
 
   std::unreachable();

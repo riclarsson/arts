@@ -142,6 +142,13 @@ template <class T, Size N> struct strided_view_t final : public mdstrided_t<T, N
     return *this;
   }
 
+  template <typename U> requires(not any_md<U> and not std::same_as<std::remove_cvref_t<U>, value_type> and
+                                 std::constructible_from<value_type, const U&>)
+  constexpr strided_view_t& operator=(const U& x) requires(not is_const) {
+    std::fill(elem_begin(), elem_end(), static_cast<value_type>(x));
+    return *this;
+  }
+
   template <ranked_convertible_md<T, N> R> constexpr strided_view_t& operator=(const R& r)
       requires(not(is_const or std::same_as<strided_view_t, R> or std::same_as<value_type, R>)) {
     assert(shape() == r.shape());
@@ -217,23 +224,27 @@ template <class T, Size N> struct strided_view_t final : public mdstrided_t<T, N
     return *this;
   }
 
-  template <std::convertible_to<T> U> constexpr strided_view_t& operator+=(U&& r) requires(not is_const) {
-    stdr::for_each(*this | by_elem, [v = std::forward_like<T>(r)](T& x) { return x += v; });
+  template <typename U> requires requires(T& x, const std::remove_cvref_t<U>& y) { x += y; }
+  constexpr strided_view_t& operator+=(U&& r) requires(not is_const) {
+    stdr::for_each(*this | by_elem, [v = std::forward<U>(r)](T& x) { x += v; });
     return *this;
   }
 
-  template <std::convertible_to<T> U> constexpr strided_view_t& operator-=(U&& r) requires(not is_const) {
-    stdr::for_each(*this | by_elem, [v = std::forward_like<T>(r)](T& x) { return x -= v; });
+  template <typename U> requires requires(T& x, const std::remove_cvref_t<U>& y) { x -= y; }
+  constexpr strided_view_t& operator-=(U&& r) requires(not is_const) {
+    stdr::for_each(*this | by_elem, [v = std::forward<U>(r)](T& x) { x -= v; });
     return *this;
   }
 
-  template <std::convertible_to<T> U> constexpr strided_view_t& operator*=(U&& r) requires(not is_const) {
-    stdr::for_each(*this | by_elem, [v = std::forward_like<T>(r)](T& x) { return x *= v; });
+  template <typename U> requires requires(T& x, const std::remove_cvref_t<U>& y) { x *= y; }
+  constexpr strided_view_t& operator*=(U&& r) requires(not is_const) {
+    stdr::for_each(*this | by_elem, [v = std::forward<U>(r)](T& x) { x *= v; });
     return *this;
   }
 
-  template <std::convertible_to<T> U> constexpr strided_view_t& operator/=(U&& r) requires(not is_const) {
-    stdr::for_each(*this | by_elem, [v = std::forward_like<T>(r)](T& x) { return x /= v; });
+  template <typename U> requires requires(T& x, const std::remove_cvref_t<U>& y) { x /= y; }
+  constexpr strided_view_t& operator/=(U&& r) requires(not is_const) {
+    stdr::for_each(*this | by_elem, [v = std::forward<U>(r)](T& x) { x /= v; });
     return *this;
   }
 

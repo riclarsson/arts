@@ -45,9 +45,8 @@ ARTS_METHOD_ERROR_CATCH
 
 namespace {
 StokvecVector from_temp(const ConstVectorView& freq_grid, const Numeric t) {
-  StokvecVector v(freq_grid.size(), 0.0);
-  std::transform(
-      freq_grid.begin(), freq_grid.end(), v.begin(), [t](auto f) -> Stokvec { return {planck(f, t), 0, 0, 0}; });
+  StokvecVector v(freq_grid.size(), Stokvec{0.0});
+  std::transform(freq_grid.begin(), freq_grid.end(), v.begin(), [t](auto f) { return Stokvec{planck(f, t)}; });
   return v;
 }
 }  // namespace
@@ -119,7 +118,7 @@ void spectral_radSurfaceBlackbody(StokvecVector&              spectral_rad,
 
       for (Size i = 0; i < freq_grid.size(); i++) {
         const Numeric dBdt = dplanck_dt(freq_grid[i], t);
-        for (const auto& w : ws) { spectral_rad_jac[w.first + target.x_start, i] += w.second * dBdt; }
+        for (const auto& w : ws) { spectral_rad_jac[w.first + target.x_start, i] += w.second * Stokvec{dBdt}; }
       }
     }
   }

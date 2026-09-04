@@ -241,7 +241,7 @@ void nlte_step(stokvec_vector_view              I,
   for (Size iv = 0; iv < NV; iv++) {
     const Numeric B0 = planck(f[iv], T0);
     const Numeric B1 = planck(f[iv], T1);
-    const stokvec J  = std::midpoint(B0, B1) + avg(inv(K0[iv]) * J0[iv], inv(K1[iv]) * J1[iv]);
+    const stokvec J  = stokvec{std::midpoint(B0, B1)} + avg(inv(K0[iv]) * J0[iv], inv(K1[iv]) * J1[iv]);
     const tran    tr{K0[iv], K1[iv], r};
     const bool thin = not tr.polarized ? std::abs(tr.a) < 0.5
                                        : std::abs(tr.a) + std::max({std::abs(tr.b) + std::abs(tr.c) + std::abs(tr.d),
@@ -556,7 +556,7 @@ void all(stokvec_vector_view               I,
   for (Size iv = 0; iv < nv; iv++) {
     const auto src = I0[iv];
 
-    muelmat P = 1.0;
+    muelmat P{1.0};
     for (Size i = N - 2; i > 0; i--) {
       const muelmat R = Ts[i + 1][iv] * P;
       for (Size iq = 0; iq < nq; iq++) {

@@ -9,17 +9,43 @@
 #include "rtepack_common.h"
 
 namespace rtepack {
+
 struct propmat final : Vector7 {
-  constexpr propmat(Numeric a = 0.0,
-                    Numeric b = 0.0,
-                    Numeric c = 0.0,
-                    Numeric d = 0.0,
-                    Numeric u = 0.0,
-                    Numeric v = 0.0,
-                    Numeric w = 0.0)
+  explicit constexpr propmat(Numeric a) : Vector7{a, 0., 0., 0., 0., 0., 0.} {}
+
+  constexpr propmat() : propmat(0.0) {}
+
+  constexpr propmat(Numeric a, Numeric b, Numeric c, Numeric d, Numeric u, Numeric v, Numeric w)
       : Vector7{a, b, c, d, u, v, w} {}
 
-  constexpr propmat(std::array<Numeric, 7> data) noexcept : Vector7{data} {}
+  template <matpack::exact_md<Numeric, 2> T> explicit constexpr propmat(const T &input) noexcept {
+    assert(input.extent(0) == 4 and input.extent(1) == 4);
+    assert((input[1, 0] == 0.0 and input[2, 0] == 0.0 and input[3, 0] == 0.0));
+    assert((input[1, 0] == input[0, 1] and input[2, 0] == input[0, 2] and input[3, 0] == input[0, 3]));
+    assert((input[2, 1] == -input[1, 2] and input[3, 1] == -input[1, 3] and input[3, 2] == -input[2, 3]));
+    data[0] = input[0, 0];
+    data[1] = input[0, 1];
+    data[2] = input[0, 2];
+    data[3] = input[0, 3];
+    data[4] = input[1, 2];
+    data[5] = input[1, 3];
+    data[6] = input[2, 3];
+  }
+
+  template <stdr::forward_range T> requires std::is_convertible_v<stdr::range_value_t<T>, Numeric>
+  explicit constexpr propmat(const T &input) noexcept : propmat{} {
+    assert(stdr::size(input) == 7);
+    stdr::copy(input, data.begin());
+  }
+
+  template <matpack::exact_md<Numeric, 2> T> constexpr propmat &operator=(const T &input) noexcept {
+    return *this = propmat{input};
+  }
+
+  template <stdr::forward_range T> requires std::is_convertible_v<stdr::range_value_t<T>, Numeric>
+  constexpr propmat &operator=(const T &input) noexcept {
+    return *this = propmat{input};
+  }
 
   [[nodiscard]] constexpr decltype(auto) A() const { return data[0]; }
   [[nodiscard]] constexpr decltype(auto) B() const { return data[1]; }
@@ -47,35 +73,34 @@ struct propmat final : Vector7 {
 
   constexpr auto operator<=>(const propmat &pm) const { return A() <=> pm.A(); }
 
-  [[nodiscard]] constexpr propmat operator-() const { return {-A(), -B(), -C(), -D(), -U(), -V(), -W()}; }
+  [[nodiscard]] constexpr propmat operator-() const { return propmat{-A(), -B(), -C(), -D(), -U(), -V(), -W()}; }
+
+  constexpr propmat &operator+=(const propmat &b) {
+    for (Size i = 0; i < 7; ++i) { data[i] += b.data[i]; }
+    return *this;
+  }
+
+  constexpr propmat &operator-=(const propmat &b) {
+    for (Size i = 0; i < 7; ++i) { data[i] -= b.data[i]; }
+    return *this;
+  }
+
+  constexpr propmat &operator/=(const Numeric &b) {
+    for (auto &x : data) { x /= b; }
+    return *this;
+  }
+
+  constexpr propmat &operator*=(const Numeric &b) {
+    for (auto &x : data) { x *= b; }
+    return *this;
+  }
 };
 
-//! Addition of two propmat matrixes
-constexpr propmat operator+(propmat a, const propmat &b) {
-  a += b;
-  return a;
-}
-
-//! Subtraction between two propmat matrixes
-constexpr propmat operator-(propmat a, const propmat &b) {
-  a -= b;
-  return a;
-}
-
-//! Scaling a propmat matrix
-constexpr propmat operator*(propmat a, const Numeric &b) {
-  a *= b;
-  return a;
-}
-
-//! Scaling a propmat matrix
-constexpr propmat operator*(const Numeric &a, propmat b) { return b * a; }
-
-//! Scaling a propmat matrix
-constexpr propmat operator/(propmat a, const propmat &b) {
-  a /= b;
-  return a;
-}
+constexpr propmat operator+(propmat a, const propmat &b) { return a += b; }
+constexpr propmat operator-(propmat a, const propmat &b) { return a -= b; }
+constexpr propmat operator*(propmat a, const Numeric &b) { return a *= b; }
+constexpr propmat operator*(const Numeric &a, propmat b) { return b *= a; }
+constexpr propmat operator/(propmat a, const Numeric &b) { return a /= b; }
 
 constexpr Numeric det(const propmat &k) {
   const auto &[a, b, c, d, u, v, w] = k.data;

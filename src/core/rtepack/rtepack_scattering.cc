@@ -98,7 +98,7 @@ Array<muelmat_matrix> bulk_backscatter_derivative(const ConstTensor5View &Pe, co
 
   for (Index ip = 0; ip < np; ip++) {
     for (Size iq = 0; iq < nq; iq++) {
-      aoaotm[ip][iq] = 0.0;
+      aoaotm[ip][iq] = muelmat{0.0};
       for (Index iv = 0; iv < nv; iv++) {
         for (Index ie = 0; ie < ne; ie++) {
           auto m              = Pe[ie, ip, iv, joker, joker];
@@ -213,7 +213,7 @@ muelmat rayleigh_scattering(const Vector2 &los_in, const Vector2 &los_out, const
   const auto F33 = 1.5 * delta * cos_theta;
   const auto F44 = 1.5 * delta * delta_prime * cos_theta;
 
-  muelmat pha;
+  muelmat pha{1.0};
   pha[0, 0] = F11;
 
   const Numeric za_sca_rad = Conversion::deg2rad(za_sca);

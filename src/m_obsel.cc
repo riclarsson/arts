@@ -34,11 +34,11 @@ void measurement_sensorAddSimple(ArrayOfSensorObsel&    measurement_sensor,
   auto f = std::make_shared<const AscendingGrid>(freq_grid);
   auto p = std::make_shared<const SensorPosLosVector>(SensorPosLosVector{{.pos = pos, .los = los}});
 
-  StokvecMatrix w(1, n, 0);
+  StokvecMatrix w(1, n, Stokvec{0.0});
   for (Index i = 0; i < n; i++) {
     w[0, i]                    = pol;
     measurement_sensor[i + sz] = {f, p, w};
-    w[0, i]                    = 0.0;
+    w[0, i]                    = Stokvec{0.0};
   }
 
   // Metadata: 1D sorted gridded field with frequency grid
@@ -333,7 +333,7 @@ Your sorting is not correct, and instead reads:
                   wposlos[iza, iaa, ialt, ilat, ilon] = SensorPosLos(pos + dpos, los + dlos);
                 }
 
-                wview[iza, iaa, ialt, ilat, ilon, ifreq] = view[ifreq, iza, iaa, ialt, ilat, ilon];
+                wview[iza, iaa, ialt, ilat, ilon, ifreq] = Stokvec{view[ifreq, iza, iaa, ialt, ilat, ilon]};
               }
             }
           }

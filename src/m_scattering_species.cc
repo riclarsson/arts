@@ -25,9 +25,9 @@ void spectral_propmat_scatSpectralInit(PropmatVector&       spectral_propmat_sca
   spectral_absvec_scat.resize(freq_grid.size());
   spectral_phamat_spectral.resize(freq_grid.size(), legendre_degree + 1);
 
-  spectral_propmat_scat    = 0.0;
-  spectral_absvec_scat     = 0.0;
-  spectral_phamat_spectral = Complex{0.0};
+  spectral_propmat_scat    = Propmat{0.0};
+  spectral_absvec_scat     = Stokvec{0.0};
+  spectral_phamat_spectral = Specmat{Complex{0.0}};
 }
 
 void spectral_propmat_scatAddSpectralScatteringSpeciesTRO(PropmatVector&                  spectral_propmat_scat,

@@ -19,21 +19,6 @@
 
 namespace {
 
-template <typename VectorType> Muelmat as_muelmat(const VectorType& x) {
-  ARTS_USER_ERROR_IF(x.size() != 16, "Expected 16 full phase-matrix coefficients, got {}", x.size())
-  Muelmat out{0.0};
-  for (Index i = 0; i < 4; ++i)
-    for (Index j = 0; j < 4; ++j) {
-      ARTS_USER_ERROR_IF(not std::isfinite(x[4 * i + j]),
-                         "Non-finite ARO phase-matrix coefficient at [{}, {}]: {}",
-                         i,
-                         j,
-                         x[4 * i + j])
-      out[i, j] = x[4 * i + j];
-    }
-  return out;
-}
-
 Numeric liebe93_k2(const Numeric frequency, const Numeric temperature) {
   ARTS_USER_ERROR_IF(
       temperature < Constant::temperature_at_0c - 40.0 or temperature > Constant::temperature_at_0c + 100.0,
@@ -74,13 +59,6 @@ struct OpticalProfile {
   std::vector<PropmatMatrix> return_extinction_jac;
   std::vector<MuelmatMatrix> backscatter_jac;
 };
-
-template <typename VectorType> Propmat as_propmat(const VectorType& x) {
-  ARTS_USER_ERROR_IF(x.size() != 3, "Expected three ARO extinction coefficients, got {}", x.size())
-  for (Index i = 0; i < 3; ++i)
-    ARTS_USER_ERROR_IF(not std::isfinite(x[i]), "Non-finite ARO extinction coefficient {}: {}", i, x[i])
-  return Propmat{x[0], x[1], 0.0, 0.0, 0.0, 0.0, x[2]};
-}
 
 Numeric normalized_delta_aa(Numeric aa) {
   while (aa < -180.0) aa += 360.0;
@@ -178,13 +156,16 @@ OpticalProfile optical_profile(const Workspace&                   ws,
     const auto  outgoing_extinction_coeffs = bulk_outgoing.extinction_matrix.get_const_coeff_vector_view();
     const auto  return_extinction_coeffs   = bulk_return.extinction_matrix.get_const_coeff_vector_view();
     for (Size iv = 0; iv < nf; ++iv) {
+      const auto& outgoing             = outgoing_extinction_coeffs[0, iv, 0];
+      const auto& returning            = return_extinction_coeffs[0, iv, 0];
       out.gas_extinction[ip][iv]       = gas_outgoing[iv];
-      out.particle_extinction[ip][iv]  = as_propmat(outgoing_extinction_coeffs[0, iv, 0]);
+      out.particle_extinction[ip][iv]  = Propmat{outgoing[0], outgoing[1], 0.0, 0.0, 0.0, 0.0, outgoing[2]};
       out.outgoing_extinction[ip][iv]  = gas_outgoing[iv];
       out.outgoing_extinction[ip][iv] += pext_scaling * out.particle_extinction[ip][iv];
       out.return_extinction[ip][iv]    = gas_return[iv];
-      out.return_extinction[ip][iv]   += pext_scaling * as_propmat(return_extinction_coeffs[0, iv, 0]);
-      out.backscatter[ip][iv]          = as_muelmat(phase_coeffs[0, iv, 0, 0, 0]);
+      out.return_extinction[ip][iv] +=
+          pext_scaling * Propmat{returning[0], returning[1], 0.0, 0.0, 0.0, 0.0, returning[2]};
+      out.backscatter[ip][iv] = phase_coeffs[0, iv, 0, 0, 0];
     }
     for (const auto& target : jac_targets.atm) {
       auto receive_za_jac =
@@ -201,12 +182,14 @@ OpticalProfile optical_profile(const Workspace&                   ws,
       const auto dreturn_extinction_coeffs   = dbulk_return.extinction_matrix.get_const_coeff_vector_view();
       for (Size iv = 0; iv < nf; ++iv) {
         out.outgoing_extinction_jac[ip][target.target_pos, iv] = gas_outgoing_jac[target.target_pos, iv];
+        const auto& doutgoing                                  = doutgoing_extinction_coeffs[0, iv, 0];
+        const auto& dreturning                                 = dreturn_extinction_coeffs[0, iv, 0];
         out.outgoing_extinction_jac[ip][target.target_pos, iv] +=
-            pext_scaling * as_propmat(doutgoing_extinction_coeffs[0, iv, 0]);
+            pext_scaling * Propmat{doutgoing[0], doutgoing[1], 0.0, 0.0, 0.0, 0.0, doutgoing[2]};
         out.return_extinction_jac[ip][target.target_pos, iv] = gas_return_jac[target.target_pos, iv];
         out.return_extinction_jac[ip][target.target_pos, iv] +=
-            pext_scaling * as_propmat(dreturn_extinction_coeffs[0, iv, 0]);
-        out.backscatter_jac[ip][target.target_pos, iv] = as_muelmat(dphase_coeffs[0, iv, 0, 0, 0]);
+            pext_scaling * Propmat{dreturning[0], dreturning[1], 0.0, 0.0, 0.0, 0.0, dreturning[2]};
+        out.backscatter_jac[ip][target.target_pos, iv] = dphase_coeffs[0, iv, 0, 0, 0];
       }
     }
   }

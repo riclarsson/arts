@@ -57,6 +57,8 @@ ws.MCRadar(**kwargs)
 signal = np.array(ws.radar_signal)
 error = np.array(ws.radar_error)
 
+assert isinstance(ws.radar_signal, A.StokvecVector)
+assert isinstance(ws.radar_error, A.StokvecVector)
 assert signal.shape == (20, 4)
 assert error.shape == signal.shape
 assert np.all(np.isfinite(signal))
@@ -78,6 +80,35 @@ factor = ze[mask] / signal[mask]
 assert np.allclose(factor, factor[0], rtol=1e-13)
 error_mask = error != 0.0
 assert np.allclose(ze_error[error_mask] / error[error_mask], factor[0])
+
+# In the pencil-beam, single-scattering limit, MCRadar must reproduce the
+# ARTS3 deterministic rtepack radar result.  One history is sufficient because
+# there is then no random angular sampling.  The small tolerance reflects the
+# midpoint quadrature used by MCRadar versus path interpolation in the
+# deterministic method.
+ws.mc_antenna.set_pencil_beam()
+ws.max_stepsize = 100.0
+ws.MCRadar(**(kwargs | {"mc_max_iter": 1}))
+mc_pencil = np.asarray(ws.radar_signal)[:, 0].copy()
+
+ws.freq_grid = [kwargs["frequency"]]
+ws.measurement_sensorInit()
+ws.radar_range_limits = np.empty((0, 2))
+ws.measurement_sensorAddSimpleRadar(
+    pos=kwargs["sensor_pos"],
+    los=kwargs["sensor_los"],
+    pol=[1.0, 0.0, 0.0, 0.0],
+    range_bins=kwargs["range_bins"],
+)
+ws.jac_targetsOff()
+ws.measurement_vecFromRadarSingleScattering(
+    transmitted_stokes=kwargs["mc_y_tx"],
+    range_mode="Distance",
+    unit="1",
+    pext_scaling=1.0,
+)
+deterministic = np.asarray(ws.measurement_vec)
+np.testing.assert_allclose(mc_pencil, deterministic, rtol=2e-3, atol=1e-15)
 
 # Invalid higher scattering orders are rejected explicitly until the collision
 # sampler is added, rather than silently returning a single-scattering result.

@@ -161,10 +161,10 @@ ParticleHabit ParticleHabit::from_legacy_aro(std::vector<::SingleScatteringData>
         SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>::from_legacy_aro(ssd_[ind], meta_[ind]));
   }
   Vector signed_delta_aa(2 * ssd_[0].aa_grid.size() - 1);
-  for (Index i = 1; i < ssd_[0].aa_grid.size(); ++i) {
+  for (Size i = 1; i < ssd_[0].aa_grid.size(); ++i) {
     signed_delta_aa[ssd_[0].aa_grid.size() - 1 - i] = -ssd_[0].aa_grid[i];
   }
-  for (Index i = 0; i < ssd_[0].aa_grid.size(); ++i) {
+  for (Size i = 0; i < ssd_[0].aa_grid.size(); ++i) {
     signed_delta_aa[ssd_[0].aa_grid.size() - 1 + i] = ssd_[0].aa_grid[i];
   }
   auto grids = ScatteringDataGrids(std::make_shared<Vector>(ssd_[0].T_grid),

@@ -38,11 +38,12 @@ template <typename T, typename Grid0, typename... Grids> struct gridded_data_t {
   // number of grids, but possibly different types.  E.g., sorted to unsorted or vice versa.
   template <typename OtherT, typename OtherGrid0, typename... OtherGrids>
   operator gridded_data_t<OtherT, OtherGrid0, OtherGrids...>() const
-      requires(std::is_convertible_v<T, OtherT> and std::is_convertible_v<Grid0, OtherGrid0> and
+      requires(std::constructible_from<OtherT, const T&> and std::is_convertible_v<Grid0, OtherGrid0> and
                (std::is_convertible_v<Grids, OtherGrids> and ...) and sizeof...(OtherGrids) == dim - 1) {
     gridded_data_t<OtherT, OtherGrid0, OtherGrids...> out;
-    out.data_name  = data_name;
-    out.data       = data;
+    out.data_name = data_name;
+    out.data.resize(data.shape());
+    stdr::transform(data | by_elem, out.data.elem_begin(), [](const T& x) { return OtherT{x}; });
     out.grid_names = grid_names;
 
     grid_copy(out, std::make_index_sequence<dim>{});

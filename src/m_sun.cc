@@ -186,7 +186,7 @@ void spectral_propmat_scatInit(PropmatVector& spectral_propmat_scat, const Ascen
   ARTS_TIME_REPORT
 
   spectral_propmat_scat.resize(freq_grid.size());
-  spectral_propmat_scat = 0.0;
+  spectral_propmat_scat = Propmat{0.0};
 }
 
 void spectral_propmat_scatAirSimple(PropmatVector&       spectral_propmat_scat,

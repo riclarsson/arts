@@ -41,8 +41,8 @@ void level_nlte(stokvec_vector_view              J,
 
   for (Size i = 0; i < N; i++) {
     if (K[i].is_rotational()) {
-      J[i]         = 0.0;
-      dJ[joker, i] = 0.0;
+      J[i]         = stokvec{0.0};
+      dJ[joker, i] = stokvec{0.0};
     } else {
       const auto b    = stokvec{planck(f[i], t), 0, 0, 0};
       const auto invK = inv(K[i]);
@@ -89,13 +89,13 @@ void SourceVector::init(const std::span<const propmat_vector> &K,
   for (Size i = 0; i < np; i++) {
     for (Size j = 0; j < nf; j++) {
       if (K[i][j].is_rotational()) {
-        J[j, i]  = 0.0;
-        dJ[j, i] = 0.0;
+        J[j, i]  = stokvec{0.0};
+        dJ[j, i] = stokvec{0.0};
       } else {
         const auto b    = planck(freq_grid[i][j], ts[i]);
         const auto invK = inv(K[i][j]);
         const auto n    = invK * nlte[i][j];
-        J[j, i]         = b + n;
+        J[j, i]         = stokvec{b} + n;
 
         for (Size k = 0; k < nq; k++) {
           dJ[j, i, k] = stokvec{it == k ? dplanck_dt(freq_grid[i][j], ts[i]) : 0, 0, 0, 0} -
@@ -136,13 +136,13 @@ void SourceVector::init(const std::span<const propmat>        &K,
 #pragma omp parallel for if (!arts_omp_in_parallel())
   for (Size i = 0; i < np; i++) {
     if (K[i].is_rotational()) {
-      J_[i]  = 0.0;
-      dJ_[i] = 0.0;
+      J_[i]  = stokvec{0.0};
+      dJ_[i] = stokvec{0.0};
     } else {
       const auto b    = planck(freq[i], ts[i]);
       const auto invK = inv(K[i]);
       const auto n    = invK * nlte[i];
-      J_[i]           = b + n;
+      J_[i]           = stokvec{b} + n;
 
       for (Size k = 0; k < nq; k++) {
         dJ_[i, k] = stokvec{it == k ? dplanck_dt(freq[i], ts[i]) : 0, 0, 0, 0} - invK * (dK[i][k] * n - dnlte[i][k]);

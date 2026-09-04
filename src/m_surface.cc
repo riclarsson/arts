@@ -61,7 +61,7 @@ surf_field:
 
   const Muelmat R        = rtepack::fresnel_reflectance(Rv, Rh);
   spectral_surf_refl     = R;
-  spectral_surf_refl_jac = 0.0;
+  spectral_surf_refl_jac = Muelmat{0.0};
 
   for (auto& target : jac_targets.surf) {
     if (target.type == refraction_target) {
@@ -114,11 +114,11 @@ surf_field:
   spectral_surf_refl.resize(nf);
   spectral_surf_refl_jac.resize(jac_targets.target_count(), nf);
 
-  spectral_surf_refl     = R;
-  spectral_surf_refl_jac = 0.0;
+  spectral_surf_refl     = Muelmat{R};
+  spectral_surf_refl_jac = Muelmat{0.0};
 
   for (auto& target : jac_targets.surf) {
-    if (target.type == reflectance_target) { spectral_surf_refl_jac[target.target_pos] = 1.0; }
+    if (target.type == reflectance_target) { spectral_surf_refl_jac[target.target_pos] = Muelmat{1.0}; }
   }
 }
 ARTS_METHOD_ERROR_CATCH

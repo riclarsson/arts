@@ -295,17 +295,19 @@ template <std::floating_point Scalar, Format format> class BackscatterMatrixData
     auto                  coeffs_this = get_const_coeff_vector_view();
     auto                  coeffs_res  = result.get_coeff_vector_view();
     for (Size i_t = 0; i_t < weights.t_grid_weights.size(); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos    gp_t  = weights.t_grid_weights[i_t];
+      Numeric    w_t_l = gp_t.fd[1];
+      Numeric    w_t_r = gp_t.fd[0];
+      const auto i_t_l = std::clamp<Index>(gp_t.idx, 0, n_temps_ - 1);
+      const auto i_t_r = std::min(i_t_l + 1, n_temps_ - 1);
       for (Size i_f = 0; i_f < weights.f_grid_weights.size(); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
-        coeffs_res[i_t, i_f] =
-            (w_t_l * w_f_l * coeffs_this[gp_t.idx, gp_f.idx] + w_t_l * w_f_r * coeffs_this[gp_t.idx, gp_f.idx + 1] +
-             w_t_r * w_f_l * coeffs_this[gp_t.idx + 1, gp_f.idx] +
-             w_t_r * w_f_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1]);
+        GridPos    gp_f      = weights.f_grid_weights[i_f];
+        Numeric    w_f_l     = gp_f.fd[1];
+        Numeric    w_f_r     = gp_f.fd[0];
+        const auto i_f_l     = std::clamp<Index>(gp_f.idx, 0, n_freqs_ - 1);
+        const auto i_f_r     = std::min(i_f_l + 1, n_freqs_ - 1);
+        coeffs_res[i_t, i_f] = (w_t_l * w_f_l * coeffs_this[i_t_l, i_f_l] + w_t_l * w_f_r * coeffs_this[i_t_l, i_f_r] +
+                                w_t_r * w_f_l * coeffs_this[i_t_r, i_f_l] + w_t_r * w_f_r * coeffs_this[i_t_r, i_f_r]);
       }
     }
     return result;
@@ -359,7 +361,15 @@ template <std::floating_point Scalar> class BackscatterMatrixData<Scalar, Format
         f_grid_(bsmat.get_f_grid_ptr()),
         n_za_inc_(za_inc_grid->size()),
         za_inc_grid_(za_inc_grid) {
-    for (Index ind = 0; ind < n_za_inc_; ++ind) { matpack::data_t<Scalar, 4>::operator[](ind) = bsmat; }
+    for (Index i_t = 0; i_t < n_temps_; ++i_t) {
+      for (Index i_f = 0; i_f < n_freqs_; ++i_f) {
+        for (Index i_za = 0; i_za < n_za_inc_; ++i_za) {
+          for (Index i_s = 0; i_s < n_stokes_coeffs; ++i_s) {
+            this->operator[](i_t, i_f, i_za, i_s) = bsmat[i_t, i_f, i_s];
+          }
+        }
+      }
+    }
   }
 
   constexpr matpack::view_t<CoeffVector, 3> get_coeff_vector_view() {

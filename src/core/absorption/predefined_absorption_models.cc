@@ -179,7 +179,7 @@ void compute_vmr_deriv(PropmatVector&                                   dpm,
                        const SpeciesEnum                                spec,
                        const Absorption::PredefinedModel::ModelVariant& predefined_model_data [[maybe_unused]]) {
   atm_point[spec] += dvmr;
-  dpm              = 0;
+  dpm              = Propmat{0.0};
   compute_selection<false>(dpm, model, f, atm_point, predefined_model_data);
   dpm -= pm;
   dpm /= dvmr;
@@ -224,7 +224,7 @@ void compute(PropmatVector&                                   propmat_clearsky,
       const auto    iq = temp_jac->target_pos;
       assert(d not_eq 0);
 
-      dpm                     = 0;
+      dpm                     = Propmat{0.0};
       auto atm_point2         = atm_point;
       atm_point2.temperature += d;
       compute_selection<false>(dpm, model, f_grid, atm_point2, predefined_model_data);
@@ -242,7 +242,7 @@ void compute(PropmatVector&                                   propmat_clearsky,
         Vector f_grid_d{f_grid};
         f_grid_d += d;
 
-        dpm = 0.0;
+        dpm = Propmat{0.0};
         compute_selection<false>(dpm, model, f_grid_d, atm_point, predefined_model_data);
         dpm                      -= pm;
         dpm                      /= d;

@@ -229,16 +229,18 @@ void spectral_radFromDisort(StokvecVector&              spectral_rad,
   if (above or below) {
     std::visit(
         [&, idx = above ? 0 : alt_grid.size() - 2](auto&& aa, auto&& za) {
-          std::transform(
-              data.begin(), data.end(), spectral_rad.begin(), [&](auto&& d) { return interp(d[idx], aa, za); });
+          std::transform(data.begin(), data.end(), spectral_rad.begin(), [&](auto&& d) {
+            return Stokvec{interp(d[idx], aa, za)};
+          });
         },
         variant_lag<aa_cyc_t>(azi_grid, ray_point.los[1]),
         variant_lag(zen_grid, ray_point.los[0]));
   } else {
     std::visit(
         [&](auto&& alt, auto&& aa, auto&& za) {
-          std::transform(
-              data.begin(), data.end(), spectral_rad.begin(), [&](auto&& d) { return interp(d, alt, aa, za); });
+          std::transform(data.begin(), data.end(), spectral_rad.begin(), [&](auto&& d) {
+            return Stokvec{interp(d, alt, aa, za)};
+          });
         },
         variant_lag(std::span{alt_grid}.subspan(1), z),
         variant_lag<aa_cyc_t>(azi_grid, ray_point.los[1]),

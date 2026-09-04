@@ -188,9 +188,24 @@ void py_rtepack(py::module_ &m) try {
   asv.doc() = "A list of :class:`~pyarts3.arts.Stokvec`";
 
   py::class_<StokvecVector> vsv(m, "StokvecVector");
-  vsv.def(py::init_implicit<std::vector<Numeric>>()).def(py::init_implicit<std::vector<Stokvec>>());
+  vsv.def(
+      "__init__",
+      [](StokvecVector *v, const std::vector<Numeric> &a) {
+        new (v) StokvecVector(a.size());
+        stdr::transform(a, v->begin(), [](const Numeric &x) { return Stokvec{x}; });
+      },
+      "a"_a);
+  vsv.def(
+      "__init__",
+      [](StokvecVector *v, const std::vector<Stokvec> &a) {
+        new (v) StokvecVector(a.size());
+        stdr::transform(a, v->begin(), [](const Stokvec &x) { return x; });
+      },
+      "a"_a);
   rtepack_array<Stokvec, 1, 4>(vsv);
   generic_interface(vsv);
+  py::implicitly_convertible<std::vector<Numeric>, StokvecVector>();
+  py::implicitly_convertible<std::vector<Stokvec>, StokvecVector>();
 
   py::class_<StokvecMatrix> msv(m, "StokvecMatrix");
   rtepack_array<Stokvec, 2, 4>(msv);
@@ -256,9 +271,24 @@ void py_rtepack(py::module_ &m) try {
   apm.doc() = "A list of :class:`~pyarts3.arts.Propmat`";
 
   py::class_<PropmatVector> vpm(m, "PropmatVector");
-  vpm.def(py::init_implicit<std::vector<Numeric>>()).def(py::init_implicit<std::vector<Propmat>>());
+  vpm.def(
+      "__init__",
+      [](PropmatVector *v, const std::vector<Numeric> &a) {
+        new (v) PropmatVector(a.size());
+        stdr::transform(a, v->begin(), [](const Numeric &x) { return Propmat{x}; });
+      },
+      "a"_a);
+  vpm.def(
+      "__init__",
+      [](PropmatVector *v, const std::vector<Propmat> &a) {
+        new (v) PropmatVector(a.size());
+        stdr::transform(a, v->begin(), [](const Propmat &x) { return x; });
+      },
+      "a"_a);
   rtepack_array<Propmat, 1, 7>(vpm);
   generic_interface(vpm);
+  py::implicitly_convertible<std::vector<Numeric>, PropmatVector>();
+  py::implicitly_convertible<std::vector<Propmat>, PropmatVector>();
 
   py::class_<PropmatMatrix> mpm(m, "PropmatMatrix");
   rtepack_array<Propmat, 2, 7>(mpm);
@@ -303,9 +333,24 @@ void py_rtepack(py::module_ &m) try {
       "is_polarized",
       [](const MuelmatVector &m) { return stdr::any_of(m, [](const Muelmat &mm) { return mm.is_polarized(); }); },
       "Check if the Mueller matrix represents a polarized state.");
-  vmm.def(py::init_implicit<std::vector<Numeric>>()).def(py::init_implicit<std::vector<Muelmat>>());
+  vmm.def(
+      "__init__",
+      [](MuelmatVector *v, const std::vector<Numeric> &a) {
+        new (v) MuelmatVector(a.size());
+        stdr::transform(a, v->begin(), [](const Numeric &x) { return Muelmat{x}; });
+      },
+      "a"_a);
+  vmm.def(
+      "__init__",
+      [](MuelmatVector *v, const std::vector<Muelmat> &a) {
+        new (v) MuelmatVector(a.size());
+        stdr::transform(a, v->begin(), [](const Muelmat &x) { return x; });
+      },
+      "a"_a);
   rtepack_array<Muelmat, 1, 4, 4>(vmm);
   generic_interface(vmm);
+  py::implicitly_convertible<std::vector<Numeric>, MuelmatVector>();
+  py::implicitly_convertible<std::vector<Muelmat>, MuelmatVector>();
 
   py::class_<MuelmatMatrix> mmm(m, "MuelmatMatrix");
   rtepack_array<Muelmat, 2, 4, 4>(mmm);
@@ -359,10 +404,25 @@ void py_rtepack(py::module_ &m) try {
   generic_interface(asp);
 
   py::class_<SpecmatVector> vcmm(m, "SpecmatVector");
-  vcmm.def(py::init_implicit<std::vector<Complex>>()).def(py::init_implicit<std::vector<Specmat>>());
+  vcmm.def(
+      "__init__",
+      [](SpecmatVector *v, const std::vector<Numeric> &a) {
+        new (v) SpecmatVector(a.size());
+        stdr::transform(a, v->begin(), [](const Numeric &x) { return Specmat{x}; });
+      },
+      "a"_a);
+  vcmm.def(
+      "__init__",
+      [](SpecmatVector *v, const std::vector<Specmat> &a) {
+        new (v) SpecmatVector(a.size());
+        stdr::transform(a, v->begin(), [](const Specmat &x) { return x; });
+      },
+      "a"_a);
   rtepack_array<Specmat, 1, 4, 4>(vcmm);
   vcmm.doc() = "A vector of :class:`~pyarts3.arts.Specmat`";
   generic_interface(vcmm);
+  py::implicitly_convertible<std::vector<Numeric>, SpecmatVector>();
+  py::implicitly_convertible<std::vector<Specmat>, SpecmatVector>();
 
   py::class_<SpecmatMatrix> mcmm(m, "SpecmatMatrix");
   rtepack_array<Specmat, 2, 4, 4>(mcmm);

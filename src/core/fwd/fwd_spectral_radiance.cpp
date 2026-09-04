@@ -103,15 +103,15 @@ spectral_rad::spectral_rad(AscendingGrid                               alt_,
       spectral_rad_surface(lat.size(), lon.size()),
       spectral_rad_space(
           spectral_rad_surface.shape(),
-          [](Numeric f, Vector2) -> Stokvec { return planck(f, Constant::cosmic_microwave_background_temperature); }),
+          [](Numeric f, Vector2) { return Stokvec{planck(f, Constant::cosmic_microwave_background_temperature)}; }),
       ellipsoid(surf.ellipsoid) {
   ARTS_USER_ERROR_IF(alt.size() == 0, "Must have a sized atmosphere")
 
   if (arts_omp_in_parallel() or arts_omp_get_max_threads() == 1) {
     for (Size j = 0; j < lat.size(); j++) {
       for (Size k = 0; k < lon.size(); k++) {
-        spectral_rad_surface[j, j] = [surf = surf.at(lat[j], lon[k])](Numeric f, Vector2) -> Stokvec {
-          return planck(f, surf.temperature);
+        spectral_rad_surface[j, k] = [surf = surf.at(lat[j], lon[k])](Numeric f, Vector2) -> Stokvec {
+          return Stokvec{planck(f, surf.temperature)};
         };
       }
     }
@@ -131,8 +131,8 @@ spectral_rad::spectral_rad(AscendingGrid                               alt_,
     for (Size j = 0; j < lat.size(); j++) {
       for (Size k = 0; k < lon.size(); k++) {
         try {
-          spectral_rad_surface[j, j] = [surf = surf.at(lat[j], lon[k])](Numeric f, Vector2) -> Stokvec {
-            return planck(f, surf.temperature);
+          spectral_rad_surface[j, k] = [surf = surf.at(lat[j], lon[k])](Numeric f, Vector2) -> Stokvec {
+            return Stokvec{planck(f, surf.temperature)};
           };
         } catch (const std::exception& e) {
 #pragma omp critical
