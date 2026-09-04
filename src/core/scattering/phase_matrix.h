@@ -240,7 +240,7 @@ template <std::floating_point Scalar, Format format> class BackscatterMatrixData
  public:
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(format);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   BackscatterMatrixData(std::shared_ptr<const Vector> t_grid, std::shared_ptr<const Vector> f_grid)
       : matpack::data_t<Scalar, 3>(t_grid->size(), f_grid->size(), n_stokes_coeffs),
@@ -336,7 +336,7 @@ template <std::floating_point Scalar> class BackscatterMatrixData<Scalar, Format
  public:
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(Format::ARO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   BackscatterMatrixData(std::shared_ptr<const Vector> t_grid,
                         std::shared_ptr<const Vector> f_grid,
@@ -493,7 +493,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::TRO,
 
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(Format::TRO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   using matpack::data_t<Scalar, 4>::operator[];
 
@@ -777,7 +777,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::TRO,
           const Index iza0        = std::clamp<Index>(gp_za_scat.idx, 0, n_za_scat_ - 1);
           const Index iza1        = std::min(iza0 + 1, n_za_scat_ - 1);
 
-          coeffs_res[i_t, i_f, i_za_scat].setZero();
+          coeffs_res[i_t, i_f, i_za_scat] = CoeffVector{};
 
           if (w_t_l > 0.0) {
             if (w_f_l > 0.0) {
@@ -845,7 +845,7 @@ template <std::floating_point Scalar, Representation repr> class PhaseMatrixData
 
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs              = detail::get_n_mat_elems(Format::TRO);
-  using CoeffVector                                   = Eigen::Matrix<std::complex<Scalar>, 1, n_stokes_coeffs>;
+  using CoeffVector                                   = matpack::cdata_t<std::complex<Scalar>, n_stokes_coeffs>;
   PhaseMatrixData()                                   = default;
   PhaseMatrixData(const PhaseMatrixData &)            = default;
   PhaseMatrixData(PhaseMatrixData &&)                 = default;
@@ -1061,7 +1061,7 @@ template <std::floating_point Scalar, Representation repr> class PhaseMatrixData
         Numeric w_f_l = gp_f.fd[1];
         Numeric w_f_r = gp_f.fd[0];
 
-        for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) { coeffs_res[i_t, i_f, i_sht].setZero(); }
+        for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) { coeffs_res[i_t, i_f, i_sht] = CoeffVector{}; }
 
         if (w_t_l > 0.0) {
           if (w_f_l > 0.0) {
@@ -1132,7 +1132,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
 
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(Format::ARO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   PhaseMatrixData()                                   = default;
   PhaseMatrixData(const PhaseMatrixData &)            = default;
@@ -1348,7 +1348,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
               Numeric w_za_scat_l = gp_za_scat.fd[1];
               Numeric w_za_scat_r = gp_za_scat.fd[0];
 
-              coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat].setZero();
+              coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] = CoeffVector{};
 
               if (w_t_l > 0.0) {
                 if (w_f_l > 0.0) {
@@ -1517,7 +1517,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
 
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(Format::ARO);
-  using CoeffVector                      = Eigen::Matrix<std::complex<Scalar>, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<std::complex<Scalar>, n_stokes_coeffs>;
 
   PhaseMatrixData()                                   = default;
   PhaseMatrixData(const PhaseMatrixData &)            = default;
@@ -1721,7 +1721,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
           Numeric w_za_inc_r = gp_za_inc.fd[0];
 
           for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) {
-            coeffs_res[i_t, i_f, i_za_inc, i_sht].setZero();
+            coeffs_res[i_t, i_f, i_za_inc, i_sht] = CoeffVector{};
           }
 
           if (w_t_l > 0.0) {

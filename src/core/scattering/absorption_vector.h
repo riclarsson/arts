@@ -41,7 +41,7 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
   using AbsorptionVectorDataLabFrame = AbsorptionVectorData<Scalar, Format::ARO, Representation::Gridded>;
 
   constexpr static Index n_stokes_coeffs = absorption::get_n_mat_elems(Format::TRO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   using matpack::data_t<Scalar, 3>::operator[];
 
@@ -120,12 +120,12 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
       const Index it0   = std::clamp<Index>(gp_t.idx, 0, n_temps_ - 1);
       const Index it1   = std::min(it0 + 1, n_temps_ - 1);
       for (Index i_f = 0; i_f < static_cast<Index>(weights.f_grid_weights.size()); ++i_f) {
-        GridPos     gp_f  = weights.f_grid_weights[i_f];
-        Numeric     w_f_l = gp_f.fd[1];
-        Numeric     w_f_r = gp_f.fd[0];
-        const Index if0   = std::clamp<Index>(gp_f.idx, 0, n_freqs_ - 1);
-        const Index if1   = std::min(if0 + 1, n_freqs_ - 1);
-        coeffs_res[i_t, i_f].setZero();
+        GridPos     gp_f     = weights.f_grid_weights[i_f];
+        Numeric     w_f_l    = gp_f.fd[1];
+        Numeric     w_f_r    = gp_f.fd[0];
+        const Index if0      = std::clamp<Index>(gp_f.idx, 0, n_freqs_ - 1);
+        const Index if1      = std::min(if0 + 1, n_freqs_ - 1);
+        coeffs_res[i_t, i_f] = CoeffVector{};
         if (w_t_l > 0.0 and w_f_l > 0.0) coeffs_res[i_t, i_f] += w_t_l * w_f_l * coeffs_this[it0, if0];
         if (w_t_l > 0.0 and w_f_r > 0.0) coeffs_res[i_t, i_f] += w_t_l * w_f_r * coeffs_this[it0, if1];
         if (w_t_r > 0.0 and w_f_l > 0.0) coeffs_res[i_t, i_f] += w_t_r * w_f_l * coeffs_this[it1, if0];
@@ -168,7 +168,7 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
 
  public:
   constexpr static Index n_stokes_coeffs = absorption::get_n_mat_elems(Format::ARO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   AbsorptionVectorData() {};
   /** Create a new AbsorptionVectorData container.
