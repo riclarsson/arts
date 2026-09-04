@@ -2,7 +2,7 @@
 <arts format="binary" version="1">
 <SingleScatteringData version="3">
 <String>"totally_random"</String>
-<String>"Spherical particle with D = 50um, generated using Atmlab and the Mie programs from C. Mtzler."</String>
+<String>"Spherical particle with D = 50um, generated using Atmlab and the Mie programs from C. Maetzler."</String>
 <Vector nelem="1">
 </Vector>
 <Vector nelem="3">
