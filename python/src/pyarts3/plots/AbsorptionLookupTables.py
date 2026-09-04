@@ -5,13 +5,14 @@ from math import ceil
 
 import matplotlib
 import numpy as np
-from pyarts3.arts import AbsorptionLookupTables, SpeciesEnum
+from pyarts3.arts import AbsorptionLookupTables, SpeciesEnum, constants
+
 
 from .common import default_fig_ax, select_flat_ax
 
 __all__ = ["plot"]
 
-_BOLTZMANN = 1.380649e-23
+_BOLTZMANN = constants.k
 _DRY_AIR_GAS_CONSTANT = 287.058
 _STANDARD_GRAVITY = 9.80665
 
