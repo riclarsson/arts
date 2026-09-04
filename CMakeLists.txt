@@ -150,7 +150,11 @@ list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
 
 find_package(nanobind CONFIG REQUIRED)
 
-set(ARTS_PYTHON_INTERPRETER "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python/src" ${Python_EXECUTABLE})
+set(ARTS_PYTHON_INTERPRETER
+    ${CMAKE_COMMAND} -E env
+    "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python/src"
+    --
+    ${Python_EXECUTABLE})
 
 if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE "RelWithDebInfo")
@@ -550,4 +554,3 @@ if (ENABLE_ASAN)
     message(FATAL_ERROR "Address sanitizer is not supported on this platform")
   endif()
 endif()
-
