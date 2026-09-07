@@ -172,13 +172,18 @@ not sufficient parity evidence.
 Hydrostatic equilibrium
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-**Status: Replacement present, coverage gap.**  ARTS 2 ``TestHSE`` adjusts an
+**Status: Replacement tested; derivative coverage gap.**  ARTS 2 ``TestHSE`` adjusts an
 altitude field as a function of pressure with ``z_fieldFromHSE``.  ARTS 3 has
 independent altitude-indexed atmospheric quantities and provides the
 design-native reverse representation, ``atm_fieldHydrostaticPressure``, which
 constructs pressure as a function of altitude.  The old direction is not a
-literal port target.  No active ARTS 3 regression was found for the replacement
-method; add one covering its supported options and boundary behavior.
+literal port target.  ``tests/core/atm/hse.py`` checks the replacement against
+analytic ideal-gas columns: isothermal pressure at cold and hot positive
+temperatures, a nonzero reference altitude, off-grid evaluation and
+extrapolation, and convergence for a temperature inversion with both supported
+options.  It uses a fixed specific gas constant and covers both scalar and
+field reference-pressure inputs.  Composition-derived gas constants and
+nonuniform horizontal fields are not covered by this small regression.
 ARTS 3 implements HSE-coupled path-length temperature derivatives through the
 ``hse_derivative`` option, but no current test exercises it.  Add an
 analytic-versus-perturbed case covering the full-Stokes/Zeeman transmission
