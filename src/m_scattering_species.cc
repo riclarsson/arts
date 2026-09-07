@@ -122,7 +122,6 @@ void spectral_rad_srcvec_pathCorrectScattering(SourceVector&               spect
   ARTS_USER_ERROR_IF(static_cast<Size>(spectral_rad_srcvec_path.J.ncols()) != np,
                      "The source vector and propagation paths have different path sizes")
 
-#pragma omp parallel for if (not arts_omp_in_parallel())
   for (Size ip = 0; ip < np; ++ip) {
     const Size nf = spectral_propmat_path[ip].size();
     ARTS_USER_ERROR_IF(not arr::same_size(spectral_propmat_path[ip],
@@ -130,7 +129,15 @@ void spectral_rad_srcvec_pathCorrectScattering(SourceVector&               spect
                                           spectral_absvec_scat_path[ip],
                                           freq_grid_path[ip]),
                        "All scattering source-correction inputs must have the same frequency size")
+    ARTS_USER_ERROR_IF(static_cast<Size>(spectral_rad_srcvec_path.J.nrows()) != nf,
+                       "The source vector and propagation paths have different frequency sizes")
+  }
+
+#pragma omp parallel for if (not arts_omp_in_parallel())
+  for (Size ip = 0; ip < np; ++ip) {
+    const Size nf = spectral_propmat_path[ip].size();
     for (Size iv = 0; iv < nf; ++iv) {
+      if (spectral_propmat_path[ip][iv].is_rotational()) continue;
       const Stokvec nonabsorbing =
           rtepack::absvec(spectral_propmat_scat_path[ip][iv]) - spectral_absvec_scat_path[ip][iv];
       spectral_rad_srcvec_path.J[iv, ip] -= inv(spectral_propmat_path[ip][iv]) *

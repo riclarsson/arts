@@ -22,8 +22,8 @@ Muelmat reflectance(Numeric ev, Numeric eh) {
   out[0, 1] = difference;
   out[1, 0] = difference;
   out[1, 1] = mean;
-  out[2, 2] = mean;
-  out[3, 3] = mean;
+  out[2, 2] = std::sqrt(rv * rh);
+  out[3, 3] = std::sqrt(rv * rh);
   return out;
 }
 

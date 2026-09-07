@@ -17,12 +17,6 @@ Numeric normalized_delta_aa(Numeric aa) {
   return aa;
 }
 
-Index range_bin(const AscendingGrid& edges, const Numeric range) {
-  const auto it = stdr::upper_bound(edges, range);
-  if (it == edges.begin() or it == edges.end()) return -1;
-  return static_cast<Index>(it - edges.begin() - 1);
-}
-
 Numeric ze_factor(const Numeric frequency, const Numeric k2) {
   const Numeric wavelength = Constant::speed_of_light / frequency;
   return 4e18 * std::pow(wavelength, 4) / (std::pow(Constant::pi, 4) * k2);
@@ -189,22 +183,33 @@ void MCRadar(const Workspace&                ws,
           optical_point(ws, frequency, ray_path[ip], atm_path[ip], scattering_species, spectral_propmat_agenda);
       const Muelmat outgoing_segment = rtepack::tran(previous.outgoing_extinction, current.outgoing_extinction, ds)();
       const Muelmat return_segment   = rtepack::tran(current.return_extinction, previous.return_extinction, ds)();
-      const Muelmat outgoing_midpoint =
-          rtepack::tran(previous.outgoing_extinction, current.outgoing_extinction, 0.5 * ds)() * outbound;
-      const Muelmat return_midpoint =
-          returning * rtepack::tran(current.return_extinction, previous.return_extinction, 0.5 * ds)();
-      travelled += 0.5 * ds;
-
-      const Index ibin = range_bin(range_bins, travelled);
-      if (ibin >= 0) {
-        const Muelmat backscatter = 0.5 * (previous.backscatter + current.backscatter);
+      // Integrate only the overlap with each gate.  Interpolate optical
+      // properties to its midpoint, including the extinction along the
+      // partial segment between the previous path point and that midpoint.
+      const auto  first_edge = stdr::upper_bound(range_bins, travelled);
+      const Index first_bin  = std::max<Index>(0, first_edge - range_bins.begin() - 1);
+      for (Index ibin = first_bin; ibin < nbins and range_bins[ibin] < travelled + ds; ++ibin) {
+        const Numeric begin = std::max(travelled, range_bins[ibin]);
+        const Numeric end   = std::min(travelled + ds, range_bins[ibin + 1]);
+        if (end <= begin) continue;
+        const Numeric midpoint = 0.5 * (begin + end) - travelled;
+        const Numeric fraction = midpoint / ds;
+        const Propmat outgoing_extinction =
+            (1.0 - fraction) * previous.outgoing_extinction + fraction * current.outgoing_extinction;
+        const Propmat return_extinction =
+            (1.0 - fraction) * previous.return_extinction + fraction * current.return_extinction;
+        const Muelmat outgoing_midpoint =
+            rtepack::tran(previous.outgoing_extinction, outgoing_extinction, midpoint)() * outbound;
+        const Muelmat return_midpoint =
+            returning * rtepack::tran(return_extinction, previous.return_extinction, midpoint)();
+        const Muelmat backscatter = (1.0 - fraction) * previous.backscatter + fraction * current.backscatter;
         const Stokvec contribution =
-            antenna_weight * ds *
+            antenna_weight * (end - begin) *
             (rx_rotation * rtepack::radar_return(return_midpoint, backscatter, outgoing_midpoint, transmitted));
         photon[ibin] += contribution;
       }
 
-      travelled += 0.5 * ds;
+      travelled += ds;
       if (travelled >= range_bins.back()) break;
       outbound  = outgoing_segment * outbound;
       returning = returning * return_segment;

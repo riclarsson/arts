@@ -231,27 +231,30 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
     auto                 coeffs_this = get_const_coeff_vector_view();
     auto                 coeffs_res  = result.get_coeff_vector_view();
     for (Index i_t = 0; i_t < static_cast<Index>(weights.t_grid_weights.size()); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t    = weights.t_grid_weights[i_t];
+      const Index t_upper = std::min<Index>(gp_t.idx + 1, coeffs_this.extent(0) - 1);
+      Numeric     w_t_l   = gp_t.fd[1];
+      Numeric     w_t_r   = gp_t.fd[0];
       for (Index i_f = 0; i_f < static_cast<Index>(weights.f_grid_weights.size()); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
+        GridPos     gp_f    = weights.f_grid_weights[i_f];
+        const Index f_upper = std::min<Index>(gp_f.idx + 1, coeffs_this.extent(1) - 1);
+        Numeric     w_f_l   = gp_f.fd[1];
+        Numeric     w_f_r   = gp_f.fd[0];
         for (Index i_za_inc = 0; i_za_inc < static_cast<Index>(weights.za_inc_grid_weights.size()); ++i_za_inc) {
-          GridPos gp_za_inc  = weights.za_inc_grid_weights[i_za_inc];
-          Numeric w_za_inc_l = gp_za_inc.fd[1];
-          Numeric w_za_inc_r = gp_za_inc.fd[0];
+          GridPos     gp_za_inc    = weights.za_inc_grid_weights[i_za_inc];
+          const Index za_inc_upper = std::min<Index>(gp_za_inc.idx + 1, coeffs_this.extent(2) - 1);
+          Numeric     w_za_inc_l   = gp_za_inc.fd[1];
+          Numeric     w_za_inc_r   = gp_za_inc.fd[0];
           coeffs_res[i_t, i_f, i_za_inc] =
               (w_t_l * w_f_l * w_za_inc_l * coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx] +
-               w_t_l * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx + 1] +
-               w_t_l * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx] +
-               w_t_l * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx + 1] +
+               w_t_l * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx, za_inc_upper] +
+               w_t_l * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx, f_upper, gp_za_inc.idx] +
+               w_t_l * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx, f_upper, za_inc_upper] +
 
-               w_t_r * w_f_l * w_za_inc_l * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx] +
-               w_t_r * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx + 1] +
-               w_t_r * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx] +
-               w_t_r * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx + 1]);
+               w_t_r * w_f_l * w_za_inc_l * coeffs_this[t_upper, gp_f.idx, gp_za_inc.idx] +
+               w_t_r * w_f_l * w_za_inc_r * coeffs_this[t_upper, gp_f.idx, za_inc_upper] +
+               w_t_r * w_f_r * w_za_inc_l * coeffs_this[t_upper, f_upper, gp_za_inc.idx] +
+               w_t_r * w_f_r * w_za_inc_r * coeffs_this[t_upper, f_upper, za_inc_upper]);
         }
       }
     }

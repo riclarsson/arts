@@ -20,7 +20,8 @@ PSDData MonodispersePSD::evaluate_with_derivatives(const AtmPoint& point,
                                                    const Vector&   sizes,
                                                    Numeric         a,
                                                    Numeric         b) const {
-  return {.values = evaluate(point, sizes, a, b), .derivatives = {{number_density, Vector{1.0}}}};
+  const Numeric derivative = point.temperature < t_min || point.temperature > t_max ? 0.0 : 1.0;
+  return {.values = evaluate(point, sizes, a, b), .derivatives = {{number_density, Vector{derivative}}}};
 }
 namespace {
 bool temperature_allowed(Numeric temperature, Numeric t_min, Numeric t_max, bool picky) {

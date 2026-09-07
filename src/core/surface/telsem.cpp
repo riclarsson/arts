@@ -111,9 +111,10 @@ void telsem_read_ascii(std::istream& is, TelsemAtlas& atlas, Index month) {
 }
 
 void TelsemAtlas::read(std::istream& is) {
-  name  = "ssmi_mean_emis_climato";
-  dlat  = 0.25;
+  name = "ssmi_mean_emis_climato";
+  dlat = 0.25;
   is >> ndat;
+  ARTS_USER_ERROR_IF(is.fail() or ndat < 0, "Invalid TELSEM atlas record count")
   channel_emissivity.resize(ndat);
   channel_emissivity = Vector7{NAN, NAN, NAN, NAN, NAN, NAN, NAN};
   channel_emissivity_error.resize(ndat);
@@ -153,6 +154,12 @@ void TelsemAtlas::read(std::istream& is) {
       classes2[ipos] = class2;
     }
   }
+  ndat = ipos + 1;
+  channel_emissivity.resize(ndat);
+  channel_emissivity_error.resize(ndat);
+  classes1.resize(ndat);
+  classes2.resize(ndat);
+  cellnums.resize(ndat);
   rebuild_correspondence();
 }
 
