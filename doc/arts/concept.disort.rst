@@ -1179,6 +1179,19 @@ VDISORT uses the same expression because its polynomial stores
 Computing all flux quantities in one call reuses a single zeroth-mode radiance
 evaluation.
 
+DFDT differentiates net upward flux with respect to downward optical depth;
+it is not a temperature tendency.  Scalar delta-M fluxes redistribute the
+difference between physical and scaled direct-beam flux into the diffuse
+component.  Their total therefore contains the scaled beam, and the direct
+contribution to :math:`J` must use :math:`\exp(-\tau^*/\mu_0)` as well.
+The factor :math:`1-\omega` and source :math:`B` retain their physical values,
+so this DFDT is with respect to physical optical depth.  A finite-difference
+regression checks the single-point, gridded, and arbitrary-grid flux interfaces.
+
+Gridded fluxes and DFDT are evaluated at each layer's lower boundary; the
+top boundary is omitted.  See :doc:`concept.heating` for conversion to K/s,
+frequency integration, and pressure-based heating diagnostics.
+
 Numerical behavior and limitations
 **********************************
 

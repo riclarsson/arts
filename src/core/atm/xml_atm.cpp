@@ -93,6 +93,9 @@ void xml_io_stream<AtmField>::extend(std::istream& is, AtmField& v, bifstream* p
   v.isots.insert_range(temp.isots);
   v.nlte.insert_range(temp.nlte);
   v.ssprops.insert_range(temp.ssprops);
+
+  // Set TOA to max of the two, since we don't want to shrink the atmosphere - better fail in interpolation than to silently shrink the atmosphere
+  v.top_of_atmosphere = std::max(v.top_of_atmosphere, temp.top_of_atmosphere);
 }
 
 void xml_io_stream<AtmField>::write(std::ostream& os, const AtmField& v, bofstream* pbofs, std::string_view name) {

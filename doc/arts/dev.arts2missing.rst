@@ -97,21 +97,6 @@ existing reflectance agenda.  The surviving ``ENABLE_FASTEM`` configure and
 link hooks are legacy integration residue; they do not provide this interface
 or an ARTS 3 implementation.
 
-Heating-rate diagnostic
-~~~~~~~~~~~~~~~~~~~~~~~
-
-**Status: Missing packaged functionality; Python decision.**  ARTS 2
-``TestHeatingRates`` and ``Test_HeatingRate`` calculate a radiance/irradiance
-field and then derive heating rate from flux divergence.  ARTS 3 provides and
-tests spectral radiance fields, spectral flux profiles, DISORT flux fields,
-frequency integration, and the ``AtmosphericFlux`` and
-``SpectralAtmosphericFlux`` Python recipes.  It does not provide a heating-rate
-method or recipe.
-
-The missing final calculation is well suited to Python.  Prefer a documented,
-unit-aware recipe with an ARTS 2 reference regression unless a C++ kernel is
-needed for performance or for use inside an agenda.
-
 Confirmed gaps with unresolved port intent
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

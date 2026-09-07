@@ -691,7 +691,10 @@ at the requested outgoing directions.  Their numerical shapes are
   df.def_rw("up", &DisortFlux::up, "Upwelling flux (layer values)\n\n.. :class:`Matrix`");
   df.def_rw("down_diffuse", &DisortFlux::down_diffuse, "Downward diffuse flux (layer values)\n\n.. :class:`Matrix`");
   df.def_rw("down_direct", &DisortFlux::down_direct, "Downward direct flux (layer values)\n\n.. :class:`Matrix`");
-  df.def_rw("dfdt", &DisortFlux::dfdt, "Flux divergence (layer values)\n\n.. :class:`Matrix`");
+  df.def_rw("dfdt", &DisortFlux::dfdt,
+            "Derivative of net upward flux with respect to downward optical depth [W/(m^2 Hz)], "
+            "at each layer's lower boundary (alt_grid[1:]), using that layer's optical properties. "
+            "Not a temperature tendency. See pyarts3.recipe.heating_rates.from_disort.\n\n.. :class:`Matrix`");
 
   py::class_<DisortRadiance> dr(m, "DisortRadiance");
   generic_interface(dr);

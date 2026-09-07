@@ -685,7 +685,15 @@ and returns any associated data.
 #. *Matrix* upwelling flux
 #. *Matrix* diffuse downwelling flux
 #. *Matrix* direct downwelling flux
-#. *Matrix* heating rate (dF/dt)
+#. *Matrix* derivative of net upward flux with respect to downward optical depth (DFDT)
+
+The matrices have shape (frequency, layer) and are evaluated at the
+lower boundary of each layer, corresponding to ``alt_grid[1:]``.  The top
+boundary is omitted.  Flux and DFDT are in W/(m^2 Hz); DFDT is not a
+temperature tendency.  Multiply DFDT by physical extinction [1/m], divide
+by density [kg/m^3] and mass specific heat capacity [J/(kg K)], and integrate
+over frequency to obtain heating in K/s.  The Python recipe
+``pyarts3.recipe.heating_rates.from_disort`` performs this conversion.
 )",
   };
 
