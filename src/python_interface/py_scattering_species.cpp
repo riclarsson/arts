@@ -518,6 +518,17 @@ void py_scattering_species(py::module_& m) try {
   bind_extinction_matrix_data_aro<double, scattering::Representation::Spectral>(m, "ExtinctionMatrixDataSpectralARO4")
       .doc() = "Extinction matrix data";
 
+  // ForwardscatterMatrixData is an alias of BackscatterMatrixData. Bind each
+  // format once so both existing SSD endpoint properties are usable in Python.
+  py::class_<scattering::BackscatterMatrixData<Numeric, scattering::Format::TRO>, Tensor3>(m,
+                                                                                           "BackscatterMatrixDataTRO")
+      .doc() =
+      "Forward or backward TRO scattering data, with axes temperature, frequency, compact Mueller coefficient.";
+  py::class_<scattering::BackscatterMatrixData<Numeric, scattering::Format::ARO>, Tensor4>(m,
+                                                                                           "BackscatterMatrixDataARO")
+      .doc() =
+      "Forward or backward ARO scattering data, with axes temperature, frequency, incident zenith, Mueller coefficient.";
+
   py::class_<scattering::ParticleProperties>(m, "ParticleProperties")
       .def(py::init<>())
       .def_rw("name", &scattering::ParticleProperties::name, "Name\n\n.. :class:`str`")
@@ -555,6 +566,31 @@ void py_scattering_species(py::module_& m) try {
       .doc() = "Bulk scattering properties";
 
   py::class_<ParticleHabit>(m, "ParticleHabit")
+      .def_static("tmatrix",
+                  &ParticleHabit::tmatrix,
+                  "t_grid"_a,
+                  "f_grid"_a,
+                  "diameters"_a,
+                  "refractive_index"_a,
+                  "density"_a,
+                  "aspect_ratio"_a,
+                  "shape"_a    = -1,
+                  "angles"_a   = 181,
+                  "accuracy"_a = 0.001,
+                  R"(Generate an in-memory, totally randomly oriented particle habit.
+
+Temperatures are in K, frequencies in Hz, volume-equivalent diameters in m,
+and material density in kg/m^3. Grids must be positive and strictly increasing.
+refractive_index is a complex matrix with shape (temperature, frequency),
+using a nonnegative imaginary part. shape=-1 is a spheroid (horizontal to
+rotational axis ratio); shape=-2 is a cylinder (diameter to length ratio).
+The angle grid contains angles equally spaced from 0 to 180 degrees.
+
+Each diameter represents one particle size; combine the resulting habit with
+an ARTS PSD using ScatteringHabit. No external scattering files are needed.
+See :doc:`user.tmatrix` for usage and :doc:`dev.tmatrix` for build requirements.
+)",
+                  py::call_guard<py::gil_scoped_release>())
       .def_static(
           "liquid_sphere",
           [](Vector t_grid, Vector f_grid, Vector diameters, const scattering::ZenithAngleGrid& za_scat_grid) {

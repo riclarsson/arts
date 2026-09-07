@@ -64,3 +64,34 @@ prevents the directly exposed AMPL angle-error STOP paths.
 
 See :doc:`user.tmatrix` for the interface and :doc:`concept.tmatrix` for
 physical definitions and normalization.
+
+Native particle-habit integration
+--------------------------------
+
+``ParticleHabit::tmatrix`` in ``particle_habit_tmatrix.cc`` generates native
+TRO gridded single-scattering data, without legacy-data adapters or files.
+The scattering library links to the optional-backend adapter; when the backend
+is disabled the factory reports its unavailability through the same exception
+path as the direct interface.
+
+For each diameter, temperature, and frequency, the factory uses the direct
+random-orientation interface with one size quadrature point at the specified
+volume-equivalent radius.  It does not perform the atmospheric PSD integration.
+The Mueller matrices are multiplied by ``Csca/(4*pi)`` and packed in native
+TRO order F11, F12, F22, F33, F34, F44.  Extinction is Cext and absorption is
+Cext minus Csca.  Both endpoint scattering matrices are extracted from the
+populated phase data.
+
+Particle mass is density times the equivalent-sphere volume.  For spheroids,
+maximum dimension is the larger axial diameter.  For cylinders it is the
+largest point-to-point distance, including both cylinder length and diameter.
+Temperature/frequency grids and all material inputs are validated before
+starting the solver calls.  The existing T-matrix mutex serializes Fortran
+access, and bulk evaluation subsequently uses the ordinary habit machinery.
+
+``tests/core/tmatrix/habit.py`` checks the direct-to-native normalization and
+component ordering, forward/backscatter extraction, metadata, and the analytic
+small-sphere Rayleigh limit.  It also exercises temperature/frequency
+interpolation and repeated number-density scaling through
+``ArrayOfScatteringSpecies``, verifying that these evaluations leave the
+original particle data intact.

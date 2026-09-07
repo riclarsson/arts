@@ -6,8 +6,8 @@ whether the backend was built; ``extended_precision()`` identifies the selected
 variant.  ``fixed`` computes a particle and evaluates its amplitude and phase
 matrices at one illumination/scattering geometry.  ``random`` computes a
 randomly oriented size distribution, defaulting to an effectively monodisperse
-particle.  These are particle calculations, not workspace radiative-transfer
-methods or an automatic scattering-habit generator.
+particle.  These functions calculate individual optical results.  Use
+``ParticleHabit.tmatrix`` below to prepare a habit for scattering species.
 
 Units and polarization
 ----------------------
@@ -36,3 +36,54 @@ Results remain valid after subsequent calls.
 
 See :doc:`concept.tmatrix` for the physical definitions and normalization.
 Build configuration and implementation notes are in :doc:`dev.tmatrix`.
+
+Using particles as scattering species
+-------------------------------------
+
+``ParticleHabit.tmatrix`` generates a totally randomly oriented habit in memory.
+Supply temperature and frequency grids, volume-equivalent diameters in metres,
+a complex refractive-index matrix with axes (temperature, frequency), and
+material density in kg/m³.  The refractive index uses a nonnegative imaginary
+part.  Shape and aspect-ratio conventions match the direct T-matrix interface.
+
+For example, a single-size ice population can be set up as follows::
+
+    import numpy as np
+    import pyarts3 as pa
+
+    A = pa.arts
+    density = 917.0
+    habit = A.ParticleHabit.tmatrix(
+        t_grid=[250.0, 280.0],
+        f_grid=[229e9, 231e9],
+        diameters=[200e-6],
+        refractive_index=np.full((2, 2), 1.78 + 0.01j),
+        density=density,
+        aspect_ratio=1.5,
+        angles=181,
+    )
+    number = A.ScatteringSpeciesProperty(
+        "ice", A.ParticulateProperty.NumberDensity)
+    psd = A.MonodispersePSD(number, 250.0, 280.0)
+    ws = pa.Workspace()
+    ws.scat_species = [A.ScatteringHabit(
+        habit, psd, density * np.pi / 6, 3.0)]
+
+The constant refractive index above is illustrative; supply the material model
+appropriate to the calculation.  Set the ``number`` property in the atmosphere
+to the particle number density in m⁻³.  The explicit mass-size relation uses
+volume-equivalent diameter: mass equals ``density * pi / 6 * diameter**3``.
+``MonodispersePSD`` requires exactly one diameter; habits containing several
+sizes can be combined with the other ARTS PSDs.
+
+The factory computes each particle size separately.  ``ScatteringHabit`` then
+applies the atmospheric PSD and interpolates the stored optical properties;
+it does not rerun T-matrix during bulk-property evaluation.  Choose the
+sampling grids to resolve changes in the optical properties.  ``angles`` sets
+an equally spaced scattering-angle grid from 0 to 180 degrees.
+
+The generated data already have physical cross-section units, including
+forward and backscatter matrices.  No additional phase normalization is needed
+before passing the habit to ``ScatteringHabit``.  The factory describes totally
+random orientations; it does not generate aligned or azimuthally random
+particle populations.

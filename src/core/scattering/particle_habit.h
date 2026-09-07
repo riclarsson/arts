@@ -112,6 +112,18 @@ class ScatteringHabit;
  */
 class ParticleHabit {
  public:
+  //! Generate native TRO data at individual volume-equivalent diameters.
+  //! SI inputs; refractive_index has shape (temperature, frequency).
+  static ParticleHabit tmatrix(const Vector&        t_grid,
+                               const Vector&        f_grid,
+                               const Vector&        diameters,
+                               const ComplexMatrix& refractive_index,
+                               Numeric              density,
+                               Numeric              aspect_ratio,
+                               int                  shape    = -1,
+                               int                  angles   = 181,
+                               Numeric              accuracy = 0.001);
+
   static ParticleHabit liquid_sphere(const StridedVectorView& t_grid,
                                      const StridedVectorView& f_grid,
                                      const StridedVectorView& diameters,

@@ -109,8 +109,9 @@ dependencies or were otherwise not registered there.  Their absence from the
   3 Monte Carlo solvers are not numerical parity for RT4.
 * The Mishchenko T-matrix particle solver has an optional ARTS 3 C++/Python
   interface and original reference tests (see :doc:`dev.tmatrix`).
-  Automatic generation of scattering habits, including the ARTS 2 azimuthal
-  orientation-averaging workflow, remains to be connected.
+  Native totally randomly oriented habits can be generated with
+  ``ParticleHabit.tmatrix``.  The ARTS 2 azimuthal orientation-averaging
+  workflow remains to be connected.
 * The NetCDF/libRadtran ``WriteMolTau`` exporter has no packaged equivalent;
   this is likely best implemented as a Python/xarray exporter if still needed.
 
