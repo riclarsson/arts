@@ -73,6 +73,14 @@ convergence envelope and some internal fatal error paths; the port is not a
 claim that arbitrary particle parameters converge.  Input angle validation
 prevents the directly exposed AMPL angle-error STOP paths.
 
+The reference test reads each selected ``.ref`` file once.  The two original
+random size distributions are each solved once for comparison; the smaller
+result is reused as the baseline for the SI scaling check.  Ownership and
+thread-safety checks use small absorbing nonspherical particles, with a barrier
+to exercise concurrent entry.  They do not repeat the expensive reference
+size distributions.  This preserves the original reference inputs and
+tolerances while avoiding redundant serialized Fortran work.
+
 See :doc:`user.tmatrix` for the interface and :doc:`concept.tmatrix` for
 physical definitions and normalization.
 

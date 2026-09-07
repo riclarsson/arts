@@ -11,10 +11,6 @@ A = pyarts.arts
 DATA = Path(__file__).with_name("data") / "mc_general_arts2"
 
 
-def load(name):
-    return np.asarray(pyarts.xml.load(str(DATA / name)))
-
-
 # Warren/Wiscombe/Gao REFICE, the material model used by historical arts_scat.
 # Source: https://radiativetransfer.org/svn/rt/PyARTS/trunk/src/REFICE.f
 # Evaluated with REAL inputs wavelength = c/f * 1e6 [micrometres], T [K],
@@ -43,13 +39,16 @@ def generate(legacy_numerics=False, quadrature=10):
     else:
         x, w = np.polynomial.legendre.leggauss(quadrature)
     theta = 90 * (1 + x)
-    weights = 2 * (np.pi / 2)**2 * w[:, None] * w[None, :] * np.sin(np.deg2rad(theta))[:, None]
+    weights = 2 * (np.pi / 2)**2 * w[:, None] * \
+        w[None, :] * np.sin(np.deg2rad(theta))[:, None]
 
     # Matrix rows: incident zenith, scattered zenith, incident azimuth,
     # scattered azimuth, alpha, beta. Oblate symmetry axis stays vertical.
-    phase_geometries = [[i, s, 0, a, 0, 0] for s in ANGLES for a in ANGLES for i in ANGLES]
+    phase_geometries = [[i, s, 0, a, 0, 0]
+                        for s in ANGLES for a in ANGLES for i in ANGLES]
     forward_geometries = [[z, z, 0, 0, 0, 0] for z in ANGLES]
-    integral_geometries = [[i, s, 0, a, 0, 0] for s in ANGLES for i in theta for a in theta]
+    integral_geometries = [[i, s, 0, a, 0, 0]
+                           for s in ANGLES for i in theta for a in theta]
     geometries = np.array(phase_geometries + forward_geometries + integral_geometries)
     nphase = len(phase_geometries)
     nz = len(ANGLES)
@@ -69,9 +68,10 @@ def generate(legacy_numerics=False, quadrature=10):
         for ti, _ in enumerate(TEMPERATURES):
             m = REFRACTIVE_INDEX[fi, ti]
             results = A.tmatrix.fixed_batch(radius, wavelength, 1.5, m.real, m.imag,
-                                             geometries, accuracy=.001, shape=-1)
+                                            geometries, accuracy=.001, shape=-1)
             orders.append(int(results[0].order))
-            phase[fi, ti] = (np.array([np.asarray(r.phase) for r in results[:nphase]]) * unit**2).reshape(nz, nz, nz, 1, 16)
+            phase[fi, ti] = (np.array([np.asarray(r.phase)
+                             for r in results[:nphase]]) * unit**2).reshape(nz, nz, nz, 1, 16)
             # Optical theorem: directional extinction, not the orientation-
             # averaged scalar cross section returned by the T-matrix solve.
             for zi, r in enumerate(results[nphase:nphase + nz]):
@@ -105,11 +105,63 @@ def generate(legacy_numerics=False, quadrature=10):
     return ssd, orders
 
 
-
 def main():
-    p = load("p_grid.xml")
-    lat = load("lat_grid.xml")
-    lon = load("lon_grid.xml")
+    # Original ARTS2 grid literals, including their printed precision and the
+    # distinct near-zero longitude node. No grid regeneration or rounding.
+    p = np.array([
+        101300.0, 90167.0235741, 80257.5729538, 71437.1813675, 63586.1600832,
+        56597.9742864, 50377.7974505, 44841.2245837, 39913.1268917, 35526.6323136,
+        31622.218098, 28146.9031067, 25053.5288841, 22300.1197385, 19849.3131507,
+        18201.0, 18200.0, 17667.8527817, 17511.9573392, 16849.9258159,
+        16212.922091, 15726.1371992, 15600.0, 13997.8181991, 12459.4432729,
+        11090.1373673, 9871.31961931, 8786.45122233, 7820.81100195, 6961.29565628,
+        6196.24195011, 5515.26845002, 4909.13465302, 4369.61559711, 3889.39025226,
+        3461.94217734, 3081.47109493, 2742.8141842, 2441.37602376, 2173.06623384,
+        1934.24397171, 1721.6685271, 1532.45534719, 1364.03689453, 1214.12780676,
+        1080.69388524, 961.924491872, 856.207979617, 762.109823124, 678.353152889,
+        603.801428709, 537.443017339, 478.377465095, 425.803279098, 379.007051376,
+        337.353778244, 300.278243591, 267.277349148, 237.903287675, 211.757466418,
+        188.485098386, 167.770388051, 149.332246144, 132.920475404, 118.312375511,
+        105.309721143, 93.7360721512, 83.4343793426, 74.2648533966, 66.1030679856,
+        58.838271366, 52.3718835274, 46.6161585058, 41.492993711, 36.9328701096,
+        32.8739088828, 29.2610317593, 26.0452136273, 23.1828172865, 20.6350013108,
+        18.3671929876, 16.3486191817, 14.5518887577, 12.952620895, 11.5291142506,
+        10.262052482, 9.13424213291, 8.13037932606, 7.23684209634, 6.44150554692,
+        5.73357731986, 5.10345114871, 4.54257650578, 4.04334257536, 3.59897497839,
+        3.20344384717, 2.85138200283, 2.53801212505, 2.25908192607, 2.010806449,
+        1.7898167077, 1.59311397114, 1.41802907199, 1.26218618719, 1.12347059917,
+        1.0,
+    ])
+    lat = np.array([
+        -25.0, -15.3469387755, -14.693877551, -14.0408163265, -13.387755102,
+        -12.7346938776, -12.0816326531, -11.4285714286, -10.7755102041, -10.1224489796,
+        -9.4693877551, -8.81632653061, -8.16326530612, -7.51020408163, -6.85714285714,
+        -6.20408163265, -5.55102040816, -4.89795918367, -4.24489795918, -3.59183673469,
+        -2.9387755102, -2.28571428571, -2.1, -2.0, -1.8,
+        -1.63265306122, -1.08, -1.0, -0.979591836735, -0.36,
+        -0.326530612245, 0.0, 0.326530612245, 0.36, 0.979591836735,
+        1.0, 1.08, 1.63265306122, 1.8, 2.0,
+        2.28571428571, 2.9387755102, 3.59183673469, 4.24489795918, 4.89795918367,
+        5.55102040816, 6.20408163265, 6.85714285714, 7.51020408163, 8.16326530612,
+        8.81632653061, 9.4693877551, 10.1224489796, 10.7755102041, 11.4285714286,
+        12.0816326531, 12.7346938776, 13.387755102, 14.0408163265, 14.693877551,
+        15.3469387755, 25.0,
+    ])
+    lon = np.array([
+        -25.0, -15.3469387755, -14.693877551, -14.0408163265, -13.387755102,
+        -12.7346938776, -12.0816326531, -11.4285714286, -10.7755102041, -10.1224489796,
+        -9.4693877551, -8.81632653061, -8.16326530612, -7.51020408163, -6.85714285714,
+        -6.20408163265, -5.55102040816, -4.89795918367, -4.24489795918, -3.59183673469,
+        -2.9387755102, -2.28571428571, -2.1, -2.0, -1.8,
+        -1.63265306122, -1.2, -1.0, -0.979591836735, -0.6,
+        -0.326530612245, -2.22044604925e-16, 0.0, 0.326530612245, 0.6,
+        0.979591836735, 1.0, 1.2, 1.63265306122, 1.8,
+        2.0, 2.28571428571, 2.9387755102, 3.59183673469, 4.24489795918,
+        4.89795918367, 5.55102040816, 6.20408163265, 6.85714285714, 7.51020408163,
+        8.16326530612, 8.81632653061, 9.4693877551, 10.1224489796, 10.7755102041,
+        11.4285714286, 12.0816326531, 12.7346938776, 13.387755102, 14.0408163265,
+        14.693877551, 15.3469387755, 25.0,
+    ])
     # Reconstruct AtmFieldsCalcExpand1D from source profiles, not its serialized
     # 3D outputs. ARTS2 interpolates these quantities linearly in log pressure.
     raw_p = A.GriddedField3.fromxml("planets/Earth/afgl/tropical/p.xml")
@@ -175,10 +227,8 @@ def main():
     grids = [z, lat, lon]
     names = ["altitude", "latitude", "longitude"]
 
-
     def field(data, field_grids=grids):
         return A.GeodeticField3(data=data, grids=field_grids, grid_names=names)
-
 
     ws.atm_field["t"] = field(t)
     ws.atm_field["p"] = field(np.broadcast_to(p[:, None, None], t.shape))
@@ -229,7 +279,6 @@ def main():
         mc_max_scatorder=30,
     )
 
-
     def check(reference):
         ws.MCGeneral(**common)
         rj = (
@@ -248,7 +297,6 @@ def main():
             f"ARTS3 I/Q={rj[:2]} +/- {error[:2]} K; "
             f"ARTS3 U/V={rj[2:]} +/- {error[2:]} K"
         )
-
 
     ws.mc_antenna.set_pencil_beam()
     check((198.7, 7.9))

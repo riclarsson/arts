@@ -1,8 +1,10 @@
 ARTS2 Monte Carlo source inputs
 ==============================
 
-``p_grid.xml``, ``lat_grid.xml`` and ``lon_grid.xml`` are unchanged ARTS2
-source inputs. The atmospheric preparation previously
+The original pressure, latitude and longitude grids are literal NumPy arrays
+in ``mc_general_arts2.py``. Their XML values and printed precision are preserved
+exactly, including the distinct near-zero longitude node. No grid XML files
+are retained. The atmospheric preparation previously
 stored here as ``TestMonteCarloDataPrepare.*`` is now performed in
 ``mc_general_arts2.py``; no generated fields or binary sidecars are retained.
 

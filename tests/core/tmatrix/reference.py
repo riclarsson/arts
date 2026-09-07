@@ -3,6 +3,7 @@
 from pathlib import Path
 import re
 from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import numpy as np
 import pyarts3 as pa
@@ -52,6 +53,13 @@ def random(radius=1.0, quadrature=5):
     )
 
 
+def small_random():
+    # COMMON-block ownership/thread checks do not need the expensive reference
+    # size distribution. Keep a nonspherical, absorbing particle in these checks.
+    return TM.random(radius=0.1, wavelength=1.0, aspect_ratio=2.0,
+                     refractive_real=1.5, refractive_imag=0.01)
+
+
 def test_fixed():
     text = (
         REFERENCES / ("tmatrix_amplq.ref" if QUAD else "tmatrix_ampld.ref")
@@ -83,7 +91,7 @@ def test_fixed():
     np.testing.assert_allclose(
         np.asarray(scaled.phase) / 1e-12, result.phase, rtol=2e-6, atol=1e-6
     )
-    random()
+    small_random()
     np.testing.assert_array_equal(result.amplitude, saved)
     # The old quad wrapper ignored the shape argument and always used spheroids.
     cylinder = fixed(shape=-2)
@@ -126,9 +134,10 @@ def test_random():
         np.testing.assert_allclose(result.effective_variance, 0.1, rtol=0, atol=5e-5)
     # The power-law root solver used an absolute lower bound of 1e-5.
     # The ARTS3 boundary must permit the same particle specified in metres.
-    base = random()
+    # Reuse the second reference result, including its four size nodes.
+    base = result
     si = TM.random(
-        radius=1e-6,
+        radius=0.5e-6,
         wavelength=0.5e-6,
         aspect_ratio=2.0,
         refractive_real=1.33 if QUAD else 1.53,
@@ -137,7 +146,7 @@ def test_random():
         distribution=3,
         b=0.1,
         gamma=0.5,
-        size_quadrature=5,
+        size_quadrature=2,
     )
     np.testing.assert_allclose(si.phase, base.phase, rtol=1e-12, atol=1e-12)
     np.testing.assert_allclose(si.scattering / 1e-12, base.scattering, rtol=1e-12)
@@ -147,7 +156,7 @@ def test_random():
     assert len(summary) == (2 if QUAD else 3)
 
 
-def test_errors_and_threads(expected):
+def test_errors_and_threads():
     for kwargs in [
         {"radius": -1},
         {"accuracy": float("nan")},
@@ -168,11 +177,19 @@ def test_errors_and_threads(expected):
     else:
         raise AssertionError("array limit did not produce a Python exception")
 
-    # Exercise interleaved random/fixed calls with the GIL released.
+    # Exercise real concurrent entry with cheap particles. Repeating the large
+    # reference cases here only serializes expensive solves on the solver mutex.
+    expected = np.array(fixed(radius=0.1, wavelength=1.0).amplitude)
+    expected_random = np.array(small_random().phase)
+    barrier = Barrier(4)
+
     def evaluate(i):
-        if i % 2:
-            random()
-        return np.array(fixed().amplitude)
+        barrier.wait(timeout=30)
+        random_result = small_random() if i % 2 else None
+        result = fixed(radius=0.1, wavelength=1.0)
+        if random_result is not None:
+            np.testing.assert_array_equal(random_result.phase, expected_random)
+        return np.array(result.amplitude)
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         for actual in pool.map(evaluate, range(8)):
@@ -206,8 +223,8 @@ def test_fixed_batch():
 
 
 assert TM.available()
-expected = test_fixed()
+test_fixed()
 test_random()
-test_errors_and_threads(expected)
+test_errors_and_threads()
 
 test_fixed_batch()
