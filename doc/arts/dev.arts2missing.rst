@@ -97,6 +97,17 @@ existing reflectance agenda.  The surviving ``ENABLE_FASTEM`` configure and
 link hooks are legacy integration residue; they do not provide this interface
 or an ARTS 3 implementation.
 
+ECS line-by-line derivatives
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Status: Missing; design deferred.**  LTE Voigt, mirrored LTE Voigt, and
+line-NLTE derivatives now have active finite-difference coverage for their
+supported atmospheric, spectroscopic-line, and line-shape targets.  ECS
+derivatives remain intentionally outside that implementation: an ECS target
+must also account for the ECS parameter set, and its derivative representation
+should be designed before adding a partial interface.  Do not treat the
+non-ECS derivative support as evidence that ECS derivatives are complete.
+
 Confirmed gaps with unresolved port intent
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -105,13 +116,16 @@ Confirmed gaps with unresolved port intent
 dependencies or were otherwise not registered there.  Their absence from the
 110-test ``check`` selection is not evidence that they were ported:
 
-* RT4 and its cross-solver/hybrid comparison are absent.  DISORT and the ARTS
-  3 Monte Carlo solvers are not numerical parity for RT4.
-* The Mishchenko T-matrix particle solver has an optional ARTS 3 C++/Python
-  interface and original reference tests (see :doc:`dev.tmatrix`).
-  Native totally randomly oriented habits can be generated with
-  ``ParticleHabit.tmatrix``.  The ARTS 2 azimuthal orientation-averaging
-  workflow remains to be connected.
+* RT4 and its cross-solver/hybrid comparison are absent.  ARTS 3 already has
+  polarized VDISORT and Monte Carlo solvers; the remaining question is whether
+  the independent RT4 algorithm and its legacy comparisons justify a port.
+* General azimuthal orientation averaging and a native ARO T-matrix habit
+  factory remain unconnected.  The vertically aligned, axisymmetric particle
+  in ``tests/core/scat/mc_general_arts2.tmatrix.py`` is already generated with
+  ``tmatrix.fixed_batch`` and consumed through the legacy ARO adapter.  That
+  case needs no orientation averaging and is not an outstanding port.  Scope
+  any further work to orientation distributions and native integration beyond
+  this case (see :doc:`dev.tmatrix`).
 * The NetCDF/libRadtran ``WriteMolTau`` exporter has no packaged equivalent;
   this is likely best implemented as a Python/xarray exporter if still needed.
 
@@ -125,17 +139,6 @@ Active coverage gaps
 These are not all missing implementations.  They are cases where the first
 audit cannot yet make a defensible parity claim.
 
-ECS line-by-line derivatives
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**Status: Missing; design deferred.**  LTE Voigt, mirrored LTE Voigt, and
-line-NLTE derivatives now have active finite-difference coverage for their
-supported atmospheric, spectroscopic-line, and line-shape targets.  ECS
-derivatives remain intentionally outside that implementation: an ECS target
-must also account for the ECS parameter set, and its derivative representation
-should be designed before adding a partial interface.  Do not treat the
-non-ECS derivative support as evidence that ECS derivatives are complete.
-
 CIA derivatives
 ~~~~~~~~~~~~~~~
 
@@ -148,7 +151,7 @@ claims to support.
 Transmission including particulate extinction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Status: Building blocks present; coverage and dependency gap.**  ARTS 2
+**Status: Building blocks present; coverage gap.**  ARTS 2
 ``TestTransmissionWithScat`` covers a refracted three-dimensional, full-Stokes
 transmission path through particles.  ARTS 3 can compose
 ``spectral_propmat_scat_pathFromPath``,
@@ -172,22 +175,36 @@ not sufficient parity evidence.
 Hydrostatic equilibrium
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-**Status: Replacement tested; derivative coverage gap.**  ARTS 2 ``TestHSE`` adjusts an
-altitude field as a function of pressure with ``z_fieldFromHSE``.  ARTS 3 has
-independent altitude-indexed atmospheric quantities and provides the
-design-native reverse representation, ``atm_fieldHydrostaticPressure``, which
-constructs pressure as a function of altitude.  The old direction is not a
-literal port target.  ``tests/core/atm/hse.py`` checks the replacement against
-analytic ideal-gas columns: isothermal pressure at cold and hot positive
-temperatures, a nonzero reference altitude, off-grid evaluation and
-extrapolation, and convergence for a temperature inversion with both supported
-options.  It uses a fixed specific gas constant and covers both scalar and
-field reference-pressure inputs.  Composition-derived gas constants and
-nonuniform horizontal fields are not covered by this small regression.
-ARTS 3 implements HSE-coupled path-length temperature derivatives through the
-``hse_derivative`` option, but no current test exercises it.  Add an
-analytic-versus-perturbed case covering the full-Stokes/Zeeman transmission
-interaction represented by ARTS 2 ``TestTjacStokes4_transmission``.
+**Status: HSE temperature coupling missing; path-length derivative validation
+missing.**  The pressure-construction replacement is implemented and tested in
+``tests/core/atm/hse.py``.  ARTS 2 ``z_fieldFromHSE`` adjusts altitude at fixed
+pressure levels; ARTS 3 ``atm_fieldHydrostaticPressure`` constructs pressure at
+fixed altitudes.  Restoring the old altitude-field representation is not a
+port target.
+
+The remaining derivative work must distinguish those two constraints:
+
+* ``hse_derivative`` enables an existing endpoint path-length correction in
+  transmission and emission calculations when a temperature Jacobian target
+  is present.  It is disabled by default and has no active regression.  This
+  correction describes layer expansion at fixed pressure levels; it is not
+  the temperature derivative of ``atm_fieldHydrostaticPressure``.  Define its
+  supported perturbation model and check it against finite differences, first
+  for an isothermal column and then for nonuniform temperatures.  The
+  full-Stokes/Zeeman interaction in ARTS 2
+  ``TestTjacStokes4_transmission`` also remains unvalidated.
+* The altitude-indexed ``Atm::HydrostaticPressure`` callable stores pressure
+  and gradient values computed at construction.  Temperature updates do not
+  rebuild it, and no temperature-to-HSE-pressure Jacobian is supplied.
+  Supporting that coupling requires an explicit dependency and propagation
+  of the induced pressure changes through the radiative-transfer calculation.
+  Validate it by perturbing temperature and rebuilding HSE pressure at fixed
+  altitudes.  Detecting the callable's type alone must not automatically
+  enable the existing path-length correction.
+
+The pressure-construction test uses a fixed specific gas constant.
+Composition-derived gas constants and nonuniform horizontal fields still lack
+focused coverage; these are validation gaps, not missing HSE solvers.
 
 Field regridding
 ~~~~~~~~~~~~~~~~
@@ -205,11 +222,12 @@ Line cutoffs and line mixing
 
 **Status: Present, focused coverage incomplete.**  ARTS 3 line-by-line code
 implements per-band cutoffs, and current camera/lookup tests use a fixed cutoff.
-The ARTS 2 Python cutoff check sweeps cutoff values against reference radiances;
-there is no equally focused ARTS 3 regression.  Add a small sweep, including
-cutoff Jacobians where supported.
+The LTE and NLTE finite-difference derivative tests also exercise pressure
+derivatives with a line cutoff.  What remains unmatched is the ARTS 2 Python
+cutoff sweep against reference radiances.  Add a focused radiance sweep; do
+not classify the already tested pressure-derivative branches as missing.
 
-ARTS 3 ECS O2 and CO2 tests exercise the new line-mixing representation, so the
+ARTS 3 ECS O2 and CO2 tests execute and plot the new line-mixing representation, so the
 old ``TestMolOxyAdaptation`` API is not a port target.  Strengthen the ECS tests
 with numerical reference or perturbation assertions before declaring complete
 scientific parity.
