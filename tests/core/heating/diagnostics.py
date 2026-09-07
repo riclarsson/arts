@@ -1,7 +1,6 @@
 """Physics and array-contract checks independent of the ARTS2 adapters."""
 
 import numpy as np
-import pytest
 from pyarts3 import arts, Workspace
 from pyarts3.recipe import heating_rates as hr
 
@@ -159,21 +158,21 @@ def test_workspace_dfdt():
 
 def test_invalid_inputs():
     for pressure in ([1.0, 1.0, 2.0], [1.0, 3.0, 2.0], [1.0, 2.0], [0.0, 1.0, 2.0]):
-        with pytest.raises(ValueError):
+        with np.testing.assert_raises(ValueError):
             hr.from_flux(np.ones(len(pressure)), pressure, 1000.0, 9.8)
     for capacity in (0.0, -1.0, np.nan):
-        with pytest.raises(ValueError):
+        with np.testing.assert_raises(ValueError):
             hr.from_flux_divergence(1.0, capacity, 9.8)
-    with pytest.raises(ValueError):
+    with np.testing.assert_raises(ValueError):
         hr.from_optical_depth_derivative(1.0, -1.0, 1.0, 1000.0)
-    with pytest.raises(ValueError):
+    with np.testing.assert_raises(ValueError):
         hr.from_optical_depth_derivative(1.0, 1.0, 0.0, 1000.0)
     for frequency in ([1.0], [2.0, 1.0], [1.0, np.nan]):
-        with pytest.raises(ValueError):
+        with np.testing.assert_raises(ValueError):
             hr.integrate_spectral(np.ones(len(frequency)), frequency)
-    with pytest.raises(ValueError):
+    with np.testing.assert_raises(ValueError):
         hr.integrate_spectral([1.0, 2.0], [1.0, 2.0], weights=[1.0])
-    with pytest.raises(ValueError):
+    with np.testing.assert_raises(ValueError):
         hr.flux_from_radiance([1.0, 2.0], [0.0, 190.0], [1.0, 1.0])
 
 

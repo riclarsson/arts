@@ -9,6 +9,7 @@ dependencies:
         - doxygen
         - eigen
         - fast_float
+        - gfortran
         - fftw
         - graphviz
         - ipykernel

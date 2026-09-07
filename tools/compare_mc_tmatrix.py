@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Load definitions without executing the MC acceptance cases.
 import runpy
 
-generate = runpy.run_path(str(ROOT / "tests/core/scat/mc_general_arts2.py"))["generate"]
+generate = runpy.run_path(str(ROOT / "tests/core/scat/mc_general_arts2.tmatrix.py"))["generate"]
 
 def compare(ssd, reference):
     report = {}

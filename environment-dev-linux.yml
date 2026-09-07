@@ -8,6 +8,7 @@ dependencies:
         - graphviz
         - eigen
         - fast_float
+        - gfortran
         - fftw
         - gcc
         - gmp

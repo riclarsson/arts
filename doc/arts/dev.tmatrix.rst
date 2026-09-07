@@ -47,7 +47,7 @@ The following defects in the ARTS-specific sources were corrected:
 * Declare all six output arrays in the quad random wrapper.  Complete the
   ARTS LAPACK symbol prefix on its ``tmzswap`` implementation.
 
-``tests/core/tmatrix/reference.py`` exercises the selected backend through
+``tests/core/tmatrix/reference.tmatrix.py`` exercises the selected backend through
 nanobind and the C++ interface, using the unchanged ``.ref`` files.  It compares
 complex amplitudes, Mueller elements, size-distribution cross sections,
 albedo, asymmetry and effective size statistics.  Printed precision determines
@@ -108,7 +108,7 @@ Temperature/frequency grids and all material inputs are validated before
 starting the solver calls.  The existing T-matrix mutex serializes Fortran
 access, and bulk evaluation subsequently uses the ordinary habit machinery.
 
-``tests/core/tmatrix/habit.py`` checks the direct-to-native normalization and
+``tests/core/tmatrix/habit.tmatrix.py`` checks the direct-to-native normalization and
 component ordering, forward/backscatter extraction, metadata, and the analytic
 small-sphere Rayleigh limit.  It also exercises temperature/frequency
 interpolation and repeated number-density scaling through
@@ -118,7 +118,7 @@ original particle data intact.
 MC azimuthally random particle reproduction
 ------------------------------------------
 
-``tests/core/scat/mc_general_arts2.py`` generates its oblate ice particle
+``tests/core/scat/mc_general_arts2.tmatrix.py`` generates its oblate ice particle
 in memory, replacing the large scattering XML fixture.  This test requires
 ``ENABLE_TMATRIX``.  ``tools/compare_mc_tmatrix.py`` reuses the generator to
 compare against an explicitly supplied original ARTS2 XML.  It uses

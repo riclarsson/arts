@@ -5,6 +5,7 @@ planets/Earth/afgl/tropical/CO2.xml
 planets/Earth/afgl/tropical/H2O.xml
 planets/Earth/afgl/tropical/O3.xml
 planets/Earth/afgl/tropical/N2.xml
+planets/Earth/Garand/garand_profile.0.xml.gz
 star/Sun/solar_spectrum_QUIET.xml
 planets/Earth/Optimized-Flux-Frequencies/SW-flux-optimized-f_grid.xml
 planets/Earth/Optimized-Flux-Frequencies/LW-flux-optimized-f_grid.xml
