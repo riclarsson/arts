@@ -7,6 +7,28 @@ This document describes some of these automatic document generators.
 
 This is an incomplete document.
 
+Choosing a documentation section
+================================
+
+Organize pages by the information they explain:
+
+* ``user.*`` explains what users need to understand in the ARTS interface:
+  terminology, data representations, parameter conventions, units, result
+  interpretation, and practical usage.
+* ``dev.*`` explains building, implementing, and maintaining ARTS: CMake
+  options such as ``ENABLE_TMATRIX``, dependencies, internal storage, source
+  changes, port history, and validation or regression-test details.
+* ``concept.*`` explains the mathematics and physics behind a calculation:
+  equations, derivations, approximations, and physical normalization.
+
+Split mixed topics into linked pages.  For example, a user page explains how
+an ARTS parameter selects a radius convention, a concept page defines the
+physical radius conventions, and a developer page explains the implementation
+and build options.  A short reference to an interface name can connect an
+equation to ARTS without turning a concept page into an API tutorial.
+
+Register pages in ``users.rst``, ``devs.rst``, or ``concepts.rst`` accordingly.
+
 Examples folder
 ===============
 

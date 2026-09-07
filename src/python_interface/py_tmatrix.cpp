@@ -9,11 +9,12 @@ using namespace nanobind::literals;
 void py_tmatrix(py::module_& m) {
   auto tm = m.def_submodule("tmatrix", R"(Original Mishchenko T-matrix solver.
 
-Requires a build with ENABLE_TMATRIX=ON. All angles are in degrees. Supply
-radius and wavelength in the same length unit (metres for SI results).
-Results own their data; calls serialize access to the Fortran shared state.
-ENABLE_TMATRIX_QUAD selects extended-precision internals. Both versions retain
-some single-precision storage and use double-precision inputs and outputs.
+Use available() to check whether this solver is available. All angles are in
+degrees. Supply radius and wavelength in the same length unit (metres for SI
+results). Results remain valid after subsequent calls.
+
+See :doc:`user.tmatrix` for interface conventions, :doc:`concept.tmatrix` for
+physical definitions, and :doc:`dev.tmatrix` for build and implementation details.
 )");
   tm.def("available", &tmatrix::available, "Whether the Fortran backend is enabled.");
   tm.def("extended_precision",

@@ -37,7 +37,3 @@ Surface-boundary behavior
 Both agenda options return polarized specular reflectance.  Thermal emission
 is supplied by the closed-surface agenda, which applies Kirchhoff consistency.
 
-FASTEM remains an intended future capability, but it cannot be added as
-another option of this reflectance agenda.  Its atmospheric correction and
-potentially independent emissivity and reflectivity require a different
-surface-boundary contract, which still needs to be designed.

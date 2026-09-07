@@ -10,7 +10,7 @@ pyarts3.recipe
 Heating-rate diagnostics
 ------------------------
 
-See :doc:`concept.heating` for units, sampling locations and examples.
+See :doc:`user.heating` for units, sampling locations and examples.
 
 .. automodule:: pyarts3.recipe.heating_rates
    :members:

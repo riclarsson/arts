@@ -1,5 +1,5 @@
 # Original ARTS2 sources; wrapper corrections are listed in
-# doc/arts/concept.tmatrix.rst.
+# doc/arts/dev.tmatrix.rst.
 if(NOT ENABLE_TMATRIX)
   return()
 endif()
