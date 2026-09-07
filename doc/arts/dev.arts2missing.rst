@@ -107,8 +107,10 @@ dependencies or were otherwise not registered there.  Their absence from the
 
 * RT4 and its cross-solver/hybrid comparison are absent.  DISORT and the ARTS
   3 Monte Carlo solvers are not numerical parity for RT4.
-* The Mishchenko T-matrix single-scattering-data generator is absent.  Reading
-  or using existing single-scattering data is a different capability.
+* The Mishchenko T-matrix particle solver has an optional ARTS 3 C++/Python
+  interface and original reference tests (see :doc:`concept.tmatrix`).
+  Automatic generation of scattering habits, including the ARTS 2 azimuthal
+  orientation-averaging workflow, remains to be connected.
 * The NetCDF/libRadtran ``WriteMolTau`` exporter has no packaged equivalent;
   this is likely best implemented as a Python/xarray exporter if still needed.
 

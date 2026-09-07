@@ -192,6 +192,7 @@ nanobind_add_module(pyarts_cpp NB_STATIC NB_DOMAIN ARTS ${NANOBIND_LTO} STABLE_A
     py_planets.cpp
     py_montecarlo.cpp
     py_rng.cpp
+    py_tmatrix.cpp
 )
 
 if(ENABLE_PCH)
@@ -234,4 +235,5 @@ arts_add_cpp_stubs(
   predef
   rtepack
   zeeman
+  tmatrix
 )

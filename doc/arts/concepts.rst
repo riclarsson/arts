@@ -13,6 +13,7 @@ The subsections below are given in no particular order.
    
    concept.absorption
    concept.radiative_transfer
+   concept.tmatrix
    concept.disort
    concept.heating
    concept.surface_emissivity
