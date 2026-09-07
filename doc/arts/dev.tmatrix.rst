@@ -8,6 +8,17 @@ spheroids and finite circular cylinders.  Enable it with
 inputs and outputs remain double precision, and both solvers retain some
 single-precision internal storage.  The two backends are alternative builds.
 
+On macOS with GNU Fortran, the backend is built as ``libtmatrix.dylib``
+instead of a static archive.  The Fortran driver links this library with its
+own Darwin unwind settings, avoiding compact-unwind conversion warnings for
+GNU stack frames.  C++ consumers retain their normal compact-unwind tables
+and exception handling.  Applying ``-no_compact_unwind`` to the mixed C++
+link instead breaks exception handling with the tested Clang/ARM64 toolchain, even with
+``-keep_dwarf_unwind``.  The shared backend must accompany the ARTS binaries;
+CMake supplies the build-tree runtime search path.  Other platforms retain
+the static backend.  No Fortran source, numerical compiler options, or
+warning-suppression flags are changed.
+
 Each call owns its output and holds one common mutex throughout computation
 and amplitude evaluation.  Results survive subsequent calls.  Concurrent
 calls are safe but do not run the Fortran solver concurrently.

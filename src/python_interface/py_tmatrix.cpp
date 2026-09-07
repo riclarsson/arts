@@ -21,37 +21,42 @@ physical definitions, and :doc:`dev.tmatrix` for build and implementation detail
          &tmatrix::extended_precision,
          "Whether the selected backend uses extended-precision internals.");
   py::class_<tmatrix::FixedResult>(tm, "FixedResult")
-      .def_ro("order", &tmatrix::FixedResult::order, "Converged multipole order.")
+      .def_ro("order", &tmatrix::FixedResult::order, "Converged multipole order.\n\n.. :class:`int`")
       .def_ro("scattering",
               &tmatrix::FixedResult::scattering,
-              "Orientation-averaged scattering cross section, in length squared.")
+              "Orientation-averaged scattering cross section, in length squared.\n\n.. :class:`float`")
       .def_ro("extinction",
               &tmatrix::FixedResult::extinction,
-              "Orientation-averaged extinction cross section, in length squared.")
+              "Orientation-averaged extinction cross section, in length squared.\n\n.. :class:`float`")
       .def_prop_ro(
           "amplitude",
           [](const tmatrix::FixedResult& x) { return ComplexMatrix{x.amplitude}; },
-          "Complex 2 by 2 amplitude matrix, in length units.")
-      .def_ro("phase",
-              &tmatrix::FixedResult::phase,
-              "4 by 4 phase matrix in the original Stokes convention, in length squared.");
+          "Complex 2 by 2 amplitude matrix, in length units.\n\n.. :class:`~pyarts3.arts.ComplexMatrix`")
+      .def_ro(
+          "phase",
+          &tmatrix::FixedResult::phase,
+          "4 by 4 phase matrix in the original Stokes convention, in length squared.\n\n.. :class:`~pyarts3.arts.Muelmat`")
+      .doc() = "Fixed form results of T-matrix evaluation for one geometry";
   py::class_<tmatrix::RandomResult>(tm, "RandomResult")
       .def_ro("effective_radius",
               &tmatrix::RandomResult::effective_radius,
-              "Effective radius in the input length unit and radius convention.")
-      .def_ro("effective_variance", &tmatrix::RandomResult::effective_variance, "Dimensionless effective variance.")
+              "Effective radius in the input length unit and radius convention.\n\n.. :class:`float`")
+      .def_ro("effective_variance",
+              &tmatrix::RandomResult::effective_variance,
+              "Dimensionless effective variance.\n\n.. :class:`float`")
       .def_ro("extinction",
               &tmatrix::RandomResult::extinction,
-              "Distribution-averaged extinction cross section, in length squared.")
+              "Distribution-averaged extinction cross section, in length squared.\n\n.. :class:`float`")
       .def_ro("scattering",
               &tmatrix::RandomResult::scattering,
-              "Distribution-averaged scattering cross section, in length squared.")
-      .def_ro("albedo", &tmatrix::RandomResult::albedo, "Single-scattering albedo.")
-      .def_ro("asymmetry", &tmatrix::RandomResult::asymmetry, "Mean cosine of scattering angle.")
+              "Distribution-averaged scattering cross section, in length squared.\n\n.. :class:`float`")
+      .def_ro("albedo", &tmatrix::RandomResult::albedo, "Single-scattering albedo.\n\n.. :class:`float`")
+      .def_ro("asymmetry", &tmatrix::RandomResult::asymmetry, "Mean cosine of scattering angle.\n\n.. :class:`float`")
       .def_ro(
           "phase",
           &tmatrix::RandomResult::phase,
-          "MuelmatVector at equally spaced angles from 0 to 180 degrees in the scattering-plane basis. Dimensionless: F11 integrates to 4*pi over solid angle. Multiply by scattering/(4*pi) for differential cross sections.");
+          "MuelmatVector at equally spaced angles from 0 to 180 degrees in the scattering-plane basis. Dimensionless: F11 integrates to 4*pi over solid angle. Multiply by scattering/(4*pi) for differential cross sections.\n\n.. :class:`~pyarts3.arts.MeulmatVector`")
+      .doc() = "Random form results of T-matrix evaluation for one distribution";
   tm.def(
       "fixed",
       &tmatrix::fixed,

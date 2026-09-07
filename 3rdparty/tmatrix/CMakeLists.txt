@@ -10,10 +10,16 @@ include(FortranCInterface)
 FortranCInterface_VERIFY(CXX)
 FortranCInterface_HEADER(${CMAKE_CURRENT_BINARY_DIR}/tmatrix_fortran.h
   MACRO_NAMESPACE "TMATRIX_FC_")
+# Keep GNU's Darwin unwind settings confined to Fortran code. Applying
+# -no_compact_unwind to the mixed C++ link breaks Clang exception unwinding.
+set(tmatrix_library_type STATIC)
+if(APPLE AND CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+  set(tmatrix_library_type SHARED)
+endif()
 if(ENABLE_TMATRIX_QUAD)
-  add_library(tmatrix STATIC tmq.arts.f amplq.arts.f lpq.f avg_tmatrixq.f)
+  add_library(tmatrix ${tmatrix_library_type} tmq.arts.f amplq.arts.f lpq.f avg_tmatrixq.f)
 else()
-  add_library(tmatrix STATIC tmd.arts.f ampld.arts.f lpd.f avg_tmatrix.f)
+  add_library(tmatrix ${tmatrix_library_type} tmd.arts.f ampld.arts.f lpd.f avg_tmatrix.f)
 endif()
 set_target_properties(tmatrix PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(tmatrix INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
