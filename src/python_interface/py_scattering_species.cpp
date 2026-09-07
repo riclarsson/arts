@@ -592,6 +592,21 @@ See :doc:`user.tmatrix` for usage and :doc:`dev.tmatrix` for build requirements.
 )",
                   py::call_guard<py::gil_scoped_release>())
       .def_static(
+          "sphere",
+          [](Vector                             t,
+             Vector                             f,
+             Vector                             d,
+             const scattering::ZenithAngleGrid& za,
+             const ComplexMatrix&               m,
+             Numeric                            density) { return ParticleHabit::sphere(t, f, d, za, m, density); },
+          "t_grid"_a,
+          "f_grid"_a,
+          "diameters"_a,
+          "za_scat_grid"_a,
+          "refractive_index"_a,
+          "density"_a,
+          "Create a Mie sphere habit. Supply temperature [K], frequency [Hz], diameters [m], density [kg/m3], and complex refractive indices with axes (temperature, frequency). Imaginary parts must be nonnegative.")
+      .def_static(
           "liquid_sphere",
           [](Vector t_grid, Vector f_grid, Vector diameters, const scattering::ZenithAngleGrid& za_scat_grid) {
             return ParticleHabit::liquid_sphere(t_grid, f_grid, diameters, za_scat_grid);

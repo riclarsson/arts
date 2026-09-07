@@ -124,6 +124,13 @@ class ParticleHabit {
                                int                  angles   = 181,
                                Numeric              accuracy = 0.001);
 
+  static ParticleHabit sphere(const StridedVectorView& t_grid,
+                              const StridedVectorView& f_grid,
+                              const StridedVectorView& diameters,
+                              const ZenithAngleGrid&   za_scat_grid,
+                              const ComplexMatrix&     refractive_index,
+                              Numeric                  density);
+
   static ParticleHabit liquid_sphere(const StridedVectorView& t_grid,
                                      const StridedVectorView& f_grid,
                                      const StridedVectorView& diameters,

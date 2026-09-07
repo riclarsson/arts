@@ -175,6 +175,20 @@ ParticleHabit ParticleHabit::from_legacy_aro(std::vector<::SingleScatteringData>
   return ParticleHabit(converted, grids);
 }
 
+ParticleHabit ParticleHabit::sphere(const StridedVectorView& t_grid,
+                                    const StridedVectorView& f_grid,
+                                    const StridedVectorView& diameters,
+                                    const ZenithAngleGrid&   za_scat_grid,
+                                    const ComplexMatrix&     refractive_index,
+                                    Numeric                  density) {
+  std::vector<SingleScatteringData<Numeric, Format::TRO, Representation::Gridded>> ssd;
+  ssd.reserve(diameters.size());
+  for (auto diameter : diameters)
+    ssd.push_back(SingleScatteringData<Numeric, Format::TRO, Representation::Gridded>::sphere(
+        t_grid, f_grid, diameter, za_scat_grid, refractive_index, density));
+  return ParticleHabit(ssd);
+}
+
 ParticleHabit ParticleHabit::liquid_sphere(const StridedVectorView& t_grid,
                                            const StridedVectorView& f_grid,
                                            const StridedVectorView& diameters,

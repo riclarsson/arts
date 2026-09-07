@@ -178,9 +178,8 @@ explicit = (y_plus - y_minus) / (2.0 * step)
 assert np.allclose(jac[:, iz], explicit, rtol=2e-10, atol=1e-15)
 
 
-# Run the central TestIyActive normalization check with its actual ARTS2 Mie
-# scattering data.  The converted file lives beside this test so this
-# regression has no dependency on the temporary ARTS2 source tree.
+# Run the central TestIyActive normalization check with an in-memory Mie
+# droplet matching the original ARTS2 material model and particle parameters.
 data = Path(__file__).parent / "data" / "radar_arts2"
 old = pyarts.Workspace()
 old.abs_speciesSet(
@@ -208,18 +207,48 @@ old.atm_field[number_density] = A.GriddedField3(
     grids=[fine_altitude, *old.atm_field["t"].data.grids[1:]],
 )
 
-legacy = pyarts.xml.load(str(data / "droplet_50um.xml"))
-meta = A.ScatteringMetaData()
-meta.mass = 1.0
-meta.diameter_volume_equ = 50e-6
-meta.diameter_max = 50e-6
-habit = A.ParticleHabit.from_legacy_tro([legacy], [meta])
+# Same Liebe (1993) water model as Atmlab eps_water_liebe93.m. Its
+# relaxation-frequency coefficient is 146, not epswater93.m's 146.4.
+# Preserve the original frequency, temperatures, diameter and angular grid.
+temperatures = np.array([268.15, 273.15, 278.15])
+theta = 300.0 / temperatures - 1.0
+e0 = 77.66 + 103.3 * theta
+e1 = 0.0671 * e0
+g1 = 20.2 - 146.0 * theta + 316.0 * theta**2
+permittivity = e0 - 94.0 * (
+    (e0 - e1) / (94.0 + 1j * g1)
+    + (e1 - 3.52) / (94.0 + 1j * 39.8 * g1)
+)
+habit = A.ParticleHabit.sphere(
+    temperatures, [94e9], [50e-6],
+    A.IrregularZenithAngleGrid(np.arange(181.0)),
+    np.sqrt(permittivity)[:, None], 1000.0,
+)
+particle = habit[0]
+np.testing.assert_allclose(particle.properties.mass, 1000 * np.pi / 6 * (50e-6)**3)
+phase = np.asarray(particle.phase_matrix)
+np.testing.assert_array_equal(particle.backscatter_matrix, phase[:, :, -1, :])
+np.testing.assert_array_equal(particle.forwardscatter_matrix, phase[:, :, 0, :])
+# Endpoint data must also be exact when the sampled phase grid omits 0/180.
+sparse = A.ParticleHabit.sphere(
+    temperatures, [94e9], [50e-6],
+    A.IrregularZenithAngleGrid([30.0, 90.0, 150.0]),
+    np.sqrt(permittivity)[:, None], 1000.0,
+)[0]
+np.testing.assert_array_equal(sparse.backscatter_matrix, particle.backscatter_matrix)
+np.testing.assert_array_equal(sparse.forwardscatter_matrix, particle.forwardscatter_matrix)
+liquid = A.ParticleHabit.liquid_sphere(
+    temperatures, [94e9], [50e-6], A.IrregularZenithAngleGrid(np.arange(181.0))
+)[0]
+np.testing.assert_allclose(liquid.properties.mass, particle.properties.mass)
+np.testing.assert_array_equal(liquid.backscatter_matrix, np.asarray(liquid.phase_matrix)[:, :, -1, :])
+np.testing.assert_array_equal(liquid.forwardscatter_matrix, np.asarray(liquid.phase_matrix)[:, :, 0, :])
 old.scat_species = [
     A.ScatteringHabit(
         habit,
         A.MonodispersePSD(number_density, 0.0, 400.0),
-        1.0,
-        1.0,
+        1000.0 * np.pi / 6,
+        3.0,
     )
 ]
 

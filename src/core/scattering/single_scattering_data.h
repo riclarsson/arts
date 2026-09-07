@@ -43,6 +43,32 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
       const StridedVectorView &f_grid,
       Numeric                  diameter,
       const ZenithAngleGrid   &za_grid) {
+    ComplexMatrix refractive_index(t_grid.size(), f_grid.size());
+    for (Index it = 0; it < t_grid.ncols(); ++it)
+      for (Index jf = 0; jf < f_grid.ncols(); ++jf)
+        refractive_index[it, jf] = refr_index_water_ellison07(f_grid[jf], t_grid[it]);
+    auto result                         = sphere(t_grid, f_grid, diameter, za_grid, refractive_index, 1e3);
+    result.properties->refractive_index = "Ellison (2007)";
+    return result;
+  }
+
+  static SingleScatteringData<Numeric, Format::TRO, Representation::Gridded> sphere(
+      const StridedVectorView &t_grid,
+      const StridedVectorView &f_grid,
+      Numeric                  diameter,
+      const ZenithAngleGrid   &za_grid,
+      const ComplexMatrix     &refractive_index,
+      Numeric                  density) {
+    ARTS_USER_ERROR_IF(refractive_index.nrows() != t_grid.ncols() || refractive_index.ncols() != f_grid.ncols(),
+                       "Refractive-index shape must match temperature/frequency grids.")
+    ARTS_USER_ERROR_IF(!std::isfinite(diameter) || diameter <= 0 || !std::isfinite(density) || density <= 0,
+                       "Diameter and density must be finite and positive.")
+    for (auto t : t_grid) ARTS_USER_ERROR_IF(!std::isfinite(t) || t <= 0, "Temperatures must be finite and positive.")
+    for (auto f : f_grid) ARTS_USER_ERROR_IF(!std::isfinite(f) || f <= 0, "Frequencies must be finite and positive.")
+    for (auto row : refractive_index)
+      for (auto m : row)
+        ARTS_USER_ERROR_IF(!std::isfinite(m.real()) || m.real() <= 0 || !std::isfinite(m.imag()) || m.imag() < 0,
+                           "Refractive index must have positive real and nonnegative imaginary parts.")
     auto t_grid_ptr  = std::make_shared<Vector>(t_grid);
     auto f_grid_ptr  = std::make_shared<Vector>(f_grid);
     auto za_grid_ptr = std::make_shared<ZenithAngleGrid>(za_grid);
@@ -53,12 +79,24 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
     BackscatterMatrixData<Numeric, Format::TRO>                         backscatter_matrix(t_grid_ptr, f_grid_ptr);
     ForwardscatterMatrixData<Numeric, Format::TRO>                      forwardscatter_matrix(t_grid_ptr, f_grid_ptr);
 
+    // Evaluate exact endpoints even when the requested angular grid omits them.
+    const auto &requested_angles = grid_vector(*za_grid_ptr);
+    Vector      angles(requested_angles.size() + 2);
+    for (Index i = 0; i < requested_angles.ncols(); ++i) angles[i] = requested_angles[i];
+    angles[requested_angles.size()]     = 0;
+    angles[requested_angles.size() + 1] = 180;
     for (size_t temp_ind = 0; temp_ind < t_grid_ptr->size(); ++temp_ind) {
-      Numeric temp = t_grid_ptr->operator[](temp_ind);
       for (size_t freq_ind = 0; freq_ind < f_grid_ptr->size(); ++freq_ind) {
         Numeric freq   = f_grid_ptr->operator[](freq_ind);
-        auto    sphere = MieSphere<Scalar>::Liquid(freq, temp, diameter / 2.0, grid_vector(*za_grid_ptr));
-        phase_matrix[temp_ind, freq_ind]      = sphere.get_scattering_matrix_compact();
+        auto    sphere = MieSphere<Scalar>(
+            Constant::speed_of_light / freq, diameter / 2.0, refractive_index[temp_ind, freq_ind], angles);
+        auto optical = sphere.get_scattering_matrix_compact();
+        for (Index ia = 0; ia < requested_angles.ncols(); ++ia)
+          for (Index k = 0; k < 6; ++k) phase_matrix[temp_ind, freq_ind, ia, k] = optical[ia, k];
+        for (Index k = 0; k < 6; ++k) {
+          forwardscatter_matrix[temp_ind, freq_ind, k] = optical[requested_angles.size(), k];
+          backscatter_matrix[temp_ind, freq_ind, k]    = optical[requested_angles.size() + 1, k];
+        }
         extinction_matrix[temp_ind, freq_ind] = sphere.get_extinction_coeff();
         absorption_vector[temp_ind, freq_ind] = sphere.get_absorption_coeff();
       }
@@ -66,8 +104,8 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
 
     auto pprops = ParticleProperties{.name             = "Mie Sphere",
                                      .source           = "ARTS Mie solver",
-                                     .refractive_index = "Ellison (2007)",
-                                     .mass             = 1e3 * 4.0 * Constant::pi * std::pow(diameter / 2.0, 3),
+                                     .refractive_index = "User-supplied temperature/frequency grid",
+                                     .mass             = density * Constant::pi / 6 * std::pow(diameter, 3),
                                      .d_veq            = diameter,
                                      .d_max            = diameter};
 
@@ -144,7 +182,7 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
       for (Size i_f = 0; i_f < f_grid->size(); ++i_f) {
         for (Size i_za_inc = 0; i_za_inc < za_inc_grid->size(); ++i_za_inc) {
           for (Size i_delta_aa = 0; i_delta_aa < delta_aa_grid->size(); ++i_delta_aa) {
-            const bool  negative = (*delta_aa_grid)[i_delta_aa] < 0.0;
+            const bool negative = (*delta_aa_grid)[i_delta_aa] < 0.0;
             const Size source_aa =
                 negative ? ssd.aa_grid.size() - 1 - i_delta_aa : i_delta_aa - (ssd.aa_grid.size() - 1);
             for (Size i_za_scat = 0; i_za_scat < static_cast<Size>(grid_size(*za_scat_grid)); ++i_za_scat) {
