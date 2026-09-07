@@ -28,7 +28,7 @@ Muelmat reflectance(Numeric ev, Numeric eh) {
 }
 }  // namespace
 
-void TelsemAtlasReadAscii(TelsemAtlas& telsem_atlas, const String& filename, const Index& month) {
+void telsem_atlasReadAscii(TelsemAtlas& telsem_atlas, const String& filename, const Index& month) {
   ARTS_TIME_REPORT
   telsem_read_ascii(filename, telsem_atlas, month);
 }

@@ -42,7 +42,7 @@ Muelmat reflectance(const TessemNN& neth,
 }
 }  // namespace
 
-void TessemNNReadAscii(TessemNN& tessem_nn, const String& filename) {
+void tessem_nnReadAscii(TessemNN& tessem_nn, const String& filename) {
   ARTS_TIME_REPORT
   tessem_read_ascii(filename, tessem_nn);
 }

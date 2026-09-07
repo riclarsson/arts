@@ -2449,7 +2449,7 @@ The reflectance matrix is
       .in     = {"freq_grid", "surf_field", "ray_point", "jac_targets"},
   };
 
-  wsm_data["TessemNNReadAscii"] = {
+  wsm_data["tessem_nnReadAscii"] = {
       .desc = R"--(Read an original TESSEM2 neural-network parameter file.)--",
       .author = {"The ARTS developers"},
       .gout = {"tessem_nn"},
@@ -2461,7 +2461,7 @@ The reflectance matrix is
       .gin_desc = {"Path to a TESSEM2 ASCII neural-network file."},
   };
 
-  wsm_data["TelsemAtlasReadAscii"] = {
+  wsm_data["telsem_atlasReadAscii"] = {
       .desc = R"--(Read one original TELSEM2 monthly atlas file.)--",
       .author = {"The ARTS developers"},
       .out = {"telsem_atlas"},
