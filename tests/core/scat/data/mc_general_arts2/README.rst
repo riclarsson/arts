@@ -1,8 +1,8 @@
 ARTS2 Monte Carlo source inputs
 ==============================
 
-``p_grid.xml``, ``lat_grid.xml``, ``lon_grid.xml`` and the ice scattering
-file are unchanged ARTS2 source inputs. The atmospheric preparation previously
+``p_grid.xml``, ``lat_grid.xml`` and ``lon_grid.xml`` are unchanged ARTS2
+source inputs. The atmospheric preparation previously
 stored here as ``TestMonteCarloDataPrepare.*`` is now performed in
 ``mc_general_arts2.py``; no generated fields or binary sidecars are retained.
 
@@ -26,3 +26,12 @@ source abundances. Original MC I/Q reference values, four-standard-error
 acceptance, seed and photon counts are unchanged. Temperature, altitude and
 particle-density reconstruction were verified against the removed snapshots
 to floating-point precision before this abundance substitution.
+
+The large azimuthally random ice XML is replaced by an in-memory T-matrix
+calculation in the test, which now requires ENABLE_TMATRIX.  The oblate
+100-micrometre volume-equivalent-radius spheroid, aspect ratio 1.5, original
+REFICE material values, frequency/temperature grids and angular grids are
+preserved.  Full-precision SI wavelengths and quadrature replace historical
+rounding.  Against the old XML, maximum differences normalized by each array's
+peak were 0.180 ppm (phase), 0.089 ppm (extinction), and 0.744 ppm (absorption)
+with the extended-precision backend.  No MC acceptance numbers were changed.

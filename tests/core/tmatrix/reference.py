@@ -179,7 +179,35 @@ def test_errors_and_threads(expected):
             np.testing.assert_array_equal(actual, expected)
 
 
+def test_fixed_batch():
+    args = (100e-6, 299792458 / 230e9, 1.5, 1.78, .003)
+    geometries = np.array([[0., 90., 0., 30., 0., 0.],
+                           [56., 65., 114., 128., 145., 52.],
+                           [90., 90., 0., 0., 0., 0.]])
+    batch = TM.fixed_batch(*args, geometries)
+    assert len(batch) == len(geometries)
+    saved = [np.array(r.phase) for r in batch]
+    # New solver calls must not overwrite earlier rows or retained batches.
+    for i, geometry in enumerate(geometries):
+        scalar = TM.fixed(*args, *geometry)
+        np.testing.assert_array_equal(batch[i].amplitude, scalar.amplitude)
+        np.testing.assert_array_equal(batch[i].phase, scalar.phase)
+        np.testing.assert_array_equal(batch[i].phase, saved[i])
+    assert TM.fixed_batch(*args, np.empty((0, 6))) == []
+    for invalid in [np.zeros((2, 5)),
+                    np.array([[0., 0., 0., 0., 0., 181.]]),
+                    np.array([[0., 0., float('nan'), 0., 0., 0.]])]:
+        try:
+            TM.fixed_batch(*args, invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('invalid batch geometry accepted')
+
+
 assert TM.available()
 expected = test_fixed()
 test_random()
 test_errors_and_threads(expected)
+
+test_fixed_batch()

@@ -4,7 +4,11 @@ T-matrix interface
 The Python interface is ``pyarts3.arts.tmatrix``.  ``available()`` reports
 whether the backend was built; ``extended_precision()`` identifies the selected
 variant.  ``fixed`` computes a particle and evaluates its amplitude and phase
-matrices at one illumination/scattering geometry.  ``random`` computes a
+matrices at one illumination/scattering geometry.  ``fixed_batch`` computes
+one particle and evaluates a matrix of geometries, returning a list of fixed
+results in row order.  Each row contains incident zenith, scattered zenith,
+incident azimuth, scattered azimuth, alpha and beta, all in degrees.
+``random`` computes a
 randomly oriented size distribution, defaulting to an effectively monodisperse
 particle.  These functions calculate individual optical results.  Use
 ``ParticleHabit.tmatrix`` below to prepare a habit for scattering species.

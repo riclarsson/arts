@@ -28,7 +28,7 @@ ParticleHabit ParticleHabit::tmatrix(const Vector&        t_grid,
   check_grid(t_grid, "t_grid");
   check_grid(f_grid, "f_grid");
   check_grid(diameters, "diameters");
-  if (refractive_index.nrows() != t_grid.size() || refractive_index.ncols() != f_grid.size())
+  if (refractive_index.nrows() != t_grid.ncols() || refractive_index.ncols() != f_grid.ncols())
     throw std::invalid_argument("refractive_index must have shape (temperature, frequency)");
   for (auto row : refractive_index)
     for (Complex m : row)
@@ -52,8 +52,8 @@ ParticleHabit ParticleHabit::tmatrix(const Vector&        t_grid,
     PhaseMatrixData<Numeric, Format::TRO, Representation::Gridded>      phase(temperatures, frequencies, angular_grid);
     ExtinctionMatrixData<Numeric, Format::TRO, Representation::Gridded> extinction(temperatures, frequencies);
     AbsorptionVectorData<Numeric, Format::TRO, Representation::Gridded> absorption(temperatures, frequencies);
-    for (Index it = 0; it < t_grid.size(); ++it) {
-      for (Index jf = 0; jf < f_grid.size(); ++jf) {
+    for (Size it = 0; it < t_grid.size(); ++it) {
+      for (Size jf = 0; jf < f_grid.size(); ++jf) {
         const Complex m = refractive_index[it, jf];
         // NKMAX=-1 gives one quadrature point at the centre of the symmetric
         // narrow interval: one size, with no second PSD integration here.

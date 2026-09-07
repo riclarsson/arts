@@ -1,5 +1,6 @@
 #include <hpy_arts.h>
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/vector.h>
 #include <tmatrix.h>
 
 namespace Python {
@@ -72,6 +73,44 @@ physical definitions, and :doc:`dev.tmatrix` for build and implementation detail
       "phi_scattered"_a,
       "alpha"_a,
       "beta"_a,
+      "accuracy"_a     = 0.001,
+      "radius_ratio"_a = 1.,
+      "shape"_a        = -1,
+      py::call_guard<py::gil_scoped_release>());
+  tm.def(
+      "fixed_batch",
+      [](Numeric       radius,
+         Numeric       wavelength,
+         Numeric       aspect_ratio,
+         Numeric       refractive_real,
+         Numeric       refractive_imag,
+         const Matrix& geometries,
+         Numeric       accuracy,
+         Numeric       radius_ratio,
+         int           shape) {
+        return tmatrix::fixed_batch(radius,
+                                    wavelength,
+                                    aspect_ratio,
+                                    refractive_real,
+                                    refractive_imag,
+                                    geometries,
+                                    accuracy,
+                                    radius_ratio,
+                                    shape);
+      },
+      R"(Compute one T-matrix and evaluate multiple geometries.
+
+Each row of geometries contains theta_incident, theta_scattered,
+phi_incident, phi_scattered, alpha, beta, in degrees. Returns a list of
+FixedResult objects in row order. Parameters and units match fixed().
+The solver lock covers the entire batch; results own their data.
+)",
+      "radius"_a,
+      "wavelength"_a,
+      "aspect_ratio"_a,
+      "refractive_real"_a,
+      "refractive_imag"_a,
+      "geometries"_a,
       "accuracy"_a     = 0.001,
       "radius_ratio"_a = 1.,
       "shape"_a        = -1,

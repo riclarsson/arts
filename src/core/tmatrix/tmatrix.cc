@@ -149,16 +149,54 @@ FixedResult fixed(Numeric radius,
                   Numeric accuracy,
                   Numeric radius_ratio,
                   int     shape) {
+  matpack::cdata_t<Numeric, 1, 6> geometries;
+  FixedResult                     result;
+  geometries[0, 0] = theta_incident;
+  geometries[0, 1] = theta_scattered;
+  geometries[0, 2] = phi_incident;
+  geometries[0, 3] = phi_scattered;
+  geometries[0, 4] = alpha;
+  geometries[0, 5] = beta;
+  fixed_batch(std::span{&result, 1},
+              radius,
+              wavelength,
+              aspect_ratio,
+              refractive_real,
+              refractive_imag,
+              geometries,
+              accuracy,
+              radius_ratio,
+              shape);
+  return result;
+}
+
+void fixed_batch(std::span<FixedResult> results,
+                 Numeric                radius,
+                 Numeric                wavelength,
+                 Numeric                aspect_ratio,
+                 Numeric                refractive_real,
+                 Numeric                refractive_imag,
+                 ConstMatrixView        geometries,
+                 Numeric                accuracy,
+                 Numeric                radius_ratio,
+                 int                    shape) {
   check(radius, wavelength, aspect_ratio, refractive_real, refractive_imag, accuracy, radius_ratio, shape);
-  for (auto angle : {theta_incident, theta_scattered, beta})
-    require(std::isfinite(angle) && angle >= 0 && angle <= 180, "zenith angles and beta must be in [0, 180] degrees");
-  for (auto angle : {phi_incident, phi_scattered, alpha})
-    require(std::isfinite(angle) && angle >= 0 && angle <= 360, "azimuth angles and alpha must be in [0, 360] degrees");
+  require(geometries.ncols() == 6, "geometries must have six columns");
+  require(results.size() == static_cast<Size>(geometries.nrows()), "results must have one element per geometry row");
+  for (Index i = 0; i < geometries.nrows(); ++i) {
+    for (Index j : {0, 1, 5})
+      require(std::isfinite(geometries[i, j]) && geometries[i, j] >= 0 && geometries[i, j] <= 180,
+              "zenith angles and beta must be in [0, 180] degrees");
+    for (Index j : {2, 3, 4})
+      require(std::isfinite(geometries[i, j]) && geometries[i, j] >= 0 && geometries[i, j] <= 360,
+              "azimuth angles and alpha must be in [0, 360] degrees");
+  }
+  if (geometries.nrows() == 0) return;
   // Equal-volume and equal-area radii coincide for a sphere. Avoid the
   // removable 0/0 in the legacy spheroid surface-area conversion.
   if (shape == -1 && aspect_ratio == 1) radius_ratio = 1;
-  FixedResult out;
 #ifdef ARTS_HAS_TMATRIX
+  FixedResult out;
   // AMPL reads the T-matrix from COMMON: keep the lock until all results
   // have been copied, including when alternating fixed/random calculations.
   std::lock_guard lock(solver_mutex);
@@ -180,21 +218,52 @@ FixedResult fixed(Numeric radius,
            sizeof(msg));
   error(msg);
   out.order = order;
-  ampl_(order,
-        wavelength,
-        theta_incident,
-        theta_scattered,
-        phi_incident,
-        phi_scattered,
-        alpha,
-        beta,
-        out.amplitude[0, 0],
-        out.amplitude[0, 1],
-        out.amplitude[1, 0],
-        out.amplitude[1, 1]);
-  ampmat_to_phamat(out.phase, out.amplitude[0, 0], out.amplitude[0, 1], out.amplitude[1, 0], out.amplitude[1, 1]);
+  for (Index i = 0; i < geometries.nrows(); ++i) {
+    auto theta_incident  = geometries[i, 0];
+    auto theta_scattered = geometries[i, 1];
+    auto phi_incident    = geometries[i, 2];
+    auto phi_scattered   = geometries[i, 3];
+    auto alpha           = geometries[i, 4];
+    auto beta            = geometries[i, 5];
+    ampl_(order,
+          wavelength,
+          theta_incident,
+          theta_scattered,
+          phi_incident,
+          phi_scattered,
+          alpha,
+          beta,
+          out.amplitude[0, 0],
+          out.amplitude[0, 1],
+          out.amplitude[1, 0],
+          out.amplitude[1, 1]);
+    ampmat_to_phamat(out.phase, out.amplitude[0, 0], out.amplitude[0, 1], out.amplitude[1, 0], out.amplitude[1, 1]);
+    results[i] = out;
+  }
 #endif
-  return out;
+}
+
+std::vector<FixedResult> fixed_batch(Numeric         radius,
+                                     Numeric         wavelength,
+                                     Numeric         aspect_ratio,
+                                     Numeric         refractive_real,
+                                     Numeric         refractive_imag,
+                                     ConstMatrixView geometries,
+                                     Numeric         accuracy,
+                                     Numeric         radius_ratio,
+                                     int             shape) {
+  std::vector<FixedResult> results(geometries.nrows());
+  fixed_batch(results,
+              radius,
+              wavelength,
+              aspect_ratio,
+              refractive_real,
+              refractive_imag,
+              geometries,
+              accuracy,
+              radius_ratio,
+              shape);
+  return results;
 }
 
 RandomResult random(Numeric radius,

@@ -1,7 +1,10 @@
 # Original ARTS2 sources; wrapper corrections are listed in
 # doc/arts/dev.tmatrix.rst.
 if(NOT ENABLE_TMATRIX)
+  message(STATUS "T-matrix is disabled")
   return()
+else()
+  message(STATUS "T-matrix is enabled")
 endif()
 if(ENABLE_ARTS_LGPL)
   message(FATAL_ERROR "T-matrix is unavailable in ENABLE_ARTS_LGPL builds")

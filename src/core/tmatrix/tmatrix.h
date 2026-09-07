@@ -2,6 +2,9 @@
 
 #include <rtepack.h>
 
+#include <span>
+#include <vector>
+
 namespace tmatrix {
 //! Whether the optional, original Fortran backend is built.
 bool available();
@@ -32,6 +35,31 @@ FixedResult fixed(Numeric radius,
                   Numeric accuracy     = 0.001,
                   Numeric radius_ratio = 1,
                   int     shape        = -1);
+
+//! Compute once, then evaluate rows of [theta_incident, theta_scattered,
+//! phi_incident, phi_scattered, alpha, beta], in degrees.
+//! Caller supplies one output per row; results own their data.
+void fixed_batch(std::span<FixedResult> results,
+                 Numeric                radius,
+                 Numeric                wavelength,
+                 Numeric                aspect_ratio,
+                 Numeric                refractive_real,
+                 Numeric                refractive_imag,
+                 ConstMatrixView        geometries,
+                 Numeric                accuracy     = 0.001,
+                 Numeric                radius_ratio = 1,
+                 int                    shape        = -1);
+
+//! Allocating convenience overload; delegates to the caller-owned span overload.
+std::vector<FixedResult> fixed_batch(Numeric         radius,
+                                     Numeric         wavelength,
+                                     Numeric         aspect_ratio,
+                                     Numeric         refractive_real,
+                                     Numeric         refractive_imag,
+                                     ConstMatrixView geometries,
+                                     Numeric         accuracy     = 0.001,
+                                     Numeric         radius_ratio = 1,
+                                     int             shape        = -1);
 
 struct RandomResult {
   Numeric effective_radius{}, effective_variance{}, extinction{}, scattering{}, albedo{}, asymmetry{};

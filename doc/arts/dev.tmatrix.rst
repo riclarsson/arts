@@ -106,3 +106,38 @@ small-sphere Rayleigh limit.  It also exercises temperature/frequency
 interpolation and repeated number-density scaling through
 ``ArrayOfScatteringSpecies``, verifying that these evaluations leave the
 original particle data intact.
+
+MC azimuthally random particle reproduction
+------------------------------------------
+
+``tests/core/scat/mc_general_arts2.py`` generates its oblate ice particle
+in memory, replacing the large scattering XML fixture.  This test requires
+``ENABLE_TMATRIX``.  ``tools/compare_mc_tmatrix.py`` reuses the generator to
+compare against an explicitly supplied original ARTS2 XML.  It uses
+``tmatrix.fixed_batch`` to compute one T-matrix per frequency/temperature and
+evaluate all geometries while holding the Fortran solver lock.  The single
+geometry interface delegates to the same implementation.  Each returned
+result owns its amplitude and Mueller matrix.  The C++ batch interface accepts
+``ConstMatrixView`` input and writes into a caller-owned
+``std::span<FixedResult>`` with one element per geometry row.  The scalar wrapper
+uses stack storage.  A vector-returning C++ convenience overload allocates the
+output and delegates to the span overload; the Python binding uses this
+convenience overload.
+
+The test records the four refractive indices obtained independently from the
+historical PyARTS REFICE material model.  With vertical symmetry axis, an oblate
+spheroid needs no orientation averaging.  Directional extinction comes from
+forward amplitudes, and absorption is extinction minus the angular scattering
+integral.  The original XML is read only after generation to report differences.
+The generated data use the legacy ARO layout and existing native habit adapter.
+MC acceptance values and native ``ParticleHabit.tmatrix`` orientation support
+remain unchanged.
+
+Run with a T-matrix-enabled Python environment::
+
+    python tools/compare_mc_tmatrix.py --reference /path/to/original.xml
+
+The default output and JSON error report go to ``tmp/mc-tmatrix-comparison``.
+``--legacy-numerics`` tests historical float32 wavelength rounding and rounded
+quadrature coefficients; ``--quadrature`` changes the absorption integration
+order.  The original reference path is protected from overwrite.
