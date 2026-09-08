@@ -42,9 +42,13 @@ void singleton_regridding() {
   PhaseMatrixData<Numeric, Format::ARO, Representation::Gridded> phase(t, f, za, aa, scat);
   std::fill_n(phase.data_handle(), phase.size(), 5.0);
   constant(phase.regrid(grids), 5.0);
+#ifndef ARTS_NO_SHTNS
+  // Only spectral regridding needs SHTNS; retain the gridded checks above
+  // and the remaining regressions in builds without that optional backend.
   PhaseMatrixData<Numeric, Format::ARO, Representation::Spectral> spectral(t, f, za, sht::provider.get_instance(1, 1));
   std::fill_n(spectral.data_handle(), spectral.size(), Complex{6.0, 7.0});
   constant(spectral.regrid(grids), Complex{6.0, 7.0});
+#endif
 }
 
 void monodisperse_cutoff() {
