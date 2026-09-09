@@ -2765,13 +2765,6 @@ Overwrites all other functional toggles.
       .gin_desc  = {"Key to toggle"},
   };
 
-  wsm_data["jac_targetsConditionalClear"] = {
-      .desc   = R"--(Clears *jac_targets* if *do_jac* evaluates false.
-)--",
-      .author = {"Richard Larsson"},
-      .out    = {"jac_targets"},
-      .in     = {"jac_targets", "do_jac"},
-  };
 
   wsm_data["jac_targetsInit"] = {
       .desc   = R"--(Initialize or reset the *jac_targets*.
@@ -4323,7 +4316,7 @@ The core calculations happens inside the *spectral_rad_observer_agenda*.
 )--",
       .author = {"Richard Larsson"},
       .out    = {"measurement_sensor"},
-      .in     = {"measurement_sensor", "model_state_vec", "jac_targets"},
+      .in     = {"measurement_sensor", "model_state_vec", "model_state_targets"},
   };
 
   wsm_data["measurement_sensorInit"] = {
@@ -4677,7 +4670,7 @@ Hence, a temperature of 0 means 0s the edges of the *freq_grid*.
 )--",
       .author = {"Richard Larsson"},
       .out    = {"atm_field"},
-      .in     = {"atm_field", "model_state_vec", "jac_targets"},
+      .in     = {"atm_field", "model_state_vec", "model_state_targets"},
   };
 
   wsm_data["surf_fieldFromModelState"] = {
@@ -4685,7 +4678,7 @@ Hence, a temperature of 0 means 0s the edges of the *freq_grid*.
 )--",
       .author = {"Richard Larsson"},
       .out    = {"surf_field"},
-      .in     = {"surf_field", "model_state_vec", "jac_targets"},
+      .in     = {"surf_field", "model_state_vec", "model_state_targets"},
   };
 
   wsm_data["subsurf_fieldFromModelState"] = {
@@ -4693,7 +4686,7 @@ Hence, a temperature of 0 means 0s the edges of the *freq_grid*.
 )--",
       .author = {"Richard Larsson"},
       .out    = {"subsurf_field"},
-      .in     = {"subsurf_field", "model_state_vec", "jac_targets"},
+      .in     = {"subsurf_field", "model_state_vec", "model_state_targets"},
   };
 
   wsm_data["abs_bandsFromModelState"] = {
@@ -4701,7 +4694,7 @@ Hence, a temperature of 0 means 0s the edges of the *freq_grid*.
 )--",
       .author = {"Richard Larsson"},
       .out    = {"abs_bands"},
-      .in     = {"abs_bands", "model_state_vec", "jac_targets"},
+      .in     = {"abs_bands", "model_state_vec", "model_state_targets"},
   };
 
   wsm_data["model_state_vecInit"] = {
@@ -5137,16 +5130,16 @@ calculation in which the *measurement_jac* and the gain matrix *measurement_gain
 )",
       .author = {"Richard Larsson"},
       .out    = {"measurement_vec_error", "measurement_jac_error"},
-      .in     = {"measurement_sensor", "jac_targets", "model_state_vec"},
+      .in     = {"measurement_sensor", "model_state_targets", "jac_targets", "model_state_vec"},
   };
 
-  wsm_data["measurement_vecConditionalAddError"] = {
+  wsm_data["measurement_vecAddError"] = {
       .desc =
           R"(Add the measurement error to the measurement.  Conditionally, also to the Jacobian.
 )",
       .author = {"Richard Larsson"},
       .out    = {"measurement_vec", "measurement_jac"},
-      .in     = {"measurement_vec", "measurement_jac", "measurement_vec_error", "measurement_jac_error", "do_jac"},
+      .in     = {"measurement_vec", "measurement_jac", "measurement_vec_error", "measurement_jac_error"},
   };
 
   wsm_data["measurement_vec_error_covmatConstant"] = {

@@ -310,12 +310,11 @@ Otherwise same as *spectral_rad_surface_agenda*.
   };
 
   wsa_data["inversion_iterate_agenda"] = {
-      .desc               = R"--(Work in progress ...
+      .desc               = R"--(Evaluate a retrieval state.  See *OEM*.
 
-See *OEM*.
-
-.. note::
-    The output *measurement_jac* size may depend on the *do_jac* input.
+*model_state_targets* always contains the complete state mapping used by
+*UpdateModelStates* and measurement-error values.  *jac_targets* contains
+the derivative targets, or is empty for a value-only evaluation.
 )--",
       .output             = {"atm_field",
                              "abs_bands",
@@ -329,53 +328,46 @@ See *OEM*.
                              "measurement_sensor",
                              "surf_field",
                              "subsurf_field",
+                             "model_state_targets",
                              "jac_targets",
-                             "model_state_vec",
-                             "do_jac",
-                             "inversion_iterate_agenda_counter"},
+                             "model_state_vec"},
       .enum_options       = {"Full"},
       .enum_default       = "Full",
       .output_constraints = {
-          {"(do_jac == 0 and measurement_jac.size() == 0) or (measurement_vec_fit.size() == static_cast<Size>(measurement_jac.nrows()))",
-           "On output, the measurement vector and Jacobian must match expected size.",
-           "measurement_vec_fit.size()",
-           "measurement_jac.nrows()",
-           "do_jac == 0"},
-          {"(do_jac == 0 and measurement_jac.size() == 0) or (model_state_vec.size() == static_cast<Size>(measurement_jac.ncols()) and jac_targets.x_size() == model_state_vec.size())",
-           "On output, the model state vector and Jacobian must match expected size.",
-           "model_state_vec.size()",
-           "measurement_jac.ncols()",
+          {"model_state_targets.x_size() == model_state_vec.size()",
+           "The complete state mapping must match the model state vector.",
+           "model_state_targets.x_size()",
+           "model_state_vec.size()"},
+          {"jac_targets.x_size() == 0 or jac_targets.x_size() == model_state_targets.x_size()",
+           "Derivative targets must be empty or span the complete state.",
            "jac_targets.x_size()",
-           "do_jac == 0"},
+           "model_state_targets.x_size()"},
+          {"(jac_targets.x_size() == 0 and measurement_jac.size() == 0) or same_shape({measurement_vec_fit.size(), jac_targets.x_size()}, measurement_jac)",
+           "The measurement Jacobian must match the derivative targets and fitted measurement.",
+           "measurement_jac.shape()",
+           "measurement_vec_fit.size()",
+           "jac_targets.x_size()"},
       }};
 
   wsa_data["measurement_inversion_agenda"] = {
-      .desc =
-          R"--(This is a helper *Agenda* intended for use within *inversion_iterate_agenda*.
+      .desc         = R"--(Simulate the fitted measurement for the current physical model.
 
-It outputs the *measurement_vec_fit* and *measurement_jac* for the
-current iteration of the inversion. The *measurement_vec_fit* is the
-fitted measurement vector, i.e., the measurement vector that is expected to be
-observed given the current *atm_field*, *abs_bands*, *measurement_sensor*,
-and *surf_field*.  It does not take these as explicit input but via the Workspace
-mechanism.  Within the *inversion_iterate_agenda*, these will be the local variables.
-
-What is special about this Agenda is that it enforces that the *measurement_jac*
-is empty on output if *do_jac* evaluates false.  Do not use this Agenda if you
-do not mind having a non-empty *measurement_jac* on output even if *do_jac*
-evaluates false.  Also do not use this Agenda if you wish to squeeze out performance,
-it does a lot of unnecessary checks and operations that are not always needed.
+Apply *UpdateModelStates* before this helper, as the predefined
+*inversion_iterate_agenda* does.  *model_state_targets* supplies the full
+mapping for measurement-error values.  *jac_targets* controls all derivatives;
+when it is empty, *measurement_jac* is empty.  Both target sets are read-only.
 )--",
       .output       = {"measurement_vec_fit", "measurement_jac"},
-      .input        = {"jac_targets", "do_jac"},
+      .input        = {"model_state_targets", "jac_targets"},
       .enum_options = {"LowMemory", "HighPerformance"},
       .enum_default = "LowMemory",
       .output_constraints =
           {
-              {"do_jac != static_cast<Index>(measurement_jac.size() == 0)",
-               "When *do_jac* evaluates as true, the *measurement_jac* must be non-empty.",
-               "do_jac != 0",
-               "measurement_jac.shape()"},
+              {"(jac_targets.x_size() == 0 and measurement_jac.size() == 0) or same_shape({measurement_vec_fit.size(), jac_targets.x_size()}, measurement_jac)",
+               "The measurement Jacobian must match the derivative targets and fitted measurement.",
+               "measurement_jac.shape()",
+               "measurement_vec_fit.size()",
+               "jac_targets.x_size()"},
           },
   };
 
