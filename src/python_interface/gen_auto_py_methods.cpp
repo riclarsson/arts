@@ -46,7 +46,15 @@ std::string method_arguments(const WorkspaceMethodInternalRecord& wsm) {
 
   std::ostringstream os;
 
-  const auto generics = wsm.generic_overloads();
+  auto generics = wsm.generic_overloads();
+  // Overload combinations may repeat a type for an individual argument.
+  // A Python variant must contain each type only once (preserve conversion order).
+  for (auto& types : generics) {
+    std::vector<std::string> unique;
+    for (const auto& type : types)
+      if (stdr::find(unique, type) == unique.end()) unique.push_back(type);
+    types = std::move(unique);
+  }
 
   os << "    Workspace& _ws [[maybe_unused]]";
   for (auto& v : wsm.out) { os << ",\n    py" << wsvs.at(v).type << "* const _" << v; }
@@ -55,7 +63,7 @@ std::string method_arguments(const WorkspaceMethodInternalRecord& wsm) {
   for (Size i = 0; i < wsm.gout.size(); i++) {
     const auto& v = wsm.gout.at(i);
 
-    if (generics[i].size() == 1) {
+    if (wsm.gout_type.at(i).find(',') == std::string::npos and generics[i].size() == 1) {
       const auto& g = wsm.gout_type.at(i);
       os << ",\n    py" << g << "* const _" << v;
     } else {
@@ -80,7 +88,7 @@ std::string method_arguments(const WorkspaceMethodInternalRecord& wsm) {
 
     if (is_gout(v)) continue;
 
-    if (generics[index].size() == 1) {
+    if (wsm.gin_type.at(i).find(',') == std::string::npos and generics[index].size() == 1) {
       const auto& g = wsm.gin_type.at(i);
       os << ",\n    const py" << g << "* const _" << v;
     } else {
