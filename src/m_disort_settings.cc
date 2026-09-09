@@ -715,7 +715,7 @@ void disort_settingsNoSurfaceScattering(DisortSettings& disort_settings) {
   disort_settings.bidirectional_reflectance_distribution_functions.resize(disort_settings.frequency_count(), 0);
 }
 
-void disort_settingsSurfaceLambertian(DisortSettings& disort_settings, const Vector& vec) {
+static void disort_settingsSurfaceLambertianImpl(DisortSettings& disort_settings, const Vector& vec) {
   ARTS_TIME_REPORT
 
   disort_settings.bidirectional_reflectance_distribution_functions.resize(disort_settings.frequency_count(), 1);
@@ -726,7 +726,7 @@ void disort_settingsSurfaceLambertian(DisortSettings& disort_settings, const Vec
   }
 }
 
-void disort_settingsSurfaceLambertian(DisortSettings& disort_settings, const Numeric& value) {
+static void disort_settingsSurfaceLambertianImpl(DisortSettings& disort_settings, const Numeric& value) {
   ARTS_TIME_REPORT
 
   disort_settings.bidirectional_reflectance_distribution_functions.resize(disort_settings.frequency_count(), 1);
@@ -1231,3 +1231,8 @@ alt_grid:          {:B,}
   }
 }
 ARTS_METHOD_ERROR_CATCH
+
+void disort_settingsSurfaceLambertian(DisortSettings&                            disort_settings,
+                                      const Generic<const Numeric, const Vector> value) {
+  std::visit([&](const auto& selected) { disort_settingsSurfaceLambertianImpl(disort_settings, *selected); }, value);
+}

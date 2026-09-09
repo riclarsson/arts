@@ -11,7 +11,7 @@ int main() {
   settings.legendre_coefficients.resize(1, 1, full_moments);
   settings.legendre_coefficients[0, 0, joker] = Vector{1.0, 0.9, 0.8, 0.72};
 
-  const auto scaling = disort::delta_m_plus(settings.legendre_coefficients[0], retained_moments);
+  const auto scaling                = disort::delta_m_plus(settings.legendre_coefficients[0], retained_moments);
   settings.fractional_scattering[0] = scaling.fraction;
   settings.delta_m_peak_moments[0]  = scaling.moments;
 
