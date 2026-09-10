@@ -29,6 +29,9 @@ number of measurements.
    * - ``li``
      - One Gauss--Newton step; direct solve in state space
      - The forward model is linear over the relevant state range.
+   * - ``li_m``
+     - One step; direct solve in measurement space
+     - Substantially fewer measurements than states; avoids CG tolerance tuning.
    * - ``li_cg``
      - One step; conjugate gradient (CG) in state space
      - A large linear problem where a direct solve is expensive.
@@ -38,6 +41,9 @@ number of measurements.
    * - ``gn``
      - Gauss--Newton; direct solve in state space
      - A mildly nonlinear problem with a plausible starting state.
+   * - ``gn_m``
+     - Gauss--Newton; direct solve in measurement space
+     - Substantially fewer measurements than states; avoids CG tolerance tuning.
    * - ``gn_cg``
      - Gauss--Newton; CG in state space
      - The same nonlinear problem when the linear solve is the bottleneck.
@@ -54,7 +60,7 @@ number of measurements.
 
 ``ml`` is an alias for ``lm``, and ``ml_cg`` is an alias for ``lm_cg``.
 In particular, ``ml`` does not select maximum-likelihood estimation or
-remove the prior.  ``li_m`` and ``gn_m`` are unsupported.
+remove the prior.
 
 Start development of a retrieval with a direct method on a small, representative
 case.  Use ``li`` only after checking linearity; a single step applied to a
@@ -223,12 +229,12 @@ are a useful initial choice for mixed units
 such as temperature and absolute VMR.  This scales state *increments*,
 so a zero prior mean is not a reason to use a zero scale.  Check that the
 retrieved state agrees with the unscaled solution within numerical accuracy.
-The state-sized normalization setting is unsupported for ``li_cg_m`` and
-``gn_cg_m``. These methods accept ``measurement_vec_normalization``: empty disables
+The state-sized normalization setting is unsupported for ``li_m``, ``gn_m``,
+``li_cg_m`` and ``gn_cg_m``. These methods accept ``measurement_vec_normalization``: empty disables
 scaling (the default); otherwise supply one finite positive D_ii per
 measurement. Noise standard deviations, D_ii = sqrt(S_e[i,i]), are a useful
 choice. The measurement-space system is scaled by their inverses. This
-uses only vector scaling and preserves the statistical objective. CG's
+uses only vector scaling and preserves the statistical objective. For CG, the
 relative residual tolerance applies to the scaled system. For correlated
 errors this is diagonal scaling, not full whitening.
 
@@ -710,3 +716,17 @@ full posterior covariance.  The `overview of uncertainty reporting in
 atmospheric retrievals <https://amt.copernicus.org/articles/13/4393/2020/>`_
 discusses how to report the role of prior information and smoothing in an
 uncertainty budget.
+
+Direct measurement-space solvers
+--------------------------------
+
+``li_m`` and ``gn_m`` assemble and factor an m by m matrix, where m is the
+number of measurements. They use the same measurement-space update as the
+CG variants, with one step for ``li_m`` and iteration for ``gn_m``. Optional
+``measurement_vec_normalization`` scales the direct system as well.
+Assembly currently applies the lazy system to each measurement basis vector;
+this avoids a state-sized normal matrix, but repeats covariance applications.
+Small m relative to the state dimension is therefore a useful starting point
+for method choice, not a guarantee of improved runtime. Requested gain-matrix
+output still uses the existing state-space postprocessing, so the complete
+retrieval can retain state-sized costs.
