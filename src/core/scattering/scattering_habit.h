@@ -7,7 +7,14 @@
 
 namespace scattering {
 
-using PSD = std::variant<MGDSingleMoment, BinnedPSD>;
+using PSD = std::variant<MonodispersePSD,
+                         MGDSingleMoment,
+                         MGDMass,
+                         MGDTwoMoment,
+                         DelanoeEtAl14,
+                         FieldEtAl07,
+                         McFarquharHeymsfield97,
+                         BinnedPSD>;
 
 /*** A scattering habit
  *
@@ -27,9 +34,26 @@ class ScatteringHabit {
                                                                                 const Vector& f_grid,
                                                                                 const Numeric f_tol = 1e-3) const;
 
+  BulkScatteringProperties<Format::TRO, Representation::Gridded> get_bulk_scattering_properties_tro_gridded(
+      const AtmPoint& point, const Vector& f_grid, std::shared_ptr<ZenithAngleGrid> za_scat_grid) const;
+
+  BulkScatteringProperties<Format::TRO, Representation::Gridded> get_bulk_scattering_properties_tro_gridded_derivative(
+      const AtmPoint&, const Vector&, std::shared_ptr<ZenithAngleGrid>, const AtmKeyVal&) const;
+
   ScatteringTroSpectralVector get_bulk_scattering_properties_tro_spectral(const AtmPoint&,
                                                                           const Vector& f_grid,
                                                                           const Index   degree [[maybe_unused]]) const;
+
+  BulkScatteringProperties<Format::ARO, Representation::Gridded> get_bulk_scattering_properties_aro_gridded(
+      const AtmPoint&                  point,
+      const Vector&                    f_grid,
+      const Vector&                    za_inc_grid,
+      const Vector&                    delta_aa_grid,
+      std::shared_ptr<ZenithAngleGrid> za_scat_grid) const;
+
+  BulkScatteringProperties<Format::ARO, Representation::Gridded> get_bulk_scattering_properties_aro_gridded_derivative(
+      const AtmPoint&, const Vector&, const Vector&, const Vector&, std::shared_ptr<ZenithAngleGrid>, const AtmKeyVal&)
+      const;
 
   //  BulkScatteringProperties<Format::TRO, Representation::Gridded>
   //  get_bulk_scattering_properties_tro_spectral(

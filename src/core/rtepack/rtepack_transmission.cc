@@ -929,7 +929,7 @@ bool use_real_pair_frechet_limit(const tran &tr) {
   return tr.y2 <= std::numeric_limits<Numeric>::epsilon() * tr.x2;
 }
 
-enum class frechet_function { exponential, phi1 };
+enum class frechet_function : bool { exponential, phi1 };
 
 muelmat separated_real_frechet(const tran &tr, const propmat &dg, const frechet_function function) {
   // Separate the +/-x eigenspaces from the nearly repeated imaginary pair.
@@ -1008,7 +1008,7 @@ muelmat separated_real_frechet(const tran &tr, const propmat &dg, const frechet_
 }  // namespace
 
 muelmat tran::operator()() const noexcept {
-  if (not polarized) return exp_a;
+  if (not polarized) return muelmat{exp_a};
 
   if (use_scaled_spectral_exponential(*this)) return scaled_spectral_exponential(*this);
 
@@ -1056,7 +1056,7 @@ muelmat tran::operator()() const noexcept {
 muelmat tran::operator()(Vector4 &diag_m1) const noexcept {
   if (not polarized) {
     diag_m1.fill(expm1_a);
-    return {exp_a};
+    return muelmat{exp_a};
   }
 
   if (use_scaled_spectral_exponential(*this)) {
@@ -1085,7 +1085,7 @@ muelmat tran::operator()(Vector4 &diag_m1) const noexcept {
 }
 
 muelmat tran::expm1() const noexcept {
-  if (not polarized) return {expm1_a};
+  if (not polarized) return muelmat{expm1_a};
 
   if (use_scaled_spectral_exponential(*this)) {
     muelmat value = scaled_spectral_exponential(*this);
@@ -1181,7 +1181,7 @@ muelmat tran::linsrc_impl(Vector4 *diag_m1) const noexcept {
   const Numeric phi1_a = a == 0.0 ? 1.0 : expm1_a / a;
   if (not polarized) {
     if (diag_m1 != nullptr) diag_m1->fill(phi1m1_scalar_from_expm1(a, expm1_a));
-    return {phi1_a};
+    return muelmat{phi1_a};
   }
 
   const propmat g{a, b, c, d, u, v, w};
@@ -1474,7 +1474,7 @@ muelmat tran::linsrc_linprop(const muelmat &t, const propmat &k1, const propmat 
   static_cast<void>(t);
 
   const scalar_linprop_result state = scalar_linprop(r * k1.A(), r * k2.A(), a, exp_a, expm1_a);
-  if (not polarized) return {state.value};
+  if (not polarized) return muelmat{state.value};
 
   // The scalar completion-of-the-square formula does not extend by applying
   // Dawson element by element.  Treat the isotropic gradient with its exact
@@ -1500,7 +1500,7 @@ muelmat tran::linsrc_linprop_deriv(const muelmat &lambda,
     static_cast<void>(lambda);
     static_cast<void>(t);
     static_cast<void>(dt);
-    return {dvalue};
+    return muelmat{dvalue};
   }
 
   static_cast<void>(lambda);
@@ -1672,7 +1672,7 @@ muelmat tran::magnus_linsrc_deriv(const propmat &k1,
 muelmat exp(propmat k, Numeric r) { return tran(k, k, r)(); }
 
 propmat logK(const muelmat &m) {
-  if (not m.is_polarized()) return std::log(midtr(m));
+  if (not m.is_polarized()) return propmat{std::log(midtr(m))};
 
   /**
     The code tries to retrieve K from exp(K) = M input as muelmat m,
@@ -1864,7 +1864,7 @@ specmat sqrt(const propmat &pm) {
   const Numeric a      = pm.A();
   const Complex sqrt_a = std::sqrt(Complex(a));
 
-  if (not pm.is_polarized()) return sqrt_a;
+  if (not pm.is_polarized()) return specmat{sqrt_a};
 
   const Numeric b = pm.B();
   const Numeric c = pm.C();
@@ -1884,7 +1884,7 @@ specmat sqrt(const propmat &pm) {
 
   if (pm.is_rotational()) {
     const Numeric rho = std::hypot(u, v, w);
-    if (rho == 0.0) return {0.0};
+    if (rho == 0.0) return specmat{0.0};
 
     // sqrt(N) = sqrt(rho/2) (N/rho - (N/rho)^2).  Normalizing first
     // preserves every nonzero binary64 rotation and avoids the singular
@@ -2112,7 +2112,7 @@ void TransmittanceMatrix::linprop(const std::span<const propmat>        &K,
     Numeric                base_phi_scalar;
     Numeric                base_phi_prime;
     if (not tr.polarized) {
-      L_[i] = state.value;
+      L_[i] = muelmat{state.value};
       l_diag_m1.fill(state.value_m1);
     } else {
       L_[i] = augmented_linprop_value(
@@ -2354,7 +2354,7 @@ void TransmittanceMatrix::linprop(const std::span<const propmat_vector> &K,
       Numeric                base_phi_scalar;
       Numeric                base_phi_prime;
       if (not tran_state.polarized) {
-        L[iv, i] = state.value;
+        L[iv, i] = muelmat{state.value};
         l_diag_m1.fill(state.value_m1);
       } else {
         L[iv, i] = augmented_linprop_value(tran_state,

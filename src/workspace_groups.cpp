@@ -263,6 +263,11 @@ The python mapping allows treating this as a same rank :class:`~numpy.ndarray` i
 )",
   };
 
+  wsg_data["MCAntenna"] = {
+      .file = "mc_antenna.h",
+      .desc = R"(Transmit/receive antenna pattern used by Monte Carlo radiative-transfer methods.)",
+  };
+
   wsg_data["Numeric"] = {
       .file       = "matpack.h",
       .desc       = "IEEE 754 binary64 floating point number\n",
@@ -334,6 +339,25 @@ A surface field effectively holds two things:
    #. *SurfaceKey* - holds basic surface data like elevation and temperature.
 
    #. *SurfacePropertyTag* - holds free-form surface properties.  The type of data is free-form and depends on the surface model/method.
+)--",
+  };
+
+  wsg_data["TessemNN"] = {
+      .file = "tessem.h",
+      .desc = R"--(A TESSEM2 neural-network model.
+
+The horizontal- and vertical-polarization networks are stored separately.
+Use *tessem_nnReadAscii* to read the original TESSEM ASCII parameter files.
+)--",
+  };
+
+  wsg_data["TelsemAtlas"] = {
+      .file = "telsem.h",
+      .desc = R"--(A TELSEM2 monthly land-surface emissivity atlas.
+
+The atlas stores its cells and the data needed by the TELSEM frequency and
+incidence-angle interpolation model.  Use *telsem_atlasReadAscii* to read an
+original TELSEM atlas file.
 )--",
   };
 
@@ -661,7 +685,15 @@ and returns any associated data.
 #. *Matrix* upwelling flux
 #. *Matrix* diffuse downwelling flux
 #. *Matrix* direct downwelling flux
-#. *Matrix* heating rate (dF/dt)
+#. *Matrix* derivative of net upward flux with respect to downward optical depth (DFDT)
+
+The matrices have shape (frequency, layer) and are evaluated at the
+lower boundary of each layer, corresponding to ``alt_grid[1:]``.  The top
+boundary is omitted.  Flux and DFDT are in W/(m^2 Hz); DFDT is not a
+temperature tendency.  Multiply DFDT by physical extinction [1/m], divide
+by density [kg/m^3] and mass specific heat capacity [J/(kg K)], and integrate
+over frequency to obtain heating in K/s.  The Python recipe
+``pyarts3.recipe.heating_rates.from_disort`` performs this conversion.
 )",
   };
 
@@ -894,9 +926,13 @@ of this term multiplied by a negative distance.
   add_select_options(wsg_data,
                      {
                          "InterpolationExtrapolation",
+                         "PredefinedSensor",
                          "SpeciesEnum",
                          "TransmittanceOption",
                          "AtmKey",
+                         "LineByLineVariable",
+                         "LineShapeModelCoefficient",
+                         "LineShapeModelVariable",
                          "SurfaceKey",
                          "SubsurfaceKey",
                          "SpectralRadianceUnitType",

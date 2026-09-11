@@ -10,6 +10,7 @@
 #include <variant>
 
 #include "bulk_scattering_properties.h"
+#include "gas_scattering.h"
 #include "general_tro_spectral.h"
 #include "henyey_greenstein.h"
 #include "particle_habit.h"
@@ -21,7 +22,7 @@ namespace scattering {
 
 struct ScatteringDataSpec {};
 
-using Species = std::variant<HenyeyGreensteinScatterer, ScatteringGeneralSpectralTRO, ScatteringHabit>;
+using Species = std::variant<GasScatterer, HenyeyGreensteinScatterer, ScatteringGeneralSpectralTRO, ScatteringHabit>;
 
 }  // namespace scattering
 
@@ -47,6 +48,12 @@ struct ArrayOfScatteringSpecies {
                                              const Vector&                                f_grid,
                                              std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid) const;
 
+  [[nodiscard]] BulkScatteringProperties<scattering::Format::TRO, scattering::Representation::Gridded>
+  get_bulk_scattering_properties_tro_gridded_derivative(const AtmPoint&,
+                                                        const Vector&,
+                                                        std::shared_ptr<scattering::ZenithAngleGrid>,
+                                                        const AtmKeyVal&) const;
+
   [[nodiscard]] ScatteringTroSpectralVector get_bulk_scattering_properties_tro_spectral(const AtmPoint& atm_point,
                                                                                         const Vector&   f_grid,
                                                                                         Index           degree) const;
@@ -57,6 +64,14 @@ struct ArrayOfScatteringSpecies {
                                              const Vector&                                za_inc_grid,
                                              const Vector&                                delta_aa_grid,
                                              std::shared_ptr<scattering::ZenithAngleGrid> za_scat_grid) const;
+
+  [[nodiscard]] BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Gridded>
+  get_bulk_scattering_properties_aro_gridded_derivative(const AtmPoint&,
+                                                        const Vector&,
+                                                        const Vector&,
+                                                        const Vector&,
+                                                        std::shared_ptr<scattering::ZenithAngleGrid>,
+                                                        const AtmKeyVal&) const;
 
   [[nodiscard]] BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Spectral>
   get_bulk_scattering_properties_aro_spectral(
@@ -79,12 +94,10 @@ template <> struct std::formatter<ArrayOfScatteringSpecies> {
 };
 
 using HenyeyGreensteinScatterer = scattering::HenyeyGreensteinScatterer;
+using GasScatterer              = scattering::GasScatterer;
 using ParticleHabit             = scattering::ParticleHabit;
 using ScatteringHabit           = scattering::ScatteringHabit;
 using PSD                       = scattering::PSD;
-
-std::ostream& operator<<(std::ostream& os,
-                         const std::variant<HenyeyGreensteinScatterer, scattering::ScatteringHabit>& /*species*/);
 
 //! Naming the variant
 template <> struct xml_io_stream_name<ScatteringSpecies> {

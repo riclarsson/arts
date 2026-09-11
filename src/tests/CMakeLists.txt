@@ -233,3 +233,8 @@ add_dependencies(check-deps test_vformat)
 
 # ####
 add_subdirectory(scattering)
+
+add_executable(test_ai_port_regressions test_ai_port_regressions.cc)
+target_link_libraries(test_ai_port_regressions artsworkspace)
+add_test(NAME "cpp.fast.test_ai_port_regressions" COMMAND test_ai_port_regressions)
+add_dependencies(check-deps test_ai_port_regressions)

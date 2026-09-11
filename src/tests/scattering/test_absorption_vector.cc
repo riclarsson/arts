@@ -89,6 +89,12 @@ bool test_absorption_vector_aro() {
   err                      = std::abs(absorption_vector_interp[0, 0, 0, 0] - 1.2347);
   if (err > 1e-10) { return false; }
 
+  // Exercise the convenience overload as well: it must treat za_inc_grid as
+  // the incident zenith-angle grid when it calculates its own weights.
+  absorption_vector_interp = absorption_vector.regrid(grids);
+  err                      = std::abs(absorption_vector_interp[0, 0, 0, 0] - 1.2347);
+  if (err > 1e-10) { return false; }
+
   return true;
 }
 

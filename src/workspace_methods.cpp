@@ -1221,6 +1221,24 @@ The calculations are in parallel if the program is not in parallel already.
       .in     = {"spectral_propmat_path", "spectral_propmat_scat_path"},
   };
 
+  wsm_data["spectral_rad_srcvec_pathCorrectScattering"] = {
+      .desc =
+          R"--(Remove thermal emission incorrectly associated with nonabsorbing scattering extinction.
+
+Call this after *spectral_rad_srcvec_pathFromPropmat* when scattering has been
+added to *spectral_propmat_path*.  True particulate absorption in
+*spectral_absvec_scat_path* retains its thermal source.
+)--",
+      .author = {"Richard Larsson"},
+      .out    = {"spectral_rad_srcvec_path"},
+      .in     = {"spectral_rad_srcvec_path",
+                 "spectral_propmat_path",
+                 "spectral_propmat_scat_path",
+                 "spectral_absvec_scat_path",
+                 "freq_grid_path",
+                 "atm_path"},
+  };
+
   wsm_data["spectral_rad_srcvec_pathAddScattering"] = {
       .desc =
           R"--(Adds the scattering part of the source vector to the rest along the path.
@@ -2431,6 +2449,59 @@ The reflectance matrix is
       .in     = {"freq_grid", "surf_field", "ray_point", "jac_targets"},
   };
 
+  wsm_data["tessem_nnReadAscii"] = {
+      .desc = R"--(Read an original TESSEM2 neural-network parameter file.)--",
+      .author = {"The ARTS developers"},
+      .gout = {"tessem_nn"},
+      .gout_type = {"TessemNN"},
+      .gout_desc = {"The loaded TESSEM neural network."},
+      .gin = {"filename"},
+      .gin_type = {"String"},
+      .gin_value = {std::nullopt},
+      .gin_desc = {"Path to a TESSEM2 ASCII neural-network file."},
+  };
+
+  wsm_data["telsem_atlasReadAscii"] = {
+      .desc = R"--(Read one original TELSEM2 monthly atlas file.)--",
+      .author = {"The ARTS developers"},
+      .out = {"telsem_atlas"},
+      .gin = {"filename", "month"},
+      .gin_type = {"String", "Index"},
+      .gin_value = {std::nullopt, Index{0}},
+      .gin_desc = {"Path to a TELSEM2 ASCII atlas file.", "Month represented by the atlas (0 if unspecified)."},
+  };
+
+  wsm_data["spectral_surf_reflTessem"] = {
+      .desc = R"--(Compute polarized specular ocean reflectance with TESSEM2.
+
+The method reads surface temperature from the canonical ``t`` entry and the
+properties ``"wind speed"`` [m/s] and ``"salinity"`` [kg/kg] from
+*surf_field*.  Spatially varying fields and surface Jacobian targets for all
+three inputs are supported.  Kirchhoff-consistent emission is supplied by the
+closed-surface agenda used by *spectral_radSurfaceReflectance*.
+)--",
+      .author = {"The ARTS developers"},
+      .out = {"spectral_surf_refl", "spectral_surf_refl_jac"},
+      .in = {"freq_grid", "surf_field", "ray_point", "jac_targets", "tessem_neth", "tessem_netv"},
+  };
+
+  wsm_data["spectral_surf_reflTelsem"] = {
+      .desc = R"--(Compute polarized specular land reflectance with TELSEM2.
+
+The atlas selects the surface emissivity from the ray point's latitude and
+longitude and interpolates it in frequency and incidence angle.  Set
+``max_distance`` to a positive angular distance in degrees to permit nearest
+land-cell lookup; the default requires the requested cell to exist.
+)--",
+      .author = {"The ARTS developers"},
+      .out = {"spectral_surf_refl", "spectral_surf_refl_jac"},
+      .in = {"freq_grid", "surf_field", "ray_point", "jac_targets", "telsem_atlas"},
+      .gin = {"max_distance"},
+      .gin_type = {"Numeric"},
+      .gin_value = {Numeric{-1}},
+      .gin_desc = {"Maximum nearest-atlas-cell distance [degrees], or a negative value to disable nearest lookup."},
+  };
+
   wsm_data["spectral_propmat_jacWindFix"] = {
       .desc   = R"--(Fix for the wind field derivative.
 
@@ -2533,6 +2604,151 @@ This is only for LTE lines in Voigt.
                                                "single_dispersion",
                                                "single_dispersion_jac"},
                                     .in     = {"jac_targets"}};
+
+  wsm_data["single_dispersionAddGasMicrowavesEarth"] = {
+      .desc =
+          R"--(Add microwave gas refractivity for an Earth-like atmosphere.
+
+This is the non-dispersive Bevis et al. (1994) model used by ARTS 2.  It
+depends on pressure, temperature, and the H2O volume-mixing ratio in
+*atm_point*.  H2O is optional and a missing H2O entry gives the dry-air value.
+
+The added value is :math:`n-1`, matching the convention consumed by
+*ray_point_back_propagation_agenda* with its ``RefractiveStepwise`` option.
+The expression is
+
+.. math::
+
+  n - 1 = \frac{k_1 (P-e) + (k_2 + k_3/T)e}{T},
+
+where :math:`e` is the water-vapour partial pressure.  The default coefficients
+are adjusted for pressure in Pa.
+
+This method contributes refractivity only.  It does not add absorption to
+*single_propmat* or derivatives to *single_dispersion_jac*.
+  )--",
+      .author    = {"Patrick Eriksson", "Richard Larsson"},
+      .out       = {"single_dispersion"},
+      .in        = {"single_dispersion", "atm_point"},
+      .gin       = {"k1", "k2", "k3"},
+      .gin_type  = {"Numeric", "Numeric", "Numeric"},
+      .gin_value = {Numeric{77.6e-8}, Numeric{70.4e-8}, Numeric{3.739e-3}},
+      .gin_desc  = {"Dry-air coefficient [K/Pa]",
+                    "Water-vapour coefficient [K/Pa]",
+                    "Water-vapour coefficient [K^2/Pa]"},
+  };
+
+  wsm_data["single_dispersionAddGasMicrowavesGeneral"] = {
+      .desc =
+          R"--(Add microwave gas refractivity for a planetary atmosphere.
+
+This is the non-dispersive Newell and Baird (1965) mixture model used by
+ARTS 2.  It supports N2, O2, CO2, H2, He, and H2O.  Every species is optional:
+only supported species present in *atm_point* contribute.  Their VMRs are
+normalized by the sum of the supported VMRs that are present.  If none are
+present, the method adds zero refractivity.
+
+Reference refractivities are scaled from 273.15 K and 760 Torr to the pressure
+and temperature in *atm_point*.  The added value is :math:`n-1`, matching the
+convention consumed by *ray_point_back_propagation_agenda* with its
+``RefractiveStepwise`` option.
+
+This method contributes refractivity only.  It does not add absorption to
+*single_propmat* or derivatives to *single_dispersion_jac*.
+  )--",
+      .author = {"Jana Mendrok", "Richard Larsson"},
+      .out    = {"single_dispersion"},
+      .in     = {"single_dispersion", "atm_point"},
+  };
+
+  wsm_data["single_propmat_agendaSetGasMicrowavesEarth"] = {
+      .desc =
+          R"--(Configure *single_propmat_agenda* for Earth microwave gas refraction.
+
+The agenda initializes all single-frequency propagation quantities and adds
+the Earth microwave gas refractivity.  Pair it with
+``ray_point_back_propagation_agendaSet(option="RefractiveStepwise")`` and a
+frequency-dependent propagation method such as
+*spectral_radClearskyEmissionFrequencyDependentPropagation*.
+
+The resulting agenda contains no absorption model.  Build a custom
+*single_propmat_agenda* when absorption and refraction are both needed.
+  )--",
+      .author    = {"Patrick Eriksson", "Richard Larsson"},
+      .out       = {"single_propmat_agenda"},
+      .gin       = {"k1", "k2", "k3"},
+      .gin_type  = {"Numeric", "Numeric", "Numeric"},
+      .gin_value = {Numeric{77.6e-8}, Numeric{70.4e-8}, Numeric{3.739e-3}},
+      .gin_desc  = {"Dry-air coefficient [K/Pa]",
+                    "Water-vapour coefficient [K/Pa]",
+                    "Water-vapour coefficient [K^2/Pa]"},
+  };
+
+  wsm_data["single_propmat_agendaSetGasMicrowavesGeneral"] = {
+      .desc =
+          R"--(Configure *single_propmat_agenda* for planetary microwave gas refraction.
+
+The agenda initializes all single-frequency propagation quantities and adds
+the general microwave gas-mixture refractivity.  Pair it with
+``ray_point_back_propagation_agendaSet(option="RefractiveStepwise")`` and a
+frequency-dependent propagation method such as
+*spectral_radClearskyEmissionFrequencyDependentPropagation*.
+
+The resulting agenda contains no absorption model.  Build a custom
+*single_propmat_agenda* when absorption and refraction are both needed.
+  )--",
+      .author = {"Jana Mendrok", "Richard Larsson"},
+      .out    = {"single_propmat_agenda"},
+  };
+
+  wsm_data["single_dispersionAddWaterVisibleNIRHarvey98"] = {
+      .desc =
+          R"--(Add the Harvey et al. (1998) water/steam refractivity to *single_dispersion*.
+
+The model covers the real refractive index in the visible and near infrared.
+The added value is :math:`n-1`, matching the convention consumed by
+*ray_point_back_propagation_agenda* when it uses its ``RefractiveStepwise``
+option.
+
+By default, the water mass density is derived from the H2O VMR, pressure,
+temperature, and isotopologue masses in *atm_point*.  Set
+``water_mass_density`` to a non-negative value to use an explicit density
+instead.  An explicit value is useful for liquid-water calculations.
+
+This method only contributes refractivity.  It does not add absorption to
+*single_propmat* or derivatives to *single_dispersion_jac*.
+)--",
+      .author    = {"Manfred Brath", "Richard Larsson"},
+      .out       = {"single_dispersion"},
+      .in        = {"single_dispersion", "freq", "atm_point"},
+      .gin       = {"water_mass_density", "check_validity"},
+      .gin_type  = {"Numeric", "Index"},
+      .gin_value = {Numeric{-1.0}, Index{1}},
+      .gin_desc  = {"Water mass density [kg/m3]. A negative value derives it from the H2O VMR in atm_point.",
+                    "Enforce the published temperature, density, and wavelength validity ranges."},
+  };
+
+  wsm_data["single_propmat_agendaSetWaterVisibleNIRHarvey98"] = {
+      .desc =
+          R"--(Configure *single_propmat_agenda* for Harvey98 water/steam refraction.
+
+The agenda initializes all single-frequency propagation quantities and then
+adds Harvey98 water refractivity.  Pair it with
+``ray_point_back_propagation_agendaSet(option="RefractiveStepwise")`` and a
+frequency-dependent propagation method such as
+*spectral_radClearskyEmissionFrequencyDependentPropagation*.
+
+The resulting agenda contains no absorption model.  Build a custom
+*single_propmat_agenda* if absorption and Harvey98 refraction are both needed.
+)--",
+      .author    = {"Manfred Brath", "Richard Larsson"},
+      .out       = {"single_propmat_agenda"},
+      .gin       = {"water_mass_density", "check_validity"},
+      .gin_type  = {"Numeric", "Index"},
+      .gin_value = {Numeric{-1.0}, Index{1}},
+      .gin_desc  = {"Water mass density [kg/m3]. A negative value derives it from the H2O VMR in atm_point.",
+                    "Enforce the published temperature, density, and wavelength validity ranges."},
+  };
 
   wsm_data["single_propmatAddVoigtLTE"] = {
       .desc      = R"--(Add line-by-line absorption to the propagation matrix.
@@ -3016,7 +3232,7 @@ See *SpeciesEnum* for valid ``species``
       .out       = {"jac_targets"},
       .in        = {"jac_targets"},
       .gin       = {"target", "d"},
-      .gin_type  = {"AtmKey,SpeciesEnum,SpeciesIsotope,QuantumLevelIdentifier", "Numeric"},
+      .gin_type  = {"AtmKey,SpeciesEnum,SpeciesIsotope,QuantumLevelIdentifier,ScatteringSpeciesProperty", "Numeric"},
       .gin_value = {std::nullopt, Numeric{0.1}},
       .gin_desc  = {"The target of interest",
                     "The perturbation used in methods that cannot compute derivatives analytically"},
@@ -3066,6 +3282,51 @@ See *SpeciesIsotope* for valid ``species``
                     "The perturbation used in methods that cannot compute derivatives analytically"},
   };
   wsm_data["RetrievalAddSpeciesIsotopologueRatio"] = jac2ret("jac_targetsAddSpeciesIsotopologueRatio");
+
+  wsm_data["jac_targetsAddLineParameter"] = {
+      .desc      = R"--(Add a spectroscopic line parameter to *jac_targets*.
+
+The target selects one line in an *AbsorptionBands* band and one of its
+fundamental parameters, such as line center, lower-state energy, or Einstein
+coefficient.  The line index is zero-based.
+  )--",
+      .author    = {"Richard Larsson"},
+      .out       = {"jac_targets"},
+      .in        = {"jac_targets"},
+      .gin       = {"band", "line", "parameter", "d"},
+      .gin_type  = {"QuantumIdentifier", "Index", "LineByLineVariable", "Numeric"},
+      .gin_value = {std::nullopt, std::nullopt, std::nullopt, Numeric{0.0}},
+      .gin_desc  = {"Band containing the line",
+                    "Zero-based line index",
+                    "Line parameter",
+                    "Perturbation used by numerical derivative consumers"},
+  };
+
+  wsm_data["jac_targetsAddLineShapeParameter"] = {
+      .desc      = R"--(Add a line-shape model coefficient to *jac_targets*.
+
+The target selects a broadening species, line-shape parameter, and temperature
+model coefficient for one line in an *AbsorptionBands* band.  The line index is
+zero-based.
+  )--",
+      .author    = {"Richard Larsson"},
+      .out       = {"jac_targets"},
+      .in        = {"jac_targets"},
+      .gin       = {"band", "line", "species", "parameter", "coefficient", "d"},
+      .gin_type  = {"QuantumIdentifier",
+                    "Index",
+                    "SpeciesEnum",
+                    "LineShapeModelVariable",
+                    "LineShapeModelCoefficient",
+                    "Numeric"},
+      .gin_value = {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, Numeric{0.0}},
+      .gin_desc  = {"Band containing the line",
+                    "Zero-based line index",
+                    "Broadening species",
+                    "Line-shape parameter",
+                    "Temperature-model coefficient",
+                    "Perturbation used by numerical derivative consumers"},
+  };
 
   wsm_data["abs_bandsReadHITRAN"] = {
       .desc =
@@ -4334,6 +4595,33 @@ The core calculations happens inside the *spectral_rad_observer_agenda*.
       .out    = {"measurement_sensor", "measurement_sensor_meta"},
   };
 
+  wsm_data["measurement_sensorFromPredefined"] = {
+      .desc =
+          R"--(Create a code-defined, predefined instrument using the ARTS3 sensor builder.
+
+The method replaces *measurement_sensor* and *measurement_sensor_meta*.  It
+constructs the selected heterodyne channels, applies their channel-specific
+polarizations, and uses a pencil-beam antenna at ``pos`` and ``los``.
+
+See *PredefinedSensor* for the available sensor styles and their descriptions.
+The optional ``channels`` list contains one-based instrument channel numbers.
+An empty list selects all channels.
+
+The integer ``n`` controls sampling for parametric channel definitions. Sensors
+with compiled tabulated responses use their fixed frequency grids instead.
+)--",
+      .author    = {"Richard Larsson"},
+      .out       = {"measurement_sensor", "measurement_sensor_meta"},
+      .gin       = {"pos", "los", "sensor", "n", "channels"},
+      .gin_type  = {"Vector3", "Vector2", "PredefinedSensor", "Index", "Vector"},
+      .gin_value = {std::nullopt, std::nullopt, std::nullopt, Index{5}, Vector{}},
+      .gin_desc  = {"Observer position [altitude, latitude, longitude]",
+                    "Observer line of sight [zenith, azimuth]",
+                    "Code-defined sensor style; see *PredefinedSensor*",
+                    "Frequency samples per parametric baseband interval",
+                    "Optional one-based instrument channel selection"},
+  };
+
   wsm_data["measurement_sensorAddSimple"] = {
       .desc =
           R"--(Adds a sensor with a dirac channel opening around the frequency grid.
@@ -4669,6 +4957,33 @@ Hence, a temperature of 0 means 0s the edges of the *freq_grid*.
       .gin_type  = {"Numeric", "Index"},
       .gin_value = {Numeric{0.0}, Index{0}},
       .gin_desc  = {R"--(The depolarization factor to use.)--", "Flag to compute the hypsometric distance derivatives"},
+      .pass_workspace = true,
+  };
+
+  wsm_data["spectral_rad_scat_pathSunsFirstOrder"] = {
+      .desc =
+          R"--(Compute first-order solar scattering from *scat_species* along *ray_path*.
+
+Unlike *spectral_rad_scat_pathSunsFirstOrderRayleigh*, both the scattering
+coefficient and the polarized phase matrix come from *scat_species*.  This
+supports gas, particulate, and mixed scattering species.
+)--",
+      .author         = {"Richard Larsson"},
+      .out            = {"spectral_rad_scat_path"},
+      .in             = {"ray_path",
+                         "ray_path_suns_path",
+                         "suns",
+                         "jac_targets",
+                         "freq_grid",
+                         "atm_field",
+                         "surf_field",
+                         "scat_species",
+                         "spectral_propmat_and_atm_path_agenda",
+                         "rte_option"},
+      .gin            = {"hse_derivative"},
+      .gin_type       = {"Index"},
+      .gin_value      = {Index{0}},
+      .gin_desc       = {"Flag to compute the hypsometric distance derivatives"},
       .pass_workspace = true,
   };
 
@@ -5915,6 +6230,343 @@ Neither polarization nor wind calculations are possible with this method.
                          "spectral_nlte_srcvec_profile",
                          "spectral_nlte_srcvec_jac_profile"},
       .in             = {"spectral_propmat_agenda", "jac_targets", "alt_grid", "atm_field", "freq_grid", "lat", "lon"},
+      .pass_workspace = true,
+  };
+
+  wsm_data["MCRadar"] = {
+      .desc   = R"--(Simulates active-radar returns using Monte Carlo antenna sampling.
+
+This ARTS3-native implementation uses *AtmField*, *SurfaceField*,
+*ArrayOfScatteringSpecies*, and *ray_path_observer_agenda*.  Range-bin edges
+are one-way geometric distances in metres.  The outputs contain one
+*Stokvec* per range bin, and the error contains the component-wise standard
+error of the Monte Carlo mean.  The implementation currently supports single
+scattering (``mc_max_scatorder=1``); the argument is retained so higher orders
+can be added without changing the interface.
+)--",
+      .author = {"Richard Larsson", "OpenAI Codex"},
+      .out    = {"radar_signal", "radar_error"},
+      .in     = {"atm_field",
+                 "surf_field",
+                 "scat_species",
+                 "mc_antenna",
+                 "ray_path_observer_agenda",
+                 "spectral_propmat_agenda"},
+      .gin    = {"frequency",
+                 "sensor_pos",
+                 "sensor_los",
+                 "mc_y_tx",
+                 "range_bins",
+                 "mc_seed",
+                 "mc_max_iter",
+                 "mc_max_scatorder",
+                 "k2",
+                 "unit"},
+      .gin_type =
+          {"Numeric", "Vector3", "Vector2", "Stokvec", "AscendingGrid", "Index", "Index", "Index", "Numeric", "String"},
+      .gin_value      = {std::nullopt,
+                         std::nullopt,
+                         std::nullopt,
+                         std::nullopt,
+                         std::nullopt,
+                         Index{0},
+                         Index{1000},
+                         Index{1},
+                         Numeric{0.93},
+                         String{"1"}},
+      .gin_desc       = {"Radar frequency [Hz].",
+                         "Sensor position [alt, lat, lon].",
+                         "Sensor boresight [zenith, azimuth].",
+                         "Transmitted Stokes vector.",
+                         "One-way range-bin edges [m].",
+                         "Random seed.",
+                         "Number of sampled antenna rays.",
+                         "Maximum scattering order (currently must be 1).",
+                         "Reference dielectric factor squared for Ze conversion.",
+                         "Output unit: '1' or 'Ze'."},
+      .pass_workspace = true,
+  };
+
+  wsm_data["measurement_sensorAddSimpleRadar"] = {
+      .desc      = R"--(Adds range-resolved pencil-beam radar observation elements.
+
+For every frequency in *freq_grid*, one observation element is appended for
+every interval in ``range_bins``.  The ordering is frequency first and range
+bin second, matching the ARTS2 ``yRadar`` convention.  All generated elements
+share their frequency and position/LOS grids.  The matching limits are
+appended to *radar_range_limits*, and *measurement_sensor_meta* receives one
+range grid per frequency.
+
+The receiving polarization is a Stokes dot-product vector.  For example,
+``[0.5, 0.5, 0, 0]`` is the old ARTS polarization index 5 (vertical linear).
+)--",
+      .author    = {"Patrick Eriksson", "OpenAI Codex"},
+      .out       = {"measurement_sensor", "measurement_sensor_meta", "radar_range_limits"},
+      .in        = {"measurement_sensor", "measurement_sensor_meta", "radar_range_limits", "freq_grid"},
+      .gin       = {"pos", "los", "pol", "range_bins"},
+      .gin_type  = {"Vector3", "Vector2", "Stokvec", "AscendingGrid"},
+      .gin_value = {std::nullopt, std::nullopt, Stokvec{0.5, 0.5, 0.0, 0.0}, std::nullopt},
+      .gin_desc  = {"Radar position [altitude, latitude, longitude].",
+                    "Radar viewing direction [zenith, azimuth].",
+                    "Receiving-polarization Stokes weights.",
+                    "Common range-bin edges."},
+  };
+
+  wsm_data["measurement_vecFromRadarSingleScattering"] = {
+      .desc     = R"--(Deterministic polarized single-scattering active-radar forward model.
+
+This is the ARTS3 counterpart of the ARTS2 ``yRadar`` and
+``iyRadarSingleScat`` workflow.  It calculates particle backscatter and
+two-way polarized attenuation by gases and particles along the propagation
+paths of *measurement_sensor*.  Surface clutter and multiple scattering are
+not included.
+
+Each element of *measurement_sensor* is paired with the corresponding row of
+*radar_range_limits*.  This keeps *measurement_vec* and *measurement_jac* in
+the standard retrieval layout: one sensor observation element produces one
+measurement.  Use *measurement_sensorAddSimpleRadar* for the common
+frequency/polarization/range-bin arrangement.
+
+``range_mode`` may be ``"Altitude"`` [m], ``"Distance"`` [m one way],
+``"RoundTripTime"`` [s, including path group refractive indices], or
+``"Legacy"`` (the ARTS2 rule: altitude if the largest edge exceeds 1,
+otherwise round-trip time).
+
+The output unit may be ``"1"`` (backscatter coefficient, 1/(m sr)),
+``"Ze"`` (mm6/m3), or ``"dBZe"``.  A negative ``k2`` derives the liquid-water
+dielectric factor at ``ze_tref`` using the Liebe-93 parameterization, as in
+ARTS2.  ``pext_scaling`` scales only particulate extinction, not particle
+backscatter.
+
+Atmospheric entries in finalized *jac_targets* are differentiated through the
+complete range-gated calculation, including gas and particle attenuation and
+particle backscatter.  The perturbation stored on each target is used; a
+scale-aware default is selected when it is zero.  Gas propagation derivatives
+come from *spectral_propmat_agenda*, scattering derivatives come from
+*scat_species*, and their ordered two-way transmission product is propagated
+analytically through rtepack.  There is no production finite-difference loop.
+
+Allowed auxiliary quantities are ``"Radiative background"``,
+``"Backscattering"``, ``"Abs species extinction"``, and
+``"Particle extinction"``.  They are returned as rows of *radar_aux* in the
+requested order.
+)--",
+      .author   = {"Patrick Eriksson", "OpenAI Codex"},
+      .out      = {"measurement_vec", "measurement_jac", "radar_aux"},
+      .in       = {"measurement_sensor",
+                   "radar_range_limits",
+                   "jac_targets",
+                   "atm_field",
+                   "surf_field",
+                   "scat_species",
+                   "ray_path_observer_agenda",
+                   "spectral_propmat_agenda"},
+      .gin      = {"transmitted_stokes", "range_mode", "unit", "ze_tref", "k2", "dbze_min", "pext_scaling", "aux_vars"},
+      .gin_type = {"Stokvec", "String", "String", "Numeric", "Numeric", "Numeric", "Numeric", "ArrayOfString"},
+      .gin_value      = {Stokvec{1.0, 1.0, 0.0, 0.0},
+                         String{"Legacy"},
+                         String{"1"},
+                         Numeric{273.15},
+                         Numeric{-1.0},
+                         Numeric{-99.0},
+                         Numeric{1.0},
+                         ArrayOfString{}},
+      .gin_desc       = {"Transmitted Stokes vector; its I component must equal one.",
+                         "Range coordinate: Altitude, Distance, RoundTripTime, or Legacy.",
+                         "Output unit: 1, Ze, or dBZe.",
+                         "Liquid-water reference temperature [K] for automatic k2.",
+                         "Reference dielectric factor squared; negative selects Liebe-93.",
+                         "Lower clipping value for dBZe.",
+                         "Multiplicative factor for particulate extinction (0 to 2).",
+                         "Requested auxiliary quantities."},
+      .pass_workspace = true,
+  };
+
+  wsm_data["model_state_vecFromRadarOnionPeeling"] = {
+      .desc           = R"--(Retrieve an atmospheric radar profile by analytical onion peeling.
+
+Range gates are processed from the sensor outwards.  At each gate, the
+strongest not-yet-peeled atmospheric state coordinate is updated by a bounded
+Newton iteration.  The forward value and derivative are provided by
+*measurement_vecFromRadarSingleScattering*, so gaseous and particulate
+attenuation, ARO polarization, non-commuting outgoing/return propagation
+matrices, sensor polarization, and range-bin integration are identical to the
+standard radar forward model.
+
+Unlike the ARTS2 implementation, this method does not create or consume a
+large dBZe/temperature inversion table.  Scattering properties are evaluated
+directly through *scat_species*.  *jac_targets* defines the retrieved state,
+including its grids and transformations.  All targets must currently be
+atmospheric targets.  The returned *model_state_vec*, updated *atm_field*,
+*measurement_vec_fit*, and *measurement_jac* are mutually consistent and can
+be used directly as the initial state and forward/Jacobian inputs of OEM.
+
+Observations at or below ``measurement_noise_floor`` are ignored.  ``state_min``,
+``state_max``, and ``max_step`` apply in model-state coordinates, after any
+target transformation.  Gates with no sensitivity to an unpeeled state
+coordinate are left unused.  A non-convergent gate is reported as an error.
+This formulation is not restricted to the old two-species liquid/ice layout;
+phase selection may instead be expressed by the scattering-species properties
+and atmospheric state chosen by the caller.
+              )--",
+      .author         = {"Patrick Eriksson", "OpenAI Codex"},
+      .out            = {"model_state_vec", "measurement_vec_fit", "measurement_jac", "atm_field"},
+      .in             = {"measurement_vec",
+                         "measurement_sensor",
+                         "radar_range_limits",
+                         "jac_targets",
+                         "surf_field",
+                         "scat_species",
+                         "ray_path_observer_agenda",
+                         "spectral_propmat_agenda"},
+      .gin            = {"transmitted_stokes",
+                         "range_mode",
+                         "unit",
+                         "ze_tref",
+                         "k2",
+                         "dbze_min",
+                         "pext_scaling",
+                         "measurement_noise_floor",
+                         "state_min",
+                         "state_max",
+                         "max_step",
+                         "tolerance",
+                         "max_iterations",
+                         "max_sweeps"},
+      .gin_type       = {"Stokvec",
+                         "String",
+                         "String",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Numeric",
+                         "Index",
+                         "Index"},
+      .gin_value      = {Stokvec{1.0, 1.0, 0.0, 0.0},
+                         String{"Legacy"},
+                         String{"1"},
+                         Numeric{273.15},
+                         Numeric{-1.0},
+                         Numeric{-99.0},
+                         Numeric{1.0},
+                         Numeric{-1e99},
+                         Numeric{0.0},
+                         Numeric{1e99},
+                         Numeric{1e99},
+                         Numeric{1e-6},
+                         Index{12},
+                         Index{8}},
+      .gin_desc       = {"Transmitted Stokes vector; its I component must equal one.",
+                         "Range coordinate: Altitude, Distance, RoundTripTime, or Legacy.",
+                         "Forward and observation unit: 1, Ze, or dBZe.",
+                         "Liquid-water reference temperature [K] for automatic k2.",
+                         "Reference dielectric factor squared; negative selects Liebe-93.",
+                         "Lower clipping value for dBZe.",
+                         "Multiplicative factor for particulate extinction (0 to 2).",
+                         "Measurements at or below this value are ignored.",
+                         "Lower bound in model-state coordinates.",
+                         "Upper bound in model-state coordinates.",
+                         "Maximum absolute Newton step in model-state coordinates.",
+                         "Relative gate-fit convergence tolerance.",
+                         "Maximum Newton iterations per gate.",
+                         "Maximum repeated outward sweeps for interpolating state grids."},
+      .pass_workspace = true,
+  };
+
+  wsm_data["MCGeneral"] = {
+      .desc           = R"--(Backward passive Monte Carlo radiative-transfer calculation.
+
+This ARTS3-native implementation samples antenna directions, extinction
+collisions, thermal absorption, repeated particle scattering, and space or
+surface background agendas.  It transports all four Stokes components using
+laboratory-frame phase matrices, including the required polarization-basis
+rotations.  Scattering directions use uniform solid-angle importance sampling.
+)--",
+      .author         = {"Cory Davis", "Patrick Eriksson", "OpenAI Codex"},
+      .out            = {"mc_spectral_rad", "mc_error", "mc_iteration_count"},
+      .in             = {"atm_field",
+                         "surf_field",
+                         "subsurf_field",
+                         "scat_species",
+                         "mc_antenna",
+                         "ray_path_observer_agenda",
+                         "spectral_propmat_agenda",
+                         "spectral_rad_space_agenda",
+                         "spectral_rad_surface_agenda"},
+      .gin            = {"frequency",
+                         "sensor_pos",
+                         "sensor_los",
+                         "mc_seed",
+                         "mc_min_iter",
+                         "mc_max_iter",
+                         "mc_max_scatorder",
+                         "mc_std_err",
+                         "mc_max_time"},
+      .gin_type       = {"Numeric", "Vector3", "Vector2", "Index", "Index", "Index", "Index", "Numeric", "Numeric"},
+      .gin_value      = {std::nullopt,
+                         std::nullopt,
+                         std::nullopt,
+                         Index{0},
+                         Index{100},
+                         Index{10000},
+                         Index{20},
+                         Numeric{0.0},
+                         Numeric{0.0}},
+      .gin_desc       = {"Frequency [Hz].",
+                         "Sensor position [alt, lat, lon].",
+                         "Sensor boresight [zenith, azimuth].",
+                         "Random seed.",
+                         "Minimum histories.",
+                         "Maximum histories.",
+                         "Maximum scattering order.",
+                         "Absolute standard-error stopping threshold in spectral-radiance units; zero disables it.",
+                         "Wall-clock stopping time [s]; zero disables it."},
+      .pass_workspace = true,
+  };
+
+  wsm_data["spectral_radMonteCarlo"] = {
+      .desc           = R"--(Computes pencil-beam spectral radiance with passive Monte Carlo.
+
+This is the observer-level interface used by *spectral_rad_observer_agenda* and
+therefore by *measurement_vecFromSensor*. Frequency, polarization, and antenna
+weighting are owned by *measurement_sensor*, so this method deliberately uses
+a pencil beam internally. One Monte Carlo calculation is performed for every
+frequency in *freq_grid*.
+
+Atmospheric, surface, and subsurface Jacobians use common-random-number forward
+perturbations in model-state space. Sensor frequency and geometry Jacobians are
+added by the predefined observer agenda. Spectroscopic targets are perturbed
+inside the propagation-matrix call using the returned propagation and NLTE
+source derivatives, without modifying global catalogue state.
+)--",
+      .author         = {"OpenAI Codex"},
+      .out            = {"spectral_rad", "spectral_rad_jac", "ray_path"},
+      .in             = {"freq_grid",
+                         "jac_targets",
+                         "obs_pos",
+                         "obs_los",
+                         "atm_field",
+                         "surf_field",
+                         "subsurf_field",
+                         "scat_species",
+                         "ray_path_observer_agenda",
+                         "spectral_propmat_agenda",
+                         "spectral_rad_space_agenda",
+                         "spectral_rad_surface_agenda"},
+      .gin            = {"mc_seed", "mc_min_iter", "mc_max_iter", "mc_max_scatorder", "mc_std_err", "mc_max_time"},
+      .gin_type       = {"Index", "Index", "Index", "Index", "Numeric", "Numeric"},
+      .gin_value      = {Index{0}, Index{100}, Index{10000}, Index{20}, Numeric{0.0}, Numeric{0.0}},
+      .gin_desc       = {"Base random seed; the frequency index is added to it.",
+                         "Minimum histories per frequency.",
+                         "Maximum histories per frequency.",
+                         "Maximum scattering order.",
+                         "Absolute standard-error threshold; zero disables it.",
+                         "Wall-clock limit per frequency [s]; zero disables it."},
       .pass_workspace = true,
   };
 

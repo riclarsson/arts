@@ -304,39 +304,8 @@ it is layer-oriented notation.  ARTS provides several approximations for
 how the source and propagation matrix vary between the two endpoints of a
 layer.  They are selected through :attr:`~pyarts3.workspace.Workspace.rte_option`.
 
-.. list-table:: Radiative-transfer layer options
-   :header-rows: 1
-   :widths: 18 30 52
-
-   * - Option
-     - Within-layer model
-     - Step
-   * - ``constant``
-     - Endpoint-average propagation matrix and source
-     - Ordinary matrix exponential with a layer-average source.
-   * - ``lintau``
-     - Constant propagation matrix and linear source
-     - Uses the linear-source operator :math:`\Lambda` described below.
-   * - ``linprop``
-     - Linear propagation and linear source
-     - Uses the exact scalar linear-propagation source integral.  Polarized
-       transfer uses endpoint-average transmission with a commutator-free
-       augmented-source correction.
-   * - ``magop``
-     - Linear propagation matrix and layer-average source
-     - Uses the second-order Magnus exponent and the ordinary source step.
-   * - ``magop_linsrc``
-     - Linear propagation matrix and linear source
-     - Adds Magnus-ordered transmission to the augmented linear-source
-       operator by retaining the first propagation-matrix commutator.
-
-All five options propagate analytical derivatives of their transmittance
-and, where applicable, source operators.  ``magop`` and ``magop_linsrc``
-are most useful when the polarized propagation matrices at the layer
-endpoints do not commute.  For scalar transfer, ``linprop`` evaluates the
-linear-propagation source integral exactly.  For polarized transfer,
-``linprop`` retains the ordinary endpoint-average transmission, whereas
-``magop_linsrc`` also includes the Magnus ordering correction.
+The option names and their selection are described in
+:doc:`user.radiative_transfer`.  Their mathematical definitions follow below.
 
 Linear source function
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -876,26 +845,7 @@ for :math:`K(s)` and :math:`J(s)`.
    which means with :math:`\exp(A) = \sum_{n=0}^\infty \frac{A^n}{n!}`, you can do
    :math:`\exp(A) A = \left(\sum_{n=0}^\infty \frac{A^{n}}{n!}\right) A = \sum_{n=0}^\infty \frac{A^{n+1}}{n!} = A \sum_{n=0}^\infty \frac{A^{n}}{n!} = A \exp(A)`.
 
-   .. admonition:: Implementation note
-      :class: tip
-
-      It is very important to implement the expression for :math:`\Lambda_0`
-      in a numerically stable way.  The expression above is not
-      stable for small :math:`K_0 r` (i.e., large :math:`T_0`) *as written*.
-      The key instability stems from the subtraction of two nearly equal
-      terms in :math:`1 - T_0`.  The IEEE floating point standard
-      provides a function :code:`expm1(x)`, which computes :math:`e^x - 1`
-      in a numerically stable way for small :math:`x`.
-
-      Likewise, the matrix expansion of :math:`1 - T_0` might be unstable.
-
-      So we use a special solution implementing our own version of the reduced
-      Cayley-Hamilton theorem to compute :math:`\Lambda_0` in a numerically
-      stable way
-      for matrices that conform to the propagation matrix notation in ARTS.
-      This makes use of the inversion of :math:`K` to remove components from
-      the expansion of the matrix exponential that would otherwise
-      cause numerical instability.
+   See :doc:`dev.radiative_transfer` for stable evaluation of this operator.
 
 3. Linear :math:`K(s)` and linear :math:`J(s)`.
 

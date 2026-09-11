@@ -719,6 +719,51 @@ Return
       &AtmField::ssprops,
       "Scattering species properties data\n\n.. :class:`dict[~pyarts3.arts.ScatteringSpeciesProperty, ~pyarts3.arts.AtmData]`");
 
+  fld.def(
+      "__init__",
+      [](AtmField *x, const AscendingGrid &z, IsoRatioOption iso, const py::kwargs &kwargs) {
+        if (z.size() == 0) throw std::runtime_error("Altitude grid must have at least one point.");
+
+        new (x) AtmField(iso);
+        x->top_of_atmosphere = z.back();
+
+        GriddedField3 gf3{.data_name  = ""s,
+                          .data       = Tensor3{z.size(), 1, 1},
+                          .grid_names = {"alt"s, "lat"s, "lon"s},
+                          .grids      = {z.vec(), Vector{0.0}, Vector{0.0}}};
+
+        AtmKeyVal atm_key;
+        Vector    values;
+
+        for (const auto &[key, val] : kwargs) {
+          try {
+            gf3.data_name = py::str(key).c_str();
+          } catch (const py::cast_error &) { throw std::runtime_error(std::format("Key not a string?")); }
+
+          try {
+            atm_key = py::cast<AtmKeyVal>(key);
+          } catch (const py::cast_error &) {
+            throw std::runtime_error(std::format("Key \"{}\" must be an AtmKeyVal", gf3.data_name));
+          }
+
+          try {
+            values = py::cast<Vector>(val);
+            if (values.size() != z.size()) {
+              throw std::runtime_error(std::format(
+                  "Value for key \"{}\" must have the same size as the altitude grid ({}).", atm_key, z.size()));
+            }
+            gf3.data[joker, 0, 0] = values;
+            (*x)[atm_key]         = gf3;
+          } catch (const py::cast_error &) {
+            throw std::runtime_error(std::format("Value for key \"{}\" must be a Vector.", atm_key));
+          }
+        }
+      },
+      "z"_a,
+      "iso"_a    = IsoRatioOption::Builtin,
+      "kwargs"_a = py::kwargs(),
+      R"(Initialize an atmospheric profile/field with a altitude grid.)");
+
   pnt.def(
       "to_dict",
       [](const AtmPoint &atm, bool core, bool specs, bool isots, bool nlte, bool ssprops) {

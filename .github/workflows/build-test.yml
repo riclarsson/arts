@@ -14,6 +14,7 @@ jobs:
           - name: linux-docs
             os: ubuntu-24.04
             preset: doc-gcc-conda
+            tmatrix: "ON"
             pyarts: "yes"
             check: "no"
             doc: "yes"
@@ -24,6 +25,7 @@ jobs:
           - name: linux-default-gcc
             os: ubuntu-24.04
             preset: default-gcc-conda
+            tmatrix: "ON"
             pyarts: "yes"
             check: "yes"
             doc: "no"
@@ -34,6 +36,7 @@ jobs:
           - name: linuxarm-default-gcc
             os: ubuntu-24.04-arm
             preset: default-gcc-conda
+            tmatrix: "ON"
             pyarts: "yes"
             check: "yes"
             doc: "no"
@@ -44,6 +47,7 @@ jobs:
           - name: linux-reldeb-gcc
             os: ubuntu-24.04
             preset: reldeb-gcc-conda
+            tmatrix: "ON"
             pyarts: "yes"
             check: "yes"
             doc: "no"
@@ -54,6 +58,7 @@ jobs:
           - name: linux-lgpl-gcc
             os: ubuntu-24.04
             preset: lgpl-gcc-conda
+            tmatrix: "OFF"
             pyarts: "yes"
             check: "yes"
             doc: "no"
@@ -64,6 +69,7 @@ jobs:
           - name: mac-default-clang
             os: macos-26
             preset: default-clang-conda
+            tmatrix: "ON"
             pyarts: "yes"
             check: "yes"
             doc: "no"
@@ -74,6 +80,7 @@ jobs:
           - name: mac-reldeb-clang
             os: macos-26
             preset: reldeb-clang-conda
+            tmatrix: "ON"
             pyarts: "yes"
             check: "yes"
             doc: "no"
@@ -84,6 +91,7 @@ jobs:
           - name: windows-default-msvc
             os: windows-2025-vs2026
             preset: default-msvc-conda
+            tmatrix: "OFF"
             pyarts: "yes"
             check: "yes"
             doc: "no"
@@ -123,7 +131,7 @@ jobs:
       - name: Configure
         shell: bash -l {0}
         run: |
-          cmake --preset=${{ matrix.preset }}  # -DARTS_CTEST_USER_OPTIONS="-V"
+          cmake --preset=${{ matrix.preset }} -DENABLE_TMATRIX=${{ matrix.tmatrix }}
 
       - name: Build ARTS Workspace
         shell: bash -l {0}

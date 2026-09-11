@@ -6,6 +6,30 @@
 #include "rtepack_stokes_vector.h"
 
 namespace rtepack {
+/** Polarized monostatic-radar return.
+ *
+ * The order is explicit because polarized outgoing and return transmissions
+ * need neither be equal nor commute.
+ */
+stokvec radar_return(const muelmat &return_transmission,
+                     const muelmat &backscatter,
+                     const muelmat &outgoing_transmission,
+                     const stokvec &transmitted);
+
+/** Directional derivative of radar_return.
+ *
+ * Implements the complete product rule for
+ * ``Tr * Z * Tf * transmitted``.  Derivatives of the transmitted Stokes
+ * vector are deliberately outside this atmospheric-optics helper.
+ */
+stokvec radar_return_derivative(const muelmat &return_transmission,
+                                const muelmat &return_transmission_derivative,
+                                const muelmat &backscatter,
+                                const muelmat &backscatter_derivative,
+                                const muelmat &outgoing_transmission,
+                                const muelmat &outgoing_transmission_derivative,
+                                const stokvec &transmitted);
+
 Array<muelmat_vector> bulk_backscatter(const ConstTensor5View &Pe, const ConstMatrixView &pnd);
 
 Array<muelmat_matrix> bulk_backscatter_derivative(const ConstTensor5View &Pe, const ArrayOfMatrix &dpnd_dx);

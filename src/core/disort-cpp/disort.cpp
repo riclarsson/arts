@@ -1885,7 +1885,10 @@ flux_values main_data::flux(flux_data& data, const Numeric tau) const {
   out.down_direct  = I0_orig * direct_beam;
 
   Numeric mean_intensity = diffuse.mean_intensity;
-  if (has_beam_source) mean_intensity += I0_orig * dc::direct_beam_radiance(I0, mu0, tau) / (4.0 * Constant::pi);
+  // The direct/diffuse flux correction preserves the scaled total beam.
+  // Its actinic contribution must therefore use the same scaled coordinate.
+  if (has_beam_source)
+    mean_intensity += I0_orig * dc::direct_beam_radiance(I0, mu0, scaled_tau) / (4.0 * Constant::pi);
 
   const Numeric source =
       dc::horner_polynomial(Nscoeffs, tau, [&](const Index coefficient) { return source_poly_coeffs[l, coefficient]; });
@@ -1918,7 +1921,8 @@ void main_data::gridded_flux(VectorView flux_up,
 
     Numeric mean_intensity = I0_orig * diffuse.mean_intensity;
     if (has_beam_source)
-      mean_intensity += I0_orig * dc::direct_beam_radiance(I0, mu0, tau_arr[l]) / (4.0 * Constant::pi);
+      mean_intensity += I0_orig * dc::direct_beam_radiance(I0, mu0, scaled_tau_arr_with_0[l + 1]) /
+                        (4.0 * Constant::pi);
     const Numeric source = dc::horner_polynomial(
         Nscoeffs, tau_arr[l], [&](const Index coefficient) { return source_poly_coeffs[l, coefficient]; });
     flux_dfdt[l] = (1.0 - omega_arr[l]) * 4.0 * Constant::pi * (mean_intensity - source);
@@ -1986,7 +1990,8 @@ void main_data::ungridded_flux(VectorView           flux_up,
     flux_down_direct[il]  = I0_orig * direct_beam;
 
     Numeric mean_intensity = I0_orig * diffuse.mean_intensity;
-    if (has_beam_source) mean_intensity += I0_orig * dc::direct_beam_radiance(I0, mu0, tau[il]) / (4.0 * Constant::pi);
+    if (has_beam_source)
+      mean_intensity += I0_orig * dc::direct_beam_radiance(I0, mu0, scaled_tau) / (4.0 * Constant::pi);
     const Numeric source = dc::horner_polynomial(
         Nscoeffs, tau[il], [&](const Index coefficient) { return source_poly_coeffs[l, coefficient]; });
     flux_dfdt[il] = (1.0 - omega_arr[l]) * 4.0 * Constant::pi * (mean_intensity - source);

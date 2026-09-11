@@ -79,7 +79,7 @@ table::table(const SpeciesEnum&                   species,
           atm_point.temperature += t_pert_local[it];
           if (do_water) atm_point["H2O"_spec] *= water_vmr_local[iw];
 
-          pm = 0.0;
+          pm = Propmat{0.0};
           lbl::calculate(pm,
                          sv,
                          dpm,

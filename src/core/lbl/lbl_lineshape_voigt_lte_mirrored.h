@@ -57,6 +57,8 @@ struct single_shape {
 
   [[nodiscard]] zFdF all(const Numeric f) const;
 
+  [[nodiscard]] Complex dparameter(const Complex ds, const Complex dz, const Numeric dz_fac, const Numeric f) const;
+
  public:
   [[nodiscard]] Complex df(const Numeric f) const;
 
@@ -345,6 +347,14 @@ struct ComputeData {
 
   //! Sets dshape and dscl and ds and dz
   void dt_core_calc(const SpeciesIsotope&    spec,
+                    const band_shape&        shp,
+                    const band_data&         bnd,
+                    const ConstVectorView&   f_grid,
+                    const AtmPoint&          atm,
+                    const ZeemanPolarization pol);
+
+  //! Sets dshape and dscl and ds and dz
+  void dp_core_calc(const SpeciesIsotope&    spec,
                     const band_shape&        shp,
                     const band_data&         bnd,
                     const ConstVectorView&   f_grid,

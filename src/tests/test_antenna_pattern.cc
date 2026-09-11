@@ -29,15 +29,15 @@ void test_gaussian_initialization_uses_los_offset() try {
   const Stokvec                 peak_weight{2.0, 1.0, 0.0, 0.0};
   const sensor::GaussianAntenna ant{ZenGrid{{0.0, 1.0}}, 1.0, 2, peak_weight};
 
-  assert_stokvec(sum(ant.data.data), 1.0, 1e-12, "gaussian peak weight");
+  assert_stokvec(Stokvec{sum(ant.data.data)}, Stokvec{1.0}, 1e-12, "gaussian peak weight");
 
   const Numeric scale    = std::exp(-0.5);
-  const Stokvec expected = scale / (2 + 2 * scale);
-  assert_stokvec(ant.data[1, 0], expected, 1e-12, "gaussian local [1, 0]");
-  assert_stokvec(ant.data[1, 1], expected, 1e-12, "gaussian local [1, 1]");
+  const Stokvec expected = Stokvec{scale / (2 + 2 * scale)};
+  assert_stokvec(Stokvec{ant.data[1, 0]}, expected, 1e-12, "gaussian local [1, 0]");
+  assert_stokvec(Stokvec{ant.data[1, 1]}, expected, 1e-12, "gaussian local [1, 1]");
 
   const sensor::GaussianAntenna def{ZenGrid{{0.0}}, 1.0, 1};
-  assert_stokvec(def.data[0, 0], {1.0, 0.0, 0.0, 0.0}, 1e-12, "default gaussian peak weight");
+  assert_stokvec(Stokvec{def.data[0, 0]}, Stokvec{1.0}, 1e-12, "default gaussian peak weight");
 } catch (const std::exception& e) {
   throw std::runtime_error(std::format("test_gaussian_initialization_uses_los_offset failed:\n{}", e.what()));
 }

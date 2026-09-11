@@ -12,7 +12,7 @@ std::shared_ptr<const AntennaPattern> clone_antenna(const std::shared_ptr<const 
   return antenna ? antenna->clone() : nullptr;
 }
 
-SensorMetaInfo make_meta_info(Size nchannels, Size geometry_index) {
+SensorMetaInfo make_meta_info(Size nchannels, Size geometry_index, std::optional<Time> time = std::nullopt) {
   SortedGriddedField1 gf;
   gf.data_name     = std::format("sensor-builder-{}", geometry_index);
   gf.gridname<0>() = "channel";
@@ -22,7 +22,7 @@ SensorMetaInfo make_meta_info(Size nchannels, Size geometry_index) {
   gf.data.resize(nchannels);
   gf.data = 0.0;
 
-  return SensorMetaInfo{std::move(gf)};
+  return SensorMetaInfo{.data = std::move(gf), .time = std::move(time)};
 }
 }  // namespace
 
@@ -56,6 +56,13 @@ Builder& Builder::operator=(const Builder& other) {
 std::pair<ArrayOfSensorObsel, ArrayOfSensorMetaInfo> Builder::operator()(std::span<const Vector3> pos,
                                                                          std::span<const Vector2> los,
                                                                          const Vector2&           ell) const {
+  return operator()(pos, los, {}, ell);
+}
+
+std::pair<ArrayOfSensorObsel, ArrayOfSensorMetaInfo> Builder::operator()(std::span<const Vector3> pos,
+                                                                         std::span<const Vector2> los,
+                                                                         std::span<const Time>    time,
+                                                                         const Vector2&           ell) const {
   ARTS_USER_ERROR_IF(channels.empty(), "Builder requires at least one channel")
   ARTS_USER_ERROR_IF(not antenna, "Builder requires an antenna pattern")
   ARTS_USER_ERROR_IF(pos.empty(), "Builder requires at least one sensor position")
@@ -64,6 +71,10 @@ std::pair<ArrayOfSensorObsel, ArrayOfSensorMetaInfo> Builder::operator()(std::sp
                      "Builder requires matching position and LOS counts. Got {} positions and {} LOS values.",
                      pos.size(),
                      los.size())
+  ARTS_USER_ERROR_IF(not time.empty() and time.size() != pos.size(),
+                     "Builder requires either no times or one time per geometry. Got {} times and {} geometries.",
+                     time.size(),
+                     pos.size())
 
   std::vector<std::shared_ptr<const AscendingGrid>> freq_grids;
   freq_grids.reserve(channels.size());
@@ -94,7 +105,8 @@ std::pair<ArrayOfSensorObsel, ArrayOfSensorMetaInfo> Builder::operator()(std::sp
           out.emplace_back(std::move(obsel));
         }
 
-        meta.push_back(make_meta_info(channels.size(), geometry_index));
+        meta.push_back(make_meta_info(
+            channels.size(), geometry_index, time.empty() ? std::nullopt : std::optional<Time>{time[geometry_index]}));
       };
 
   for (Size i = 0; i < pos.size(); ++i) append_geometry(pos[i], los[i], ell, i);

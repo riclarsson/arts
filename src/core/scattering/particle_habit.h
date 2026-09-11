@@ -36,6 +36,9 @@ auto ssd_to_tro_gridded(const ScatteringDataGrids& new_grids, const SingleScatte
     ARTS_USER_ERROR("Cannot convert scattering data from ARO format to TRO format.");
   } else {
     if constexpr (repr == Representation::Gridded) {
+      // Regrid also provides the required owning copy.  Returning ssd
+      // directly aliases its matpack storage; bulk PSD scaling would then
+      // modify the particle habit and make later evaluations stateful.
       return ssd.regrid(new_grids);
     } else {
       return ssd.to_gridded().regrid(new_grids);
@@ -109,12 +112,33 @@ class ScatteringHabit;
  */
 class ParticleHabit {
  public:
+  //! Generate native TRO data at individual volume-equivalent diameters.
+  //! SI inputs; refractive_index has shape (temperature, frequency).
+  static ParticleHabit tmatrix(const Vector&        t_grid,
+                               const Vector&        f_grid,
+                               const Vector&        diameters,
+                               const ComplexMatrix& refractive_index,
+                               Numeric              density,
+                               Numeric              aspect_ratio,
+                               int                  shape    = -1,
+                               int                  angles   = 181,
+                               Numeric              accuracy = 0.001);
+
+  static ParticleHabit sphere(const StridedVectorView& t_grid,
+                              const StridedVectorView& f_grid,
+                              const StridedVectorView& diameters,
+                              const ZenithAngleGrid&   za_scat_grid,
+                              const ComplexMatrix&     refractive_index,
+                              Numeric                  density);
+
   static ParticleHabit liquid_sphere(const StridedVectorView& t_grid,
                                      const StridedVectorView& f_grid,
                                      const StridedVectorView& diameters,
                                      const ZenithAngleGrid&   za_scat_grid);
 
   static ParticleHabit from_legacy_tro(std::vector<::SingleScatteringData> ssd_,
+                                       std::vector<::ScatteringMetaData>   meta_);
+  static ParticleHabit from_legacy_aro(std::vector<::SingleScatteringData> ssd_,
                                        std::vector<::ScatteringMetaData>   meta_);
 
   ParticleHabit()                                = default;

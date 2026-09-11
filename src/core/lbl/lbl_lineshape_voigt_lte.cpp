@@ -118,6 +118,26 @@ Complex dline_strength_calc_dT(
          (2 * T * (dlm * s + lm * ds) * f0 - 2 * T * df0 * lm * s - f0 * lm * s) / (2 * T * f0);
 }
 
+Complex dline_strength_calc_dP(
+    const Numeric inv_gd, const Numeric f0, const SpeciesIsotope& spec, const line& line, const AtmPoint& atm) {
+  const auto s = line.s(atm.temperature, PartitionFunctions::Q(atm.temperature, spec));
+
+  const Numeric G   = line.ls.G(atm);
+  const Numeric Y   = line.ls.Y(atm);
+  const Numeric dG  = line.ls.dG_dP(atm);
+  const Numeric dY  = line.ls.dY_dP(atm);
+  const Numeric dD0 = line.ls.dD0_dP(atm);
+  const Numeric dDV = line.ls.dDV_dP(atm);
+
+  const Numeric df0 = dD0 + dDV;
+  const Complex lm{1 + G, -Y};
+  const Complex dlm{dG, -dY};
+  const Numeric r = atm[spec];
+  const Numeric x = atm[spec.spec];
+
+  return Constant::inv_sqrt_pi * inv_gd * r * x * s * (dlm - (df0 / f0) * lm);
+}
+
 Numeric line_center_calc(const line& line, const AtmPoint& atm) { return line.f0 + line.ls.D0(atm) + line.ls.DV(atm); }
 
 Numeric dline_center_calc_dT(const line& line, const AtmPoint& atm) {
@@ -813,6 +833,35 @@ void ComputeData::dt_core_calc(const SpeciesIsotope&    spec,
   }
 }
 
+void ComputeData::dp_core_calc(const SpeciesIsotope&    spec,
+                               const band_shape&        shp,
+                               const band_data&         bnd,
+                               const ConstVectorView&   f_grid,
+                               const AtmPoint&          atm,
+                               const ZeemanPolarization pol) {
+  std::transform(scl.begin(), scl.end(), dscl.begin(), [P = atm.pressure](auto x) { return x / P; });
+
+  for (Size i = 0; i < pos.size(); i++) {
+    const auto&   line = bnd.lines[pos[i].line];
+    const auto&   lshp = shp.lines[i];
+    const Numeric df0  = line.ls.dD0_dP(atm) + line.ls.dDV_dP(atm);
+
+    dz_fac[i] = -df0 / lshp.f0;
+    ds[i] = line.z.Strength(line.qn, pol, pos[i].iz) * dline_strength_calc_dP(lshp.inv_gd, lshp.f0, spec, line, atm);
+    dz[i] = lshp.inv_gd * Complex{-df0, line.ls.dG0_dP(atm)};
+  }
+
+  if (bnd.cutoff.type != LineByLineCutoffType::None) {
+    shp.dVMR(dcut, ds, dz, dz_fac);
+    std::transform(f_grid.begin(), f_grid.end(), dshape.begin(), [this, &shp](Numeric f) {
+      return shp.dVMR(dcut, ds, dz, dz_fac, f);
+    });
+  } else {
+    std::transform(
+        f_grid.begin(), f_grid.end(), dshape.begin(), [this, &shp](Numeric f) { return shp.dVMR(ds, dz, dz_fac, f); });
+  }
+}
+
 //! Sets dshape and dscl
 void ComputeData::df_core_calc(const band_shape&      shp,
                                const band_data&       bnd,
@@ -1185,7 +1234,13 @@ void compute_derivative(PropmatVectorView        dpm,
             zeeman::scale(com_data.npm, com_data.dscl[i] * com_data.shape[i] + com_data.scl[i] * com_data.dshape[i]);
       }
       return;
-    case p: ARTS_USER_ERROR("Not implemented, pressure derivative"); break;
+    case p:
+      com_data.dp_core_calc(spec, shape, bnd, f_grid, atm, pol);
+      for (Size i = 0; i < f_grid.size(); i++) {
+        dpm[i] +=
+            zeeman::scale(com_data.npm, com_data.dscl[i] * com_data.shape[i] + com_data.scl[i] * com_data.dshape[i]);
+      }
+      break;
     case mag_u:
       if (pol == ZeemanPolarization::no) return;
       com_data.dmag_u_core_calc(shape, bnd, f_grid, atm, pol);
@@ -1286,7 +1341,7 @@ void compute_derivative(PropmatVectorView        dpm,
         dpm[i] += zeeman::scale(com_data.npm, com_data.scl[i] * com_data.dshape[i]);
       }
       return;
-    case LineByLineVariable::unused: return;
+    case LineByLineVariable::unused: break;
   }
 
   switch (deriv.ls_var) {
@@ -1427,7 +1482,16 @@ void compute_derivative(ComplexVectorView dp,
           });
 
     } break;
-    case p:     ARTS_USER_ERROR("Not implemented, pressure derivative"); break;
+    case p: {
+      const Numeric df0 = line.ls.dD0_dP(atm) + line.ls.dDV_dP(atm);
+      const Complex ds =
+          line.z.Strength(line.qn, pol, iz) * dline_strength_calc_dP(shp.inv_gd, shp.f0, qid.isot, line, atm);
+      const Complex dz     = shp.inv_gd * Complex{-df0, line.ls.dG0_dP(atm)};
+      const Numeric dz_fac = -df0 / shp.f0;
+      std::transform(f_grid.begin(), f_grid.end(), dp.begin(), dp.begin(), [&shp, ds, dz, dz_fac](auto f, auto d) {
+        return shp.dVMR(ds, dz, dz_fac, f) + d;
+      });
+    } break;
     case mag_u: {
       if (pol == ZeemanPolarization::no) return;
       const Numeric H         = std::hypot(atm.mag[0], atm.mag[1], atm.mag[2]);
@@ -1749,9 +1813,10 @@ void multiply_scale(ComplexVectorView      pm,
     const Numeric scl = -N * f * e * sc;
 
     auto& p = pm[i];
+    for (Size j = 0; j < jac_targets.target_count(); ++j) { dpm[j, i] *= scl; }
+
     for (auto& atm_target : jac_targets.atm) {
-      auto& dp  = dpm[atm_target.target_pos, i];
-      dp       *= scl;
+      auto& dp = dpm[atm_target.target_pos, i];
 
       std::visit(
           [&]<typename U>(const U& key) {

@@ -65,7 +65,7 @@ template <typename T, Size N> class [[nodiscard]] data_t {
   explicit constexpr data_t(std::pair<std::array<Index, N>, T> x)
       : data(mdsize(x.first), x.second), view(base{data.data(), x.first}) {}
 
-  constexpr data_t(std::array<Index, N> sz, T x = {}) : data_t(std::pair<std::array<Index, N>, T>{sz, x}) {}
+  constexpr data_t(std::array<Index, N> sz, T x = T{}) : data_t(std::pair<std::array<Index, N>, T>{sz, x}) {}
 
   constexpr data_t() : data_t(std::array<Index, N>{}) {}
   constexpr data_t(const data_t& x) : data(x.data), view(base{data.data(), x.shape()}) {}
@@ -140,6 +140,13 @@ template <typename T, Size N> class [[nodiscard]] data_t {
   }
 
   constexpr data_t& operator=(const value_type& x) {
+    view = x;
+    return *this;
+  }
+
+  template <typename U> requires(not any_md<U> and not std::same_as<std::remove_cvref_t<U>, value_type> and
+                                 std::constructible_from<value_type, const U&>)
+  constexpr data_t& operator=(const U& x) {
     view = x;
     return *this;
   }

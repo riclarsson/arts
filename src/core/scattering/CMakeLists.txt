@@ -9,6 +9,7 @@ add_library(scattering STATIC
    phase_matrix.cc
    henyey_greenstein.cc
    particle_habit.cc
+   particle_habit_tmatrix.cc
    scattering_habit.cc
    bulk_scattering_properties.cc
    optproperties.cc
@@ -24,3 +25,5 @@ else()
 target_include_directories(scattering PRIVATE "${FFTW_INCLUDE_DIR}" "${CMAKE_SOURCE_DIR}/3rdparty/shtns")
 target_link_libraries(scattering PRIVATE fftw3 shtns)
 endif()
+
+target_link_libraries(scattering PRIVATE arts_tmatrix)

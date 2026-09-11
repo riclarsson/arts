@@ -109,6 +109,10 @@ Agenda get_spectral_rad_observer_agenda(const std::string_view option) {
       agenda.add("ray_path_observer_agendaExecute");
       agenda.add("spectral_radClearskyEmission");
       break;
+    case MonteCarlo:
+      agenda.add("spectral_radMonteCarlo");
+      agenda.add("spectral_rad_jacAddSensorJacobianPerturbations");
+      break;
   }
 
   return std::move(agenda).finalize(false);
@@ -204,6 +208,8 @@ Agenda get_spectral_surf_refl_agenda(const std::string_view option) {
   switch (to<spectral_surf_refl_agendaPredefined>(option)) {
     case FlatScalar:      agenda.add("spectral_surf_reflFlatScalar"); break;
     case FlatRealFresnel: agenda.add("spectral_surf_reflFlatRealFresnel"); break;
+    case Tessem:          agenda.add("spectral_surf_reflTessem"); break;
+    case Telsem:          agenda.add("spectral_surf_reflTelsem"); break;
   }
 
   return std::move(agenda).finalize(true);

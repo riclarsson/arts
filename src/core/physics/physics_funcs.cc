@@ -14,6 +14,8 @@
 
 #include "physics_funcs.h"
 
+#include <debug.h>
+
 #include <cmath>
 
 inline constexpr Numeric BOLTZMAN_CONST = Constant::boltzmann_constant;
@@ -80,6 +82,62 @@ Numeric dinvplanckdI(const Numeric& i, const Numeric& f) {
   const Numeric     binv = a * f / log1p(d);
 
   return binv * binv / (a * f * i * (1 / d + 1));
+}
+
+Numeric refractive_index_water_visible_nir_harvey98(const Numeric frequency,
+                                                    const Numeric temperature,
+                                                    const Numeric density,
+                                                    const bool    check_validity) {
+  constexpr Numeric reference_temperature = 273.15;  // K
+  constexpr Numeric reference_density     = 1000.0;  // kg/m3
+  constexpr Numeric reference_wavelength  = 0.589;   // micrometres
+
+  const Numeric wavelength = Conversion::freq2wavelen(frequency) * 1e6;
+
+  if (check_validity) {
+    ARTS_USER_ERROR_IF(not(temperature > 261.15 and temperature < 773.15),
+                       "Harvey98 water refractive index is valid for 261.15 K < temperature < 773.15 K. "
+                       "Got {} K.",
+                       temperature)
+    ARTS_USER_ERROR_IF(not(density > 0.0 and density < 1060.0),
+                       "Harvey98 water refractive index is valid for 0 kg/m3 < density < 1060 kg/m3. "
+                       "Got {} kg/m3.",
+                       density)
+    ARTS_USER_ERROR_IF(not(wavelength > 0.2 and wavelength < 1.9),
+                       "Harvey98 water refractive index is valid for 0.2 micrometres < wavelength < "
+                       "1.9 micrometres. Got frequency {} Hz (wavelength {} micrometres).",
+                       frequency,
+                       wavelength)
+  }
+
+  constexpr Numeric a0 = 0.244257733;
+  constexpr Numeric a1 = 9.74634476e-3;
+  constexpr Numeric a2 = -3.73234996e-3;
+  constexpr Numeric a3 = 2.68678472e-4;
+  constexpr Numeric a4 = 1.58920570e-3;
+  constexpr Numeric a5 = 2.45934259e-3;
+  constexpr Numeric a6 = 0.900704920;
+  constexpr Numeric a7 = -1.66626219e-2;
+
+  constexpr Numeric lambda_uv = 0.2292020;
+  constexpr Numeric lambda_ir = 5.432937;
+
+  const Numeric reduced_temperature = temperature / reference_temperature;
+  const Numeric reduced_density     = density / reference_density;
+  const Numeric reduced_wavelength  = wavelength / reference_wavelength;
+  const Numeric wavelength_squared  = Math::pow2(reduced_wavelength);
+
+  Numeric rhs  = a0;
+  rhs         += a1 * reduced_density;
+  rhs         += a2 * reduced_temperature;
+  rhs         += a3 * wavelength_squared * reduced_temperature;
+  rhs         += a4 / wavelength_squared;
+  rhs         += a5 / (wavelength_squared - Math::pow2(lambda_uv));
+  rhs         += a6 / (wavelength_squared - Math::pow2(lambda_ir));
+  rhs         += a7 * Math::pow2(reduced_density);
+
+  const Numeric lorentz_lorenz = reduced_density * rhs;
+  return std::sqrt((1.0 + 2.0 * lorentz_lorenz) / (1.0 - lorentz_lorenz));
 }
 
 /** fresnel

@@ -78,6 +78,18 @@ void RetrievalAddAtmosphere(JacobianTargets&                            jac_targ
 
 void RetrievalAddAtmosphere(JacobianTargets&                            jac_targets,
                             JacobianTargetsDiagonalCovarianceMatrixMap& covmat_diagonal_blocks,
+                            const ScatteringSpeciesProperty&            key,
+                            const Numeric&                              d,
+                            const BlockMatrix&                          matrix,
+                            const BlockMatrix&                          inverse) {
+  ARTS_TIME_REPORT
+
+  jac_targetsAddAtmosphere(jac_targets, key, d);
+  covmat_diagonal_blocks[JacobianTargetType{jac_targets.atm.back().type}] = {.first = matrix, .second = inverse};
+}
+
+void RetrievalAddAtmosphere(JacobianTargets&                            jac_targets,
+                            JacobianTargetsDiagonalCovarianceMatrixMap& covmat_diagonal_blocks,
                             const SpeciesEnum&                          key,
                             const Numeric&                              d,
                             const BlockMatrix&                          matrix,

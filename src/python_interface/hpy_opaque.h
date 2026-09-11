@@ -11,6 +11,7 @@ NB_MAKE_OPAQUE(QuantumState);
 NB_MAKE_OPAQUE(FileType);
 NB_MAKE_OPAQUE(std::vector<Jacobian::AtmTarget>);
 NB_MAKE_OPAQUE(std::vector<Jacobian::SurfaceTarget>);
+NB_MAKE_OPAQUE(std::vector<Jacobian::SubsurfaceTarget>);
 NB_MAKE_OPAQUE(std::vector<Jacobian::LineTarget>);
 NB_MAKE_OPAQUE(std::vector<Jacobian::SensorTarget>);
 NB_MAKE_OPAQUE(std::vector<Jacobian::ErrorTarget>);

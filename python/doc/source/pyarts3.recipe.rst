@@ -6,3 +6,11 @@ pyarts3.recipe
    :imported-members:
    :undoc-members:
    :special-members: __init__, __call__
+
+Heating-rate diagnostics
+------------------------
+
+See :doc:`user.heating` for units, sampling locations and examples.
+
+.. automodule:: pyarts3.recipe.heating_rates
+   :members:

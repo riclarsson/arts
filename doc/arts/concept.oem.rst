@@ -180,10 +180,7 @@ matching :math:`f` and :math:`f^{-1}`, as well as a way to compute
 the partial derivative of :math:`f^{-1}` with regards to
 :math:`\vec{x}`.
 
-We provide several such solutions built-in to ARTS
-as listed below but it is possible to specify these
-directly from python by simply providing the three
-operators above.
+See :doc:`user.oem` for assigning these operators to a Jacobian target.
 
 Relative retrievals
 ^^^^^^^^^^^^^^^^^^^

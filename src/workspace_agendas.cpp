@@ -90,6 +90,9 @@ in question here only compute a single frequency point at a time.
 
 If you do not need single-frequency-point calculations, consider using
 *spectral_propmat_agenda* instead as it will likely be more efficient.
+
+Convenience setters provide *single_dispersion* for microwave gases in Earth
+or planetary atmospheres and for visible/near-infrared water or steam.
 )--",
       .output = {"single_propmat",
                  "single_nlte_srcvec",
@@ -168,6 +171,11 @@ It is up to internal methods if they respect *single_dispersion* or not.
 
 It is up to internal methods if they respect *max_stepsize* or not.
 
+The ``RefractiveStepwise`` option consumes *single_dispersion*.  It can, for
+example, be paired with *single_propmat_agendaSetGasMicrowavesEarth*,
+*single_propmat_agendaSetGasMicrowavesGeneral*, or
+*single_propmat_agendaSetWaterVisibleNIRHarvey98*.
+
 A special exception may be made for a 1-size *ray_path* that is in space or at the surface,
 where the next point may be the same point as the input.
 
@@ -193,7 +201,7 @@ is warranted.
 )--",
       .output       = {"spectral_rad", "spectral_rad_jac", "ray_path"},
       .input        = {"freq_grid", "jac_targets", "obs_pos", "obs_los", "atm_field", "surf_field", "subsurf_field"},
-      .enum_options = {"Emission", "EmissionAdaptiveHalfsteps", "EmissionNoSensor"},
+      .enum_options = {"Emission", "EmissionAdaptiveHalfsteps", "EmissionNoSensor", "MonteCarlo"},
       .enum_default = "Emission",
       .output_constraints =
           {
@@ -384,7 +392,7 @@ it does a lot of unnecessary checks and operations that are not always needed.
 )--",
       .output             = {"spectral_surf_refl", "spectral_surf_refl_jac"},
       .input              = {"freq_grid", "surf_field", "ray_point", "jac_targets"},
-      .enum_options       = {"FlatScalar", "FlatRealFresnel"},
+      .enum_options       = {"FlatScalar", "FlatRealFresnel", "Tessem", "Telsem"},
       .output_constraints = {{"spectral_surf_refl.size() == freq_grid.size()",
                               "*spectral_surf_refl* match *freq_grid* size",
                               "spectral_surf_refl.size()",

@@ -8,6 +8,27 @@
 #include "rtepack_stokes_vector.h"
 
 namespace rtepack {
+stokvec radar_return(const muelmat &return_transmission,
+                     const muelmat &backscatter,
+                     const muelmat &outgoing_transmission,
+                     const stokvec &transmitted) {
+  return return_transmission * (backscatter * (outgoing_transmission * transmitted));
+}
+
+stokvec radar_return_derivative(const muelmat &return_transmission,
+                                const muelmat &return_transmission_derivative,
+                                const muelmat &backscatter,
+                                const muelmat &backscatter_derivative,
+                                const muelmat &outgoing_transmission,
+                                const muelmat &outgoing_transmission_derivative,
+                                const stokvec &transmitted) {
+  const stokvec outgoing             = outgoing_transmission * transmitted;
+  const stokvec outgoing_derivative  = outgoing_transmission_derivative * transmitted;
+  const stokvec scattered            = backscatter * outgoing;
+  const stokvec scattered_derivative = backscatter_derivative * outgoing + backscatter * outgoing_derivative;
+  return return_transmission_derivative * scattered + return_transmission * scattered_derivative;
+}
+
 Array<muelmat_vector> bulk_backscatter(const ConstTensor5View &Pe, const ConstMatrixView &pnd) {
   assert(Pe.ncols() == 4 and Pe.nrows() == 4);
   const Index nv = Pe.npages();
@@ -77,7 +98,7 @@ Array<muelmat_matrix> bulk_backscatter_derivative(const ConstTensor5View &Pe, co
 
   for (Index ip = 0; ip < np; ip++) {
     for (Size iq = 0; iq < nq; iq++) {
-      aoaotm[ip][iq] = 0.0;
+      aoaotm[ip][iq] = muelmat{0.0};
       for (Index iv = 0; iv < nv; iv++) {
         for (Index ie = 0; ie < ne; ie++) {
           auto m              = Pe[ie, ip, iv, joker, joker];
@@ -192,7 +213,7 @@ muelmat rayleigh_scattering(const Vector2 &los_in, const Vector2 &los_out, const
   const auto F33 = 1.5 * delta * cos_theta;
   const auto F44 = 1.5 * delta * delta_prime * cos_theta;
 
-  muelmat pha;
+  muelmat pha{1.0};
   pha[0, 0] = F11;
 
   const Numeric za_sca_rad = Conversion::deg2rad(za_sca);

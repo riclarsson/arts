@@ -185,6 +185,8 @@ add_library(artsworkspace STATIC
   m_lookup.cc
   m_measurement_vector.cc
   m_model_state.cc
+  m_montecarlo.cc
+  m_montecarlo_radar.cc
   m_nlte.cc
   m_obsel.cc
   m_oem.cc
@@ -192,10 +194,13 @@ add_library(artsworkspace STATIC
   m_partfun.cc
   m_planets.cc
   m_ppvar.cc
+  m_predefined_sensor.cc
   m_profile.cc
   m_propagation_path.cc
   m_propagation_path_observer.cc
   m_propmat.cc
+  m_radar.cc
+  m_refraction.cc
   m_retrieval.cc
   m_rad.cc
   m_scattering_species.cc
@@ -206,6 +211,8 @@ add_library(artsworkspace STATIC
   m_subsurface.cc
   m_sun.cc
   m_surface.cc
+  m_telsem.cc
+  m_tessem.cc
   m_tramat.cc
   m_wigner.cc
   sun_methods.cc

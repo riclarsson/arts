@@ -10,8 +10,10 @@ namespace rtepack {
 
 //! A 4x4 matrix of Complex values to be used as a Mueller Matrix
 struct specmat final : ComplexMatrix44 {
-  constexpr specmat(Complex tau = 1.0) noexcept
+  explicit constexpr specmat(Complex tau) noexcept
       : ComplexMatrix44{tau, 0, 0, 0, 0, tau, 0, 0, 0, 0, tau, 0, 0, 0, 0, tau} {}
+
+  constexpr specmat() : specmat(1.0) {}
 
   constexpr specmat(Complex m00,
                     Complex m01,
@@ -31,10 +33,35 @@ struct specmat final : ComplexMatrix44 {
                     Complex m33) noexcept
       : ComplexMatrix44{m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33} {}
 
-  constexpr specmat(std::array<Complex, 16> data) noexcept : ComplexMatrix44{data} {}
+  template <matpack::exact_md<Complex, 2> T> explicit constexpr specmat(const T &input) noexcept {
+    assert(input.extent(0) == 4 and input.extent(1) == 4);
+    stdr::copy(input, data.begin());
+  }
+
+  template <stdr::forward_range T> requires std::is_convertible_v<stdr::range_value_t<T>, Complex>
+  explicit constexpr specmat(const T &input) noexcept {
+    assert(stdr::size(input) == 16);
+    stdr::copy(input, data.begin());
+  }
+
+  template <matpack::exact_md<Complex, 2> T> constexpr specmat &operator=(const T &input) noexcept {
+    return *this = specmat{input};
+  }
+
+  template <stdr::forward_range T> requires std::is_convertible_v<stdr::range_value_t<T>, Complex>
+  constexpr specmat &operator=(const T &input) noexcept {
+    return *this = specmat{input};
+  }
 
   //! The identity matrix
   static constexpr specmat id() { return specmat{1.0}; }
+
+  //! The completely constant matrix
+  static constexpr specmat constant(Complex value) {
+    specmat x{};
+    x.data.fill(value);
+    return x;
+  }
 
   constexpr specmat &operator+=(const specmat &b) {
     data[0]  += b.data[0];
@@ -98,6 +125,16 @@ struct specmat final : ComplexMatrix44 {
                     a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33};
   }
 
+  constexpr specmat &operator*=(const Complex &b) {
+    for (auto &x : data) { x *= b; }
+    return *this;
+  }
+
+  constexpr specmat &operator/=(const Complex &b) {
+    for (auto &x : data) { x /= b; }
+    return *this;
+  }
+
   constexpr specmat operator-() const {
     return specmat{-data[0],
                    -data[1],
@@ -118,29 +155,11 @@ struct specmat final : ComplexMatrix44 {
   }
 };
 
-//! Addition between specmat matrices
 constexpr specmat operator+(specmat a, const specmat &b) { return a += b; }
-
-constexpr specmat operator+(Complex a, specmat b) { return specmat{a} + b; }
-
-//! Subtraction between specmat matrices
 constexpr specmat operator-(specmat a, const specmat &b) { return a -= b; }
-
-constexpr specmat operator-(Complex a, specmat b) { return specmat{a} - b; }
-
-//! Scaling a specmat matrix
 constexpr specmat operator*(specmat a, const Complex &b) { return a *= b; }
-
-//! Scaling a specmat matrix
 constexpr specmat operator*(const Complex &a, specmat b) { return b * a; }
-
-//! Scaling a specmat matrix
-constexpr specmat operator/(specmat a, const Complex &b) {
-  a *= (1.0 / b);
-  return a;
-}
-
-//! Scaling a specmat matrix
+constexpr specmat operator/(specmat a, const Complex &b) { return a /= b; }
 constexpr specmat operator*(specmat a, const specmat &b) { return a *= b; }
 
 //! Take the average of two specmat matrices

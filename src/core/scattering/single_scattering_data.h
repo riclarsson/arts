@@ -43,6 +43,32 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
       const StridedVectorView &f_grid,
       Numeric                  diameter,
       const ZenithAngleGrid   &za_grid) {
+    ComplexMatrix refractive_index(t_grid.size(), f_grid.size());
+    for (Index it = 0; it < t_grid.ncols(); ++it)
+      for (Index jf = 0; jf < f_grid.ncols(); ++jf)
+        refractive_index[it, jf] = refr_index_water_ellison07(f_grid[jf], t_grid[it]);
+    auto result                         = sphere(t_grid, f_grid, diameter, za_grid, refractive_index, 1e3);
+    result.properties->refractive_index = "Ellison (2007)";
+    return result;
+  }
+
+  static SingleScatteringData<Numeric, Format::TRO, Representation::Gridded> sphere(
+      const StridedVectorView &t_grid,
+      const StridedVectorView &f_grid,
+      Numeric                  diameter,
+      const ZenithAngleGrid   &za_grid,
+      const ComplexMatrix     &refractive_index,
+      Numeric                  density) {
+    ARTS_USER_ERROR_IF(refractive_index.nrows() != t_grid.ncols() || refractive_index.ncols() != f_grid.ncols(),
+                       "Refractive-index shape must match temperature/frequency grids.")
+    ARTS_USER_ERROR_IF(!std::isfinite(diameter) || diameter <= 0 || !std::isfinite(density) || density <= 0,
+                       "Diameter and density must be finite and positive.")
+    for (auto t : t_grid) ARTS_USER_ERROR_IF(!std::isfinite(t) || t <= 0, "Temperatures must be finite and positive.")
+    for (auto f : f_grid) ARTS_USER_ERROR_IF(!std::isfinite(f) || f <= 0, "Frequencies must be finite and positive.")
+    for (auto row : refractive_index)
+      for (auto m : row)
+        ARTS_USER_ERROR_IF(!std::isfinite(m.real()) || m.real() <= 0 || !std::isfinite(m.imag()) || m.imag() < 0,
+                           "Refractive index must have positive real and nonnegative imaginary parts.")
     auto t_grid_ptr  = std::make_shared<Vector>(t_grid);
     auto f_grid_ptr  = std::make_shared<Vector>(f_grid);
     auto za_grid_ptr = std::make_shared<ZenithAngleGrid>(za_grid);
@@ -53,12 +79,24 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
     BackscatterMatrixData<Numeric, Format::TRO>                         backscatter_matrix(t_grid_ptr, f_grid_ptr);
     ForwardscatterMatrixData<Numeric, Format::TRO>                      forwardscatter_matrix(t_grid_ptr, f_grid_ptr);
 
+    // Evaluate exact endpoints even when the requested angular grid omits them.
+    const auto &requested_angles = grid_vector(*za_grid_ptr);
+    Vector      angles(requested_angles.size() + 2);
+    for (Index i = 0; i < requested_angles.ncols(); ++i) angles[i] = requested_angles[i];
+    angles[requested_angles.size()]     = 0;
+    angles[requested_angles.size() + 1] = 180;
     for (size_t temp_ind = 0; temp_ind < t_grid_ptr->size(); ++temp_ind) {
-      Numeric temp = t_grid_ptr->operator[](temp_ind);
       for (size_t freq_ind = 0; freq_ind < f_grid_ptr->size(); ++freq_ind) {
         Numeric freq   = f_grid_ptr->operator[](freq_ind);
-        auto    sphere = MieSphere<Scalar>::Liquid(freq, temp, diameter / 2.0, grid_vector(*za_grid_ptr));
-        phase_matrix[temp_ind, freq_ind]      = sphere.get_scattering_matrix_compact();
+        auto    sphere = MieSphere<Scalar>(
+            Constant::speed_of_light / freq, diameter / 2.0, refractive_index[temp_ind, freq_ind], angles);
+        auto optical = sphere.get_scattering_matrix_compact();
+        for (Index ia = 0; ia < requested_angles.ncols(); ++ia)
+          for (Index k = 0; k < 6; ++k) phase_matrix[temp_ind, freq_ind, ia, k] = optical[ia, k];
+        for (Index k = 0; k < 6; ++k) {
+          forwardscatter_matrix[temp_ind, freq_ind, k] = optical[requested_angles.size(), k];
+          backscatter_matrix[temp_ind, freq_ind, k]    = optical[requested_angles.size() + 1, k];
+        }
         extinction_matrix[temp_ind, freq_ind] = sphere.get_extinction_coeff();
         absorption_vector[temp_ind, freq_ind] = sphere.get_absorption_coeff();
       }
@@ -66,8 +104,8 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
 
     auto pprops = ParticleProperties{.name             = "Mie Sphere",
                                      .source           = "ARTS Mie solver",
-                                     .refractive_index = "Ellison (2007)",
-                                     .mass             = 1e3 * 4.0 * Constant::pi * std::pow(diameter / 2.0, 3),
+                                     .refractive_index = "User-supplied temperature/frequency grid",
+                                     .mass             = density * Constant::pi / 6 * std::pow(diameter, 3),
                                      .d_veq            = diameter,
                                      .d_max            = diameter};
 
@@ -114,6 +152,63 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
         smd.description, smd.source, smd.refr_index, smd.mass, smd.diameter_volume_equ, smd.diameter_max};
 
     return SingleScatteringData<Numeric, Format::TRO, Representation::Gridded>(
+        properties, phase_matrix, extinction_matrix, absorption_vector, backscatter_matrix, forwardscatter_matrix);
+  }
+
+  static SingleScatteringData<Numeric, Format::ARO, Representation::Gridded> from_legacy_aro(::SingleScatteringData ssd,
+                                                                                             ::ScatteringMetaData smd) {
+    ARTS_USER_ERROR_IF(ssd.ptype != PType::PTYPE_AZIMUTH_RND,
+                       "Converting legacy scattering data to ARO format requires PType::PTYPE_AZIMUTH_RND.")
+    ARTS_USER_ERROR_IF(ssd.pha_mat_data.extent(5) != 1,
+                       "Legacy ARO conversion requires a singleton incident-azimuth dimension.")
+
+    auto t_grid      = std::make_shared<Vector>(ssd.T_grid);
+    auto f_grid      = std::make_shared<Vector>(ssd.f_grid);
+    auto za_inc_grid = std::make_shared<Vector>(ssd.za_grid);
+    ARTS_USER_ERROR_IF(ssd.aa_grid.empty() || ssd.aa_grid.front() != 0.0 || ssd.aa_grid.back() != 180.0,
+                       "Legacy ARO azimuth grid must span 0 to 180 degrees.")
+    Vector signed_delta_aa(2 * ssd.aa_grid.size() - 1);
+    for (Size i = 1; i < ssd.aa_grid.size(); ++i) { signed_delta_aa[ssd.aa_grid.size() - 1 - i] = -ssd.aa_grid[i]; }
+    for (Size i = 0; i < ssd.aa_grid.size(); ++i) { signed_delta_aa[ssd.aa_grid.size() - 1 + i] = ssd.aa_grid[i]; }
+    auto delta_aa_grid = std::make_shared<Vector>(std::move(signed_delta_aa));
+    auto za_scat_grid  = std::make_shared<ZenithAngleGrid>(IrregularZenithAngleGrid(ssd.za_grid));
+
+    PhaseMatrixData<Numeric, Format::ARO, Representation::Gridded> phase_matrix(
+        t_grid, f_grid, za_inc_grid, delta_aa_grid, za_scat_grid);
+    ExtinctionMatrixData<Numeric, Format::ARO, Representation::Gridded> extinction_matrix(t_grid, f_grid, za_inc_grid);
+    AbsorptionVectorData<Numeric, Format::ARO, Representation::Gridded> absorption_vector(t_grid, f_grid, za_inc_grid);
+
+    for (Size i_t = 0; i_t < t_grid->size(); ++i_t) {
+      for (Size i_f = 0; i_f < f_grid->size(); ++i_f) {
+        for (Size i_za_inc = 0; i_za_inc < za_inc_grid->size(); ++i_za_inc) {
+          for (Size i_delta_aa = 0; i_delta_aa < delta_aa_grid->size(); ++i_delta_aa) {
+            const bool negative = (*delta_aa_grid)[i_delta_aa] < 0.0;
+            const Size source_aa =
+                negative ? ssd.aa_grid.size() - 1 - i_delta_aa : i_delta_aa - (ssd.aa_grid.size() - 1);
+            for (Size i_za_scat = 0; i_za_scat < static_cast<Size>(grid_size(*za_scat_grid)); ++i_za_scat) {
+              for (Size i_s = 0; i_s < phase_matrix.n_stokes_coeffs; ++i_s) {
+                const bool odd =
+                    i_s == 2 || i_s == 3 || i_s == 6 || i_s == 7 || i_s == 8 || i_s == 9 || i_s == 12 || i_s == 13;
+                phase_matrix[i_t, i_f, i_za_inc, i_delta_aa, i_za_scat, i_s] =
+                    (negative && odd ? -1.0 : 1.0) * ssd.pha_mat_data[i_f, i_t, i_za_scat, source_aa, i_za_inc, 0, i_s];
+              }
+            }
+          }
+          for (Size i_s = 0; i_s < extinction_matrix.n_stokes_coeffs; ++i_s) {
+            extinction_matrix[i_t, i_f, i_za_inc, i_s] = ssd.ext_mat_data[i_f, i_t, i_za_inc, 0, i_s];
+          }
+          for (Size i_s = 0; i_s < absorption_vector.n_stokes_coeffs; ++i_s) {
+            absorption_vector[i_t, i_f, i_za_inc, i_s] = ssd.abs_vec_data[i_f, i_t, i_za_inc, 0, i_s];
+          }
+        }
+      }
+    }
+
+    auto properties = ParticleProperties{
+        smd.description, smd.source, smd.refr_index, smd.mass, smd.diameter_volume_equ, smd.diameter_max};
+    auto backscatter_matrix    = phase_matrix.extract_backscatter_matrix();
+    auto forwardscatter_matrix = phase_matrix.extract_forwardscatter_matrix();
+    return SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>(
         properties, phase_matrix, extinction_matrix, absorption_vector, backscatter_matrix, forwardscatter_matrix);
   }
 
@@ -251,15 +346,22 @@ template <std::floating_point Scalar, Format format, Representation repr> struct
   SingleScatteringData<Numeric, Format::ARO, Representation::Gridded> to_lab_frame(
       const ScatteringDataGrids &grids) const {
     if constexpr (format == Format::ARO) { return regrid(grids); }
-    auto new_pm  = phase_matrix.transform([&grids](const auto &pm) {
-      return pm.to_lab_frame(grids.za_inc_grid, grids.aa_scat_grid, grids.za_scat_grid).regrid(grids);
+    // Interpolate the compact TRO quantities before expanding them.  The
+    // laboratory-frame grids are then already exact, avoiding both redundant
+    // work and degenerate singleton-grid interpolation at zenith/nadir.
+    const ScatteringDataGrids tf_grids(grids.t_grid, grids.f_grid);
+    auto                      new_pm = phase_matrix.transform([&](const auto &pm) {
+      // TRO's zenith grid is a scattering-angle grid, not the laboratory
+      // output-zenith grid.  Preserve it while interpolating T/f.
+      const ScatteringDataGrids tro_grids(grids.t_grid, grids.f_grid, pm.get_za_scat_grid());
+      return pm.regrid(tro_grids).to_lab_frame(grids.za_inc_grid, grids.aa_scat_grid, grids.za_scat_grid);
     });
-    auto new_em  = extinction_matrix.to_lab_frame(grids.za_inc_grid);
-    auto new_av  = absorption_vector.to_lab_frame(grids.za_inc_grid);
+    auto                      new_em = extinction_matrix.regrid(tf_grids).to_lab_frame(grids.za_inc_grid);
+    auto                      new_av = absorption_vector.regrid(tf_grids).to_lab_frame(grids.za_inc_grid);
     auto new_bsm = BackscatterMatrixData<Numeric, Format::ARO>(backscatter_matrix, grids.za_inc_grid);
     auto new_fsm = ForwardscatterMatrixData<Numeric, Format::ARO>(forwardscatter_matrix, grids.za_inc_grid);
     return SingleScatteringData<Numeric, Format::ARO, Representation::Gridded>(
-        properties, new_pm, new_em.regrid(grids), new_av.regrid(grids), new_bsm, new_fsm);
+        properties, new_pm, new_em, new_av, new_bsm, new_fsm);
   }
 
   std::optional<ParticleProperties>                    properties;

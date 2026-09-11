@@ -64,6 +64,11 @@ option (ENABLE_MPI "Turn on MPI" OFF)
 option (ENABLE_ARTS_PROFILING "Turn on the profiling macro" OFF)
 option (ENABLE_PCH "Turn on precomnpiled headers" OFF)
 option (ENABLE_CDISORT "Turn on cdisort" ON)
+option (ENABLE_TMATRIX "Build the original T-matrix solver" OFF)
+option (ENABLE_TMATRIX_QUAD "Use extended-precision T-matrix internals" OFF)
+if(ENABLE_TMATRIX)
+  enable_language(Fortran)
+endif()
 option (ENABLE_PYARTS_STUBS "Turn on python stub generation for pyarts library" ON)
 option (ENABLE_EXAMPLE_PLOTS "Generate plots for examples in sphinx docs" OFF)
 option (DISABLE_SHTNS "Turn off SHTns" OFF)
@@ -150,7 +155,11 @@ list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
 
 find_package(nanobind CONFIG REQUIRED)
 
-set(ARTS_PYTHON_INTERPRETER "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python/src" ${Python_EXECUTABLE})
+set(ARTS_PYTHON_INTERPRETER
+    ${CMAKE_COMMAND} -E env
+    "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/python/src"
+    --
+    ${Python_EXECUTABLE})
 
 if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE "RelWithDebInfo")
@@ -550,4 +559,3 @@ if (ENABLE_ASAN)
     message(FATAL_ERROR "Address sanitizer is not supported on this platform")
   endif()
 endif()
-

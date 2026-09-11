@@ -2,7 +2,9 @@ For Developers
 ==============
 
 This section is for ARTS developers.
-It contains design descriptions, development guidelines, and practical tips.
+It covers build configuration, implementation, maintenance, and validation.
+See :doc:`users` for interface guidance and :doc:`concepts` for mathematics
+and physical theory.
 
 Consider it a collection of notes and documentation for developers.
 Each page explains a specific topic in various detail.
@@ -24,3 +26,11 @@ and how to use existing features.
    dev.doc
    dev.xml
    dev.species
+   dev.arts2missing
+   dev.arts2notintended
+
+   dev.tmatrix
+   dev.heating
+   dev.disort
+   dev.surface_emissivity
+   dev.radiative_transfer

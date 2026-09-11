@@ -291,7 +291,7 @@ stokvec dflat_scalar_reflection_dr(stokvec I, const stokvec B) {
 stokvec reflection(stokvec I, const muelmat R, const stokvec B) {
   I      = R * I;
   I.V() *= -1.0;
-  I     += (1.0 - R) * B;
+  I     += (muelmat::id() - R) * B;
   return I;
 }
 

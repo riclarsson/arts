@@ -11,14 +11,21 @@
 
 namespace rtepack {
 struct stokvec final : Vector4 {
-  [[nodiscard]] constexpr stokvec(Numeric i = 0.0, Numeric q = 0.0, Numeric u = 0.0, Numeric v = 0.0)
-      : Vector4{i, q, u, v} {}
+  explicit constexpr stokvec(Numeric i) : Vector4{i, 0., 0., 0.} {}
 
-  constexpr stokvec(std::array<Numeric, 4> data) noexcept : Vector4{data} {}
+  constexpr stokvec() : stokvec{0.0} {}
 
-  constexpr stokvec &operator=(Numeric i) {
-    data = {i, 0., 0., 0.};
-    return *this;
+  constexpr stokvec(Numeric i, Numeric q, Numeric u, Numeric v) : Vector4{i, q, u, v} {}
+
+  template <stdr::forward_range T> requires std::is_convertible_v<stdr::range_value_t<T>, Numeric>
+  explicit constexpr stokvec(const T &input) noexcept : stokvec{} {
+    assert(stdr::size(input) == 4);
+    stdr::copy(input, data.begin());
+  }
+
+  template <stdr::forward_range T> requires std::is_convertible_v<stdr::range_value_t<T>, Numeric>
+  constexpr stokvec &operator=(const T &input) noexcept {
+    return *this = stokvec{input};
   }
 
   [[nodiscard]] constexpr Numeric I() const { return data[0]; }
@@ -31,22 +38,6 @@ struct stokvec final : Vector4 {
   [[nodiscard]] constexpr Numeric &U() { return data[2]; }
   [[nodiscard]] constexpr Numeric &V() { return data[3]; }
 
-  constexpr stokvec &operator+=(const stokvec &b) {
-    I() += b.I();
-    Q() += b.Q();
-    U() += b.U();
-    V() += b.V();
-    return *this;
-  }
-
-  constexpr stokvec &operator-=(const stokvec &b) {
-    I() -= b.I();
-    Q() -= b.Q();
-    U() -= b.U();
-    V() -= b.V();
-    return *this;
-  }
-
   [[nodiscard]] constexpr bool is_zero() const { return I() == 0.0 && Q() == 0.0 && U() == 0.0 && V() == 0.0; }
 
   [[nodiscard]] constexpr bool is_polarized() const { return Q() != 0.0 or U() != 0.0 or V() != 0.0; }
@@ -57,6 +48,31 @@ struct stokvec final : Vector4 {
   }
 
   constexpr stokvec operator-() const { return stokvec{-data[0], -data[1], -data[2], -data[3]}; }
+
+  constexpr stokvec &operator+=(const stokvec &b) {
+    for (Size i = 0; i < 4; ++i) { data[i] += b.data[i]; }
+    return *this;
+  }
+
+  constexpr stokvec &operator-=(const stokvec &b) {
+    for (Size i = 0; i < 4; ++i) { data[i] -= b.data[i]; }
+    return *this;
+  }
+
+  constexpr stokvec &operator/=(const Numeric &b) {
+    for (auto &x : data) { x /= b; }
+    return *this;
+  }
+
+  constexpr stokvec &operator*=(const Numeric &b) {
+    for (auto &x : data) { x *= b; }
+    return *this;
+  }
+
+  constexpr stokvec &operator*=(const stokvec &b) {
+    for (Size i = 0; i < 4; ++i) { data[i] *= b.data[i]; }
+    return *this;
+  }
 };
 
 constexpr stokvec to_stokvec(PolarizationChoice p) {
@@ -76,35 +92,11 @@ constexpr stokvec to_stokvec(PolarizationChoice p) {
   std::unreachable();
 }
 
-//! Addition of two stokvec vectors
-constexpr stokvec operator+(stokvec a, const stokvec &b) {
-  a += b;
-  return a;
-}
-
-//! Subtraction between two stokvec vectors
-constexpr stokvec operator-(stokvec a, const stokvec &b) {
-  a -= b;
-  return a;
-}
-
-//! Scaling a stokvec vector
-constexpr stokvec operator*(const Numeric &a, stokvec b) {
-  b *= a;
-  return b;
-}
-
-//! Scaling a stokvec vector
-constexpr stokvec operator*(stokvec a, const Numeric &b) {
-  a *= b;
-  return a;
-}
-
-//! Scaling a stokvec vector
-constexpr stokvec operator/(stokvec a, const Numeric &b) {
-  a /= b;
-  return a;
-}
+constexpr stokvec operator+(stokvec a, const stokvec &b) { return a += b; }
+constexpr stokvec operator-(stokvec a, const stokvec &b) { return a -= b; }
+constexpr stokvec operator*(const Numeric &a, stokvec b) { return b *= a; }
+constexpr stokvec operator*(stokvec a, const Numeric &b) { return a *= b; }
+constexpr stokvec operator/(stokvec a, const Numeric &b) { return a /= b; }
 
 constexpr stokvec fma(const Numeric &x, const stokvec &a, const stokvec &b) {
   return {std::fma(x, a.I(), b.I()), std::fma(x, a.Q(), b.Q()), std::fma(x, a.U(), b.U()), std::fma(x, a.V(), b.V())};

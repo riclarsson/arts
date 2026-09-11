@@ -24,6 +24,12 @@ target_include_directories(test_absorption_vector PRIVATE ${ARTS_SOURCE_DIR}/src
 add_test(NAME "cpp.fast.scattering.test_absorption_vector" COMMAND test_absorption_vector)
 add_dependencies(check-deps test_absorption_vector)
 
+add_executable(test_gas_scattering test_gas_scattering.cc)
+target_link_libraries(test_gas_scattering scattering)
+target_include_directories(test_gas_scattering PRIVATE ${ARTS_SOURCE_DIR}/src/core ${CMAKE_CURRENT_BINARY_DIR})
+add_test(NAME "cpp.fast.scattering.test_gas_scattering" COMMAND test_gas_scattering)
+add_dependencies(check-deps test_gas_scattering)
+
 add_executable(test_sht test_sht.cc)
 target_link_libraries(test_sht scattering)
 target_include_directories(test_sht PRIVATE ${ARTS_SOURCE_DIR}/src/core ${CMAKE_CURRENT_BINARY_DIR})

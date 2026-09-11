@@ -240,7 +240,7 @@ template <std::floating_point Scalar, Format format> class BackscatterMatrixData
  public:
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(format);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   BackscatterMatrixData(std::shared_ptr<const Vector> t_grid, std::shared_ptr<const Vector> f_grid)
       : matpack::data_t<Scalar, 3>(t_grid->size(), f_grid->size(), n_stokes_coeffs),
@@ -295,17 +295,19 @@ template <std::floating_point Scalar, Format format> class BackscatterMatrixData
     auto                  coeffs_this = get_const_coeff_vector_view();
     auto                  coeffs_res  = result.get_coeff_vector_view();
     for (Size i_t = 0; i_t < weights.t_grid_weights.size(); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos    gp_t  = weights.t_grid_weights[i_t];
+      Numeric    w_t_l = gp_t.fd[1];
+      Numeric    w_t_r = gp_t.fd[0];
+      const auto i_t_l = std::clamp<Index>(gp_t.idx, 0, n_temps_ - 1);
+      const auto i_t_r = std::min(i_t_l + 1, n_temps_ - 1);
       for (Size i_f = 0; i_f < weights.f_grid_weights.size(); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
-        coeffs_res[i_t, i_f] =
-            (w_t_l * w_f_l * coeffs_this[gp_t.idx, gp_f.idx] + w_t_l * w_f_r * coeffs_this[gp_t.idx, gp_f.idx + 1] +
-             w_t_r * w_f_l * coeffs_this[gp_t.idx + 1, gp_f.idx] +
-             w_t_r * w_f_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1]);
+        GridPos    gp_f      = weights.f_grid_weights[i_f];
+        Numeric    w_f_l     = gp_f.fd[1];
+        Numeric    w_f_r     = gp_f.fd[0];
+        const auto i_f_l     = std::clamp<Index>(gp_f.idx, 0, n_freqs_ - 1);
+        const auto i_f_r     = std::min(i_f_l + 1, n_freqs_ - 1);
+        coeffs_res[i_t, i_f] = (w_t_l * w_f_l * coeffs_this[i_t_l, i_f_l] + w_t_l * w_f_r * coeffs_this[i_t_l, i_f_r] +
+                                w_t_r * w_f_l * coeffs_this[i_t_r, i_f_l] + w_t_r * w_f_r * coeffs_this[i_t_r, i_f_r]);
       }
     }
     return result;
@@ -334,7 +336,7 @@ template <std::floating_point Scalar> class BackscatterMatrixData<Scalar, Format
  public:
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(Format::ARO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   BackscatterMatrixData(std::shared_ptr<const Vector> t_grid,
                         std::shared_ptr<const Vector> f_grid,
@@ -359,7 +361,15 @@ template <std::floating_point Scalar> class BackscatterMatrixData<Scalar, Format
         f_grid_(bsmat.get_f_grid_ptr()),
         n_za_inc_(za_inc_grid->size()),
         za_inc_grid_(za_inc_grid) {
-    for (Index ind = 0; ind < n_za_inc_; ++ind) { matpack::data_t<Scalar, 4>::operator[](ind) = bsmat; }
+    for (Index i_t = 0; i_t < n_temps_; ++i_t) {
+      for (Index i_f = 0; i_f < n_freqs_; ++i_f) {
+        for (Index i_za = 0; i_za < n_za_inc_; ++i_za) {
+          for (Index i_s = 0; i_s < n_stokes_coeffs; ++i_s) {
+            this->operator[](i_t, i_f, i_za, i_s) = bsmat[i_t, i_f, i_s];
+          }
+        }
+      }
+    }
   }
 
   constexpr matpack::view_t<CoeffVector, 3> get_coeff_vector_view() {
@@ -407,28 +417,31 @@ template <std::floating_point Scalar> class BackscatterMatrixData<Scalar, Format
     auto                  coeffs_this = get_const_coeff_vector_view();
     auto                  coeffs_res  = result.get_coeff_vector_view();
     for (Size i_t = 0; i_t < weights.t_grid_weights.size(); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t    = weights.t_grid_weights[i_t];
+      const Index t_upper = std::min<Index>(gp_t.idx + 1, coeffs_this.extent(0) - 1);
+      Numeric     w_t_l   = gp_t.fd[1];
+      Numeric     w_t_r   = gp_t.fd[0];
       for (Size i_f = 0; i_f < weights.f_grid_weights.size(); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
+        GridPos     gp_f    = weights.f_grid_weights[i_f];
+        const Index f_upper = std::min<Index>(gp_f.idx + 1, coeffs_this.extent(1) - 1);
+        Numeric     w_f_l   = gp_f.fd[1];
+        Numeric     w_f_r   = gp_f.fd[0];
         for (Size i_za_inc = 0; i_za_inc < weights.za_inc_grid_weights.size(); ++i_za_inc) {
-          GridPos gp_za_inc  = weights.za_inc_grid_weights[i_za_inc];
-          Numeric w_za_inc_l = gp_za_inc.fd[1];
-          Numeric w_za_inc_r = gp_za_inc.fd[0];
+          GridPos     gp_za_inc    = weights.za_inc_grid_weights[i_za_inc];
+          const Index za_inc_upper = std::min<Index>(gp_za_inc.idx + 1, coeffs_this.extent(2) - 1);
+          Numeric     w_za_inc_l   = gp_za_inc.fd[1];
+          Numeric     w_za_inc_r   = gp_za_inc.fd[0];
           for (Index i_s = 0; i_s < n_stokes_coeffs; ++i_s) {
             coeffs_res[i_t, i_f, i_za_inc] =
                 (w_t_l * w_f_l * w_za_inc_l * coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx] +
-                 w_t_l * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx + 1] +
-                 w_t_l * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx] +
-                 w_t_l * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx + 1] +
+                 w_t_l * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx, za_inc_upper] +
+                 w_t_l * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx, f_upper, gp_za_inc.idx] +
+                 w_t_l * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx, f_upper, za_inc_upper] +
 
-                 w_t_r * w_f_l * w_za_inc_l * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx] +
-                 w_t_r * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx + 1] +
-                 w_t_r * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx] +
-                 w_t_r * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx + 1]);
+                 w_t_r * w_f_l * w_za_inc_l * coeffs_this[t_upper, gp_f.idx, gp_za_inc.idx] +
+                 w_t_r * w_f_l * w_za_inc_r * coeffs_this[t_upper, gp_f.idx, za_inc_upper] +
+                 w_t_r * w_f_r * w_za_inc_l * coeffs_this[t_upper, f_upper, gp_za_inc.idx] +
+                 w_t_r * w_f_r * w_za_inc_r * coeffs_this[t_upper, f_upper, za_inc_upper]);
           }
         }
       }
@@ -483,7 +496,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::TRO,
 
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(Format::TRO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   using matpack::data_t<Scalar, 4>::operator[];
 
@@ -611,23 +624,42 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::TRO,
     PhaseMatrixDataLabFrame result(t_grid_, f_grid_, za_inc_grid, delta_aa_grid, za_scat_grid_new);
 
     for (Size i_za_inc = 0; i_za_inc < za_inc_grid->size(); ++i_za_inc) {
-      GridPos angle_interp;
       for (Size i_delta_aa = 0; i_delta_aa < delta_aa_grid->size(); ++i_delta_aa) {
         for (Index i_za_scat = 0; i_za_scat < grid_size(*za_scat_grid_new); ++i_za_scat) {
           std::array<Scalar, 5> coeffs = detail::rotation_coefficients(
               0.0, (*za_inc_grid)[i_za_inc], (*delta_aa_grid)[i_delta_aa], grid_vector(*za_scat_grid_new)[i_za_scat]);
 
           // On the fly interpolation of stokes components and expansion.
-          Scalar scat_angle = Conversion::rad2deg(std::get<0>(coeffs));
-          gridpos(angle_interp, grid_vector(*za_scat_grid_), scat_angle, 1e99);
+          Scalar     scat_angle    = Conversion::rad2deg(std::get<0>(coeffs));
+          const auto source_angles = grid_vector(*za_scat_grid_);
+          Index      angle0;
+          Index      angle1;
+          Scalar     weight0;
+          Scalar     weight1;
+          if (n_za_scat_ == 1 or scat_angle <= source_angles.front()) {
+            angle0 = angle1 = 0;
+            weight0         = 1.0;
+            weight1         = 0.0;
+          } else if (scat_angle >= source_angles.back()) {
+            angle0 = angle1 = n_za_scat_ - 1;
+            weight0         = 1.0;
+            weight1         = 0.0;
+          } else {
+            const auto upper = std::ranges::upper_bound(source_angles, scat_angle);
+            angle1           = static_cast<Index>(upper - source_angles.begin());
+            angle0           = angle1 - 1;
+            weight1          = (scat_angle - source_angles[angle0]) / (source_angles[angle1] - source_angles[angle0]);
+            weight0          = 1.0 - weight1;
+          }
 
           Tensor3 scat_mat_interpd(n_temps_, n_freqs_, 4);
           Vector  pm_comps(n_stokes_coeffs);
           for (Index i_t = 0; i_t < n_temps_; ++i_t) {
             for (Index i_f = 0; i_f < n_freqs_; ++i_f) {
               for (Index i_s = 0; i_s < n_stokes_coeffs; ++i_s) {
-                pm_comps[i_s] = (angle_interp.fd[1] * this->operator[](i_t, i_f, angle_interp.idx, i_s) +
-                                 angle_interp.fd[0] * this->operator[](i_t, i_f, angle_interp.idx + 1, i_s));
+                pm_comps[i_s] = 0.0;
+                if (weight0 > 0.0) pm_comps[i_s] += weight0 * this->operator[](i_t, i_f, angle0, i_s);
+                if (weight1 > 0.0) pm_comps[i_s] += weight1 * this->operator[](i_t, i_f, angle1, i_s);
               }
               detail::expand_and_transform<Scalar>(result[i_t, i_f, i_za_inc, i_delta_aa, i_za_scat, joker],
                                                    pm_comps,
@@ -730,46 +762,44 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::TRO,
     auto            coeffs_this = get_const_coeff_vector_view();
     auto            coeffs_res  = result.get_coeff_vector_view();
     for (Index i_t = 0; i_t < static_cast<Index>(weights.t_grid_weights.size()); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t  = weights.t_grid_weights[i_t];
+      Numeric     w_t_l = gp_t.fd[1];
+      Numeric     w_t_r = gp_t.fd[0];
+      const Index it0   = std::clamp<Index>(gp_t.idx, 0, n_temps_ - 1);
+      const Index it1   = std::min(it0 + 1, n_temps_ - 1);
       for (Index i_f = 0; i_f < static_cast<Index>(weights.f_grid_weights.size()); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
+        GridPos     gp_f  = weights.f_grid_weights[i_f];
+        Numeric     w_f_l = gp_f.fd[1];
+        Numeric     w_f_r = gp_f.fd[0];
+        const Index if0   = std::clamp<Index>(gp_f.idx, 0, n_freqs_ - 1);
+        const Index if1   = std::min(if0 + 1, n_freqs_ - 1);
         for (Index i_za_scat = 0; i_za_scat < static_cast<Index>(weights.za_scat_grid_weights.size()); ++i_za_scat) {
-          GridPos gp_za_scat  = weights.za_scat_grid_weights[i_za_scat];
-          Numeric w_za_scat_l = gp_za_scat.fd[1];
-          Numeric w_za_scat_r = gp_za_scat.fd[0];
+          GridPos     gp_za_scat  = weights.za_scat_grid_weights[i_za_scat];
+          Numeric     w_za_scat_l = gp_za_scat.fd[1];
+          Numeric     w_za_scat_r = gp_za_scat.fd[0];
+          const Index iza0        = std::clamp<Index>(gp_za_scat.idx, 0, n_za_scat_ - 1);
+          const Index iza1        = std::min(iza0 + 1, n_za_scat_ - 1);
 
-          coeffs_res[i_t, i_f, i_za_scat].setZero();
+          coeffs_res[i_t, i_f, i_za_scat] = CoeffVector{};
 
           if (w_t_l > 0.0) {
             if (w_f_l > 0.0) {
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_l * w_f_l * w_za_scat_l * coeffs_this[gp_t.idx, gp_f.idx, gp_za_scat.idx];
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_l * w_f_l * w_za_scat_r * coeffs_this[gp_t.idx, gp_f.idx, gp_za_scat.idx + 1];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_l * w_f_l * w_za_scat_l * coeffs_this[it0, if0, iza0];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_l * w_f_l * w_za_scat_r * coeffs_this[it0, if0, iza1];
             }
             if (w_f_r > 0.0) {
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_l * w_f_r * w_za_scat_l * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_scat.idx];
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_l * w_f_r * w_za_scat_r * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_scat.idx + 1];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_l * w_f_r * w_za_scat_l * coeffs_this[it0, if1, iza0];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_l * w_f_r * w_za_scat_r * coeffs_this[it0, if1, iza1];
             }
           }
           if (w_t_r > 0.0) {
             if (w_f_l > 0.0) {
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_r * w_f_l * w_za_scat_l * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_scat.idx];
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_r * w_f_l * w_za_scat_r * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_scat.idx + 1];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_r * w_f_l * w_za_scat_l * coeffs_this[it1, if0, iza0];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_r * w_f_l * w_za_scat_r * coeffs_this[it1, if0, iza1];
             }
             if (w_f_r > 0.0) {
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_r * w_f_r * w_za_scat_l * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_scat.idx];
-              coeffs_res[i_t, i_f, i_za_scat] +=
-                  w_t_r * w_f_r * w_za_scat_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_scat.idx + 1];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_r * w_f_r * w_za_scat_l * coeffs_this[it1, if1, iza0];
+              coeffs_res[i_t, i_f, i_za_scat] += w_t_r * w_f_r * w_za_scat_r * coeffs_this[it1, if1, iza1];
             }
           }
         }
@@ -818,7 +848,7 @@ template <std::floating_point Scalar, Representation repr> class PhaseMatrixData
 
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs              = detail::get_n_mat_elems(Format::TRO);
-  using CoeffVector                                   = Eigen::Matrix<std::complex<Scalar>, 1, n_stokes_coeffs>;
+  using CoeffVector                                   = matpack::cdata_t<std::complex<Scalar>, n_stokes_coeffs>;
   PhaseMatrixData()                                   = default;
   PhaseMatrixData(const PhaseMatrixData &)            = default;
   PhaseMatrixData(PhaseMatrixData &&)                 = default;
@@ -1026,15 +1056,17 @@ template <std::floating_point Scalar, Representation repr> class PhaseMatrixData
     auto            coeffs_this = get_const_coeff_vector_view();
     auto            coeffs_res  = result.get_coeff_vector_view();
     for (Size i_t = 0; i_t < weights.t_grid_weights.size(); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t    = weights.t_grid_weights[i_t];
+      const Index t_upper = std::min<Index>(gp_t.idx + 1, coeffs_this.extent(0) - 1);
+      Numeric     w_t_l   = gp_t.fd[1];
+      Numeric     w_t_r   = gp_t.fd[0];
       for (Size i_f = 0; i_f < weights.f_grid_weights.size(); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
+        GridPos     gp_f    = weights.f_grid_weights[i_f];
+        const Index f_upper = std::min<Index>(gp_f.idx + 1, coeffs_this.extent(1) - 1);
+        Numeric     w_f_l   = gp_f.fd[1];
+        Numeric     w_f_r   = gp_f.fd[0];
 
-        for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) { coeffs_res[i_t, i_f, i_sht].setZero(); }
+        for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) { coeffs_res[i_t, i_f, i_sht] = CoeffVector{}; }
 
         if (w_t_l > 0.0) {
           if (w_f_l > 0.0) {
@@ -1044,19 +1076,19 @@ template <std::floating_point Scalar, Representation repr> class PhaseMatrixData
           }
           if (w_f_r > 0.0) {
             for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) {
-              coeffs_res[i_t, i_f, i_sht] += w_t_l * w_f_r * coeffs_this[gp_t.idx, gp_f.idx + 1, i_sht];
+              coeffs_res[i_t, i_f, i_sht] += w_t_l * w_f_r * coeffs_this[gp_t.idx, f_upper, i_sht];
             }
           }
         }
         if (w_t_r > 0.0) {
           if (w_f_l > 0.0) {
             for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) {
-              coeffs_res[i_t, i_f, i_sht] += w_t_r * w_f_l * coeffs_this[gp_t.idx + 1, gp_f.idx, i_sht];
+              coeffs_res[i_t, i_f, i_sht] += w_t_r * w_f_l * coeffs_this[t_upper, gp_f.idx, i_sht];
             }
           }
           if (w_f_r > 0.0) {
             for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) {
-              coeffs_res[i_t, i_f, i_sht] += w_t_r * w_f_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, i_sht];
+              coeffs_res[i_t, i_f, i_sht] += w_t_r * w_f_r * coeffs_this[t_upper, f_upper, i_sht];
             }
           }
         }
@@ -1105,7 +1137,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
 
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(Format::ARO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   PhaseMatrixData()                                   = default;
   PhaseMatrixData(const PhaseMatrixData &)            = default;
@@ -1166,6 +1198,12 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
         reinterpret_cast<const CoeffVector *>(this->data_handle()),
         std::array<Index, 5>{this->extent(0), this->extent(1), this->extent(2), this->extent(3), this->extent(4)})};
   }
+
+  std::shared_ptr<const Vector>          get_t_grid() const { return t_grid_; }
+  std::shared_ptr<const Vector>          get_f_grid() const { return f_grid_; }
+  std::shared_ptr<const Vector>          get_za_inc_grid() const { return za_inc_grid_; }
+  std::shared_ptr<const Vector>          get_delta_aa_grid() const { return delta_aa_grid_; }
+  std::shared_ptr<const ZenithAngleGrid> get_za_scat_grid() const { return za_scat_grid_; }
 
   PhaseMatrixData &operator=(const matpack::data_t<Scalar, 6> &data) {
     ARTS_USER_ERROR_IF(data.shape()[0] != n_temps_,
@@ -1295,27 +1333,32 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
     auto            coeffs_res  = result.get_coeff_vector_view();
 
     for (Size i_t = 0; i_t < weights.t_grid_weights.size(); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t    = weights.t_grid_weights[i_t];
+      const Index t_upper = std::min<Index>(gp_t.idx + 1, coeffs_this.extent(0) - 1);
+      Numeric     w_t_l   = gp_t.fd[1];
+      Numeric     w_t_r   = gp_t.fd[0];
       for (Size i_f = 0; i_f < weights.f_grid_weights.size(); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
+        GridPos     gp_f    = weights.f_grid_weights[i_f];
+        const Index f_upper = std::min<Index>(gp_f.idx + 1, coeffs_this.extent(1) - 1);
+        Numeric     w_f_l   = gp_f.fd[1];
+        Numeric     w_f_r   = gp_f.fd[0];
         for (Size i_za_inc = 0; i_za_inc < weights.za_inc_grid_weights.size(); ++i_za_inc) {
-          GridPos gp_za_inc  = weights.za_inc_grid_weights[i_za_inc];
-          Numeric w_za_inc_l = gp_za_inc.fd[1];
-          Numeric w_za_inc_r = gp_za_inc.fd[0];
+          GridPos     gp_za_inc    = weights.za_inc_grid_weights[i_za_inc];
+          const Index za_inc_upper = std::min<Index>(gp_za_inc.idx + 1, coeffs_this.extent(2) - 1);
+          Numeric     w_za_inc_l   = gp_za_inc.fd[1];
+          Numeric     w_za_inc_r   = gp_za_inc.fd[0];
           for (Size i_aa_scat = 0; i_aa_scat < weights.aa_scat_grid_weights.size(); ++i_aa_scat) {
-            GridPos gp_aa_scat  = weights.aa_scat_grid_weights[i_aa_scat];
-            Numeric w_aa_scat_l = gp_aa_scat.fd[1];
-            Numeric w_aa_scat_r = gp_aa_scat.fd[0];
+            GridPos     gp_aa_scat    = weights.aa_scat_grid_weights[i_aa_scat];
+            const Index aa_scat_upper = std::min<Index>(gp_aa_scat.idx + 1, coeffs_this.extent(3) - 1);
+            Numeric     w_aa_scat_l   = gp_aa_scat.fd[1];
+            Numeric     w_aa_scat_r   = gp_aa_scat.fd[0];
             for (Size i_za_scat = 0; i_za_scat < weights.za_scat_grid_weights.size(); ++i_za_scat) {
-              GridPos gp_za_scat  = weights.za_scat_grid_weights[i_za_scat];
-              Numeric w_za_scat_l = gp_za_scat.fd[1];
-              Numeric w_za_scat_r = gp_za_scat.fd[0];
+              GridPos     gp_za_scat    = weights.za_scat_grid_weights[i_za_scat];
+              const Index za_scat_upper = std::min<Index>(gp_za_scat.idx + 1, coeffs_this.extent(4) - 1);
+              Numeric     w_za_scat_l   = gp_za_scat.fd[1];
+              Numeric     w_za_scat_r   = gp_za_scat.fd[0];
 
-              coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat].setZero();
+              coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] = CoeffVector{};
 
               if (w_t_l > 0.0) {
                 if (w_f_l > 0.0) {
@@ -1324,110 +1367,109 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
                       coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_l * w_za_inc_l * w_aa_scat_l * w_za_scat_r *
-                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx + 1];
+                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx, za_scat_upper];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_l * w_za_inc_l * w_aa_scat_r * w_za_scat_l *
-                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx + 1, gp_za_scat.idx];
+                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx, aa_scat_upper, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_l * w_za_inc_l * w_aa_scat_r * w_za_scat_r *
-                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx + 1, gp_za_scat.idx + 1];
+                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx, aa_scat_upper, za_scat_upper];
 
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_l * w_za_inc_r * w_aa_scat_l * w_za_scat_l *
-                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx + 1, gp_aa_scat.idx, gp_za_scat.idx];
+                      coeffs_this[gp_t.idx, gp_f.idx, za_inc_upper, gp_aa_scat.idx, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_l * w_za_inc_r * w_aa_scat_l * w_za_scat_r *
-                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx + 1, gp_aa_scat.idx, gp_za_scat.idx + 1];
+                      coeffs_this[gp_t.idx, gp_f.idx, za_inc_upper, gp_aa_scat.idx, za_scat_upper];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_l * w_za_inc_r * w_aa_scat_r * w_za_scat_l *
-                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx + 1, gp_aa_scat.idx + 1, gp_za_scat.idx];
+                      coeffs_this[gp_t.idx, gp_f.idx, za_inc_upper, aa_scat_upper, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_l * w_za_inc_r * w_aa_scat_r * w_za_scat_r *
-                      coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx + 1, gp_aa_scat.idx + 1, gp_za_scat.idx + 1];
+                      coeffs_this[gp_t.idx, gp_f.idx, za_inc_upper, aa_scat_upper, za_scat_upper];
                 }
                 if (w_f_r > 0.0) {
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_r * w_za_inc_l * w_aa_scat_l * w_za_scat_l *
-                      coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx];
+                      coeffs_this[gp_t.idx, f_upper, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_r * w_za_inc_l * w_aa_scat_l * w_za_scat_r *
-                      coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx + 1];
+                      coeffs_this[gp_t.idx, f_upper, gp_za_inc.idx, gp_aa_scat.idx, za_scat_upper];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_r * w_za_inc_l * w_aa_scat_r * w_za_scat_l *
-                      coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx, gp_aa_scat.idx + 1, gp_za_scat.idx];
+                      coeffs_this[gp_t.idx, f_upper, gp_za_inc.idx, aa_scat_upper, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_r * w_za_inc_l * w_aa_scat_r * w_za_scat_r *
-                      coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx, gp_aa_scat.idx + 1, gp_za_scat.idx + 1];
+                      coeffs_this[gp_t.idx, f_upper, gp_za_inc.idx, aa_scat_upper, za_scat_upper];
 
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_r * w_za_inc_r * w_aa_scat_l * w_za_scat_l *
-                      coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx + 1, gp_aa_scat.idx, gp_za_scat.idx];
+                      coeffs_this[gp_t.idx, f_upper, za_inc_upper, gp_aa_scat.idx, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_r * w_za_inc_r * w_aa_scat_l * w_za_scat_r *
-                      coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx + 1, gp_aa_scat.idx, gp_za_scat.idx + 1];
+                      coeffs_this[gp_t.idx, f_upper, za_inc_upper, gp_aa_scat.idx, za_scat_upper];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_r * w_za_inc_r * w_aa_scat_r * w_za_scat_l *
-                      coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx + 1, gp_aa_scat.idx + 1, gp_za_scat.idx];
+                      coeffs_this[gp_t.idx, f_upper, za_inc_upper, aa_scat_upper, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_l * w_f_r * w_za_inc_r * w_aa_scat_r * w_za_scat_r *
-                      coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx + 1, gp_aa_scat.idx + 1, gp_za_scat.idx + 1];
+                      coeffs_this[gp_t.idx, f_upper, za_inc_upper, aa_scat_upper, za_scat_upper];
                 }
               }
               if (w_t_r > 0.0) {
                 if (w_f_l > 0.0) {
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_l * w_za_inc_l * w_aa_scat_l * w_za_scat_l *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx];
+                      coeffs_this[t_upper, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_l * w_za_inc_l * w_aa_scat_l * w_za_scat_r *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx + 1];
+                      coeffs_this[t_upper, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx, za_scat_upper];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_l * w_za_inc_l * w_aa_scat_r * w_za_scat_l *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx + 1, gp_za_scat.idx];
+                      coeffs_this[t_upper, gp_f.idx, gp_za_inc.idx, aa_scat_upper, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_l * w_za_inc_l * w_aa_scat_r * w_za_scat_r *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx, gp_aa_scat.idx + 1, gp_za_scat.idx + 1];
+                      coeffs_this[t_upper, gp_f.idx, gp_za_inc.idx, aa_scat_upper, za_scat_upper];
 
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_l * w_za_inc_r * w_aa_scat_l * w_za_scat_l *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx + 1, gp_aa_scat.idx, gp_za_scat.idx];
+                      coeffs_this[t_upper, gp_f.idx, za_inc_upper, gp_aa_scat.idx, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_l * w_za_inc_r * w_aa_scat_l * w_za_scat_r *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx + 1, gp_aa_scat.idx, gp_za_scat.idx + 1];
+                      coeffs_this[t_upper, gp_f.idx, za_inc_upper, gp_aa_scat.idx, za_scat_upper];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_l * w_za_inc_r * w_aa_scat_r * w_za_scat_l *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx + 1, gp_aa_scat.idx + 1, gp_za_scat.idx];
+                      coeffs_this[t_upper, gp_f.idx, za_inc_upper, aa_scat_upper, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_l * w_za_inc_r * w_aa_scat_r * w_za_scat_r *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx + 1, gp_aa_scat.idx + 1, gp_za_scat.idx + 1];
+                      coeffs_this[t_upper, gp_f.idx, za_inc_upper, aa_scat_upper, za_scat_upper];
                 }
                 if (w_f_r > 0.0) {
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_r * w_za_inc_l * w_aa_scat_l * w_za_scat_l *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx];
+                      coeffs_this[t_upper, f_upper, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_r * w_za_inc_l * w_aa_scat_l * w_za_scat_r *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx, gp_aa_scat.idx, gp_za_scat.idx + 1];
+                      coeffs_this[t_upper, f_upper, gp_za_inc.idx, gp_aa_scat.idx, za_scat_upper];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_r * w_za_inc_l * w_aa_scat_r * w_za_scat_l *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx, gp_aa_scat.idx + 1, gp_za_scat.idx];
+                      coeffs_this[t_upper, f_upper, gp_za_inc.idx, aa_scat_upper, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_r * w_za_inc_l * w_aa_scat_r * w_za_scat_r *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx, gp_aa_scat.idx + 1, gp_za_scat.idx + 1];
+                      coeffs_this[t_upper, f_upper, gp_za_inc.idx, aa_scat_upper, za_scat_upper];
 
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_r * w_za_inc_r * w_aa_scat_l * w_za_scat_l *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx + 1, gp_aa_scat.idx, gp_za_scat.idx];
+                      coeffs_this[t_upper, f_upper, za_inc_upper, gp_aa_scat.idx, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_r * w_za_inc_r * w_aa_scat_l * w_za_scat_r *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx + 1, gp_aa_scat.idx, gp_za_scat.idx + 1];
+                      coeffs_this[t_upper, f_upper, za_inc_upper, gp_aa_scat.idx, za_scat_upper];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_r * w_za_inc_r * w_aa_scat_r * w_za_scat_l *
-                      coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx + 1, gp_aa_scat.idx + 1, gp_za_scat.idx];
+                      coeffs_this[t_upper, f_upper, za_inc_upper, aa_scat_upper, gp_za_scat.idx];
                   coeffs_res[i_t, i_f, i_za_inc, i_aa_scat, i_za_scat] +=
                       w_t_r * w_f_r * w_za_inc_r * w_aa_scat_r * w_za_scat_r *
-                      coeffs_this
-                          [gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx + 1, gp_aa_scat.idx + 1, gp_za_scat.idx + 1];
+                      coeffs_this[t_upper, f_upper, za_inc_upper, aa_scat_upper, za_scat_upper];
                 }
               }
             }
@@ -1484,7 +1526,7 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
 
   /// The number of stokes coefficients.
   static constexpr Index n_stokes_coeffs = detail::get_n_mat_elems(Format::ARO);
-  using CoeffVector                      = Eigen::Matrix<std::complex<Scalar>, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<std::complex<Scalar>, n_stokes_coeffs>;
 
   PhaseMatrixData()                                   = default;
   PhaseMatrixData(const PhaseMatrixData &)            = default;
@@ -1675,20 +1717,23 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
     auto            coeffs_res  = result.get_coeff_vector_view();
 
     for (Size i_t = 0; i_t < weights.t_grid_weights.size(); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t    = weights.t_grid_weights[i_t];
+      const Index t_upper = std::min<Index>(gp_t.idx + 1, coeffs_this.extent(0) - 1);
+      Numeric     w_t_l   = gp_t.fd[1];
+      Numeric     w_t_r   = gp_t.fd[0];
       for (Size i_f = 0; i_f < weights.f_grid_weights.size(); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
+        GridPos     gp_f    = weights.f_grid_weights[i_f];
+        const Index f_upper = std::min<Index>(gp_f.idx + 1, coeffs_this.extent(1) - 1);
+        Numeric     w_f_l   = gp_f.fd[1];
+        Numeric     w_f_r   = gp_f.fd[0];
         for (Size i_za_inc = 0; i_za_inc < weights.za_inc_grid_weights.size(); ++i_za_inc) {
-          GridPos gp_za_inc  = weights.za_inc_grid_weights[i_za_inc];
-          Numeric w_za_inc_l = gp_za_inc.fd[1];
-          Numeric w_za_inc_r = gp_za_inc.fd[0];
+          GridPos     gp_za_inc    = weights.za_inc_grid_weights[i_za_inc];
+          const Index za_inc_upper = std::min<Index>(gp_za_inc.idx + 1, coeffs_this.extent(2) - 1);
+          Numeric     w_za_inc_l   = gp_za_inc.fd[1];
+          Numeric     w_za_inc_r   = gp_za_inc.fd[0];
 
           for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) {
-            coeffs_res[i_t, i_f, i_za_inc, i_sht].setZero();
+            coeffs_res[i_t, i_f, i_za_inc, i_sht] = CoeffVector{};
           }
 
           if (w_t_l > 0.0) {
@@ -1697,15 +1742,15 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
                 coeffs_res[i_t, i_f, i_za_inc, i_sht] +=
                     w_t_l * w_f_l * w_za_inc_l * coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx, i_sht];
                 coeffs_res[i_t, i_f, i_za_inc, i_sht] +=
-                    w_t_l * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx + 1, i_sht];
+                    w_t_l * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx, za_inc_upper, i_sht];
               }
             }
             if (w_f_r > 0.0) {
               for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) {
                 coeffs_res[i_t, i_f, i_za_inc, i_sht] +=
-                    w_t_l * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx, i_sht];
+                    w_t_l * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx, f_upper, gp_za_inc.idx, i_sht];
                 coeffs_res[i_t, i_f, i_za_inc, i_sht] +=
-                    w_t_l * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx + 1, i_sht];
+                    w_t_l * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx, f_upper, za_inc_upper, i_sht];
               }
             }
           }
@@ -1713,17 +1758,17 @@ template <std::floating_point Scalar> class PhaseMatrixData<Scalar, Format::ARO,
             if (w_f_l > 0.0) {
               for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) {
                 coeffs_res[i_t, i_f, i_za_inc, i_sht] +=
-                    w_t_r * w_f_l * w_za_inc_l * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx, i_sht];
+                    w_t_r * w_f_l * w_za_inc_l * coeffs_this[t_upper, gp_f.idx, gp_za_inc.idx, i_sht];
                 coeffs_res[i_t, i_f, i_za_inc, i_sht] +=
-                    w_t_r * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx + 1, i_sht];
+                    w_t_r * w_f_l * w_za_inc_r * coeffs_this[t_upper, gp_f.idx, za_inc_upper, i_sht];
               }
             }
             if (w_f_r > 0.0) {
               for (Index i_sht = 0; i_sht < n_spectral_coeffs_; ++i_sht) {
                 coeffs_res[i_t, i_f, i_za_inc, i_sht] +=
-                    w_t_r * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx, i_sht];
+                    w_t_r * w_f_r * w_za_inc_l * coeffs_this[t_upper, f_upper, gp_za_inc.idx, i_sht];
                 coeffs_res[i_t, i_f, i_za_inc, i_sht] +=
-                    w_t_r * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx + 1, i_sht];
+                    w_t_r * w_f_r * w_za_inc_r * coeffs_this[t_upper, f_upper, za_inc_upper, i_sht];
               }
             }
           }

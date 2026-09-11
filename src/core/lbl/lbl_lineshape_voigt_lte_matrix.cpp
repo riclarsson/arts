@@ -426,7 +426,7 @@ void prepare_g0_deriv(MatrixView&                            mat,
 
       auto&         line = lines[target.type.line];
       const Size    nz   = line.z.size(line.qn, pol);
-      const Numeric dG0  = line.ls.dG0_dX(atm, target.type.band.isot.spec, target.type.ls_coeff);
+      const Numeric dG0  = line.ls.dG0_dX(atm, target.type.spec, target.type.ls_coeff);
 
       for (Size iz = 0; iz < nz; ++iz) {
         auto v  = mat[idx + iz];
@@ -456,7 +456,7 @@ void prepare_d0_deriv(MatrixView&                            mat,
       auto&         line = lines[target.type.line];
       const Size    nz   = line.z.size(line.qn, pol);
       const Numeric G0   = line.ls.G0(atm);
-      const Numeric dD0  = line.ls.dD0_dX(atm, target.type.band.isot.spec, target.type.ls_coeff);
+      const Numeric dD0  = line.ls.dD0_dX(atm, target.type.spec, target.type.ls_coeff);
 
       for (Size iz = 0; iz < nz; ++iz) {
         auto v  = mat[idx + iz];
@@ -464,6 +464,8 @@ void prepare_d0_deriv(MatrixView&                            mat,
         dv[0]   = dD0;
         dv[1]   = -v[1] * dv[0] / v[0];
         dv[2]   = G0 * dv[1];
+        dv[3]   = v[3] * dv[1] / v[1];
+        dv[4]   = v[4] * dv[1] / v[1];
       }
 
       return;
@@ -488,7 +490,7 @@ void prepare_dv_deriv(MatrixView&                            mat,
       auto&         line = lines[target.type.line];
       const Size    nz   = line.z.size(line.qn, pol);
       const Numeric G0   = line.ls.G0(atm);
-      const Numeric dDV  = line.ls.dDV_dX(atm, target.type.band.isot.spec, target.type.ls_coeff);
+      const Numeric dDV  = line.ls.dDV_dX(atm, target.type.spec, target.type.ls_coeff);
 
       for (Size iz = 0; iz < nz; ++iz) {
         auto v  = mat[idx + iz];
@@ -496,6 +498,8 @@ void prepare_dv_deriv(MatrixView&                            mat,
         dv[0]   = dDV;
         dv[1]   = -v[1] * dv[0] / v[0];
         dv[2]   = G0 * dv[1];
+        dv[3]   = v[3] * dv[1] / v[1];
+        dv[4]   = v[4] * dv[1] / v[1];
       }
 
       return;
@@ -525,12 +529,14 @@ void prepare_y_deriv(MatrixView&                            mat,
       auto&         line = lines[target.type.line];
       const Size    nz   = line.z.size(line.qn, pol);
       const Numeric s_   = line.s(T, Q);
+      const Numeric dY   = line.ls.dY_dX(atm, target.type.spec, target.type.ls_coeff);
 
       for (Size iz = 0; iz < nz; ++iz) {
-        auto          dv = mat[idx + iz, range];
+        auto          v  = mat[idx + iz];
+        auto          dv = v[range];
         const Numeric Sz = line.z.Strength(line.qn, pol, iz);
         const Numeric s  = Sz * s_;
-        dv[4]            = -rx * s;
+        dv[4]            = -rx * s * v[1] * dY;
       }
 
       return;
@@ -560,12 +566,14 @@ void prepare_g_deriv(MatrixView&                            mat,
       auto&         line = lines[target.type.line];
       const Size    nz   = line.z.size(line.qn, pol);
       const Numeric s_   = line.s(T, Q);
+      const Numeric dG   = line.ls.dG_dX(atm, target.type.spec, target.type.ls_coeff);
 
       for (Size iz = 0; iz < nz; ++iz) {
-        auto          dv = mat[idx + iz, range];
+        auto          v  = mat[idx + iz];
+        auto          dv = v[range];
         const Numeric Sz = line.z.Strength(line.qn, pol, iz);
         const Numeric s  = Sz * s_;
-        dv[3]            = rx * s;
+        dv[3]            = rx * s * v[1] * dG;
       }
 
       return;
@@ -579,6 +587,7 @@ void prepare_with_atmjac_line(MatrixView&             mat,
                               const std::vector<Zee>& zee,
                               const Numeric           Q,
                               const Numeric           dQdT,
+                              const SpeciesEnum       absorber,
                               const Numeric           isotr,
                               const Numeric           vmr,
                               const Numeric           H,
@@ -625,7 +634,7 @@ void prepare_with_atmjac_line(MatrixView&             mat,
               case wind_w: break;
             }
           } else if constexpr (std::same_as<T, SpeciesEnum>) {
-            const Numeric drx = Constant::inv_sqrt_pi * isotr;
+            const Numeric drx = jac == absorber ? Constant::inv_sqrt_pi * isotr : 0.0;
             prepare_deriv_vmr_line(mat, line, zee, atm, jac, rx, drx, s_, G0, lmr, lmi, r);
           } else if constexpr (std::is_same_v<T, SpeciesIsotope>) {
             const Numeric drx = Constant::inv_sqrt_pi * vmr;
@@ -693,14 +702,14 @@ void prepare_with_jac(MatrixView                             mat,
       zeeman_splitting(zee, line, pol);
       const Size nz   = zee.size();
       auto       matl = mat[Range{idx, nz}];
-      prepare_with_atmjac_line(matl, line, atm, zee, Q, dQdT, isotr, vmr, H, GD, jac_targets);
+      prepare_with_atmjac_line(matl, line, atm, zee, Q, dQdT, ir.spec, isotr, vmr, H, GD, jac_targets);
       idx += nz;
     }
+  }
 
-#pragma omp parallel for if (arts_omp_parallel())
-    for (auto& target : jac_targets.line) {
-      prepare_line_deriv(mat, atm, bands, target, {target.target_pos * 5 + 5, 5}, pol);
-    }
+#pragma omp parallel for if (arts_omp_parallel(jac_targets.line.size()))
+  for (auto& target : jac_targets.line) {
+    prepare_line_deriv(mat, atm, bands, target, {target.target_pos * 5 + 5, 5}, pol);
   }
 }
 }  // namespace
@@ -725,8 +734,12 @@ void str_scale(ComplexVectorView a, const AtmPoint& atm, const ConstVectorView& 
   }
 }
 
-void str_scale(
-    ComplexMatrixView a, const AtmPoint& atm, const ConstVectorView& fs, const std::vector<bool>& df, const Size it) {
+void str_scale(ComplexMatrixView        a,
+               const AtmPoint&          atm,
+               const ConstVectorView&   fs,
+               const std::vector<bool>& df,
+               const Size               it,
+               const Size               ip) {
   using Constant::pi, Constant::c, Constant::h, Constant::k;
   constexpr Numeric sc = c * c / (8 * pi);
 
@@ -753,6 +766,7 @@ void str_scale(
     a[iv, Range{1, nq}] *= scl;
 
     if (it > 0) { a[iv, it] -= a[iv, 0] * f * N * (r * (e + 1) - e) * sc / T; }
+    if (ip > 0) { a[iv, ip] += a[iv, 0] * scl / P; }
 
     for (Size iq = 0; iq < nq; iq++) {
       if (df[iq]) { a[iv, iq + 1] += a[iv, 0] * N * (r * (e + 1) - e) * sc; }

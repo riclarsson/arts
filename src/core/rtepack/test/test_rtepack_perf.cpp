@@ -72,7 +72,7 @@ Numeric test_linprop_deriv_k1(const PropmatVector& K) {
     const auto t      = rtepack::tran(k, k, 1.0);
     const auto exp_t  = t();
     const auto la     = t.linsrc_linprop(exp_t, k, k, 1.0)[0, 0];
-    sum              += t.linsrc_linprop_deriv(la, exp_t, k, k, k, exp_t, 1.0, 1.0, true)[0, 0];
+    sum              += t.linsrc_linprop_deriv(Muelmat{la}, exp_t, k, k, k, exp_t, 1.0, 1.0, true)[0, 0];
   }
 
   return sum;
@@ -87,7 +87,7 @@ Numeric test_linprop_deriv_k2(const PropmatVector& K) {
     const auto t      = rtepack::tran(k, k, 1.0);
     const auto exp_t  = t();
     const auto la     = t.linsrc_linprop(exp_t, k, k, 1.0)[0, 0];
-    sum              += t.linsrc_linprop_deriv(la, exp_t, k, k, k, exp_t, 1.0, 1.0, false)[0, 0];
+    sum              += t.linsrc_linprop_deriv(Muelmat{la}, exp_t, k, k, k, exp_t, 1.0, 1.0, false)[0, 0];
   }
 
   return sum;

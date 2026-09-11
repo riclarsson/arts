@@ -180,6 +180,38 @@ struct ComputeData {
                     const AtmPoint&          atm,
                     const ZeemanPolarization pol);
 
+  void dp_core_calc(const band_shape& shp, const band_data& bnd, const ConstVectorView& f_grid, const AtmPoint& atm);
+
+  void dVMR_core_calc(const QuantumIdentifier& qid,
+                      const band_shape&        shp,
+                      const band_data&         bnd,
+                      const ConstVectorView&   f_grid,
+                      const AtmPoint&          atm,
+                      const SpeciesEnum        species);
+
+  void disot_core_calc(const QuantumIdentifier& qid,
+                       const band_shape&        shp,
+                       const band_data&         bnd,
+                       const ConstVectorView&   f_grid,
+                       const AtmPoint&          atm,
+                       const SpeciesIsotope&    species);
+
+  void dlevel_core_calc(const QuantumIdentifier&      qid,
+                        const band_shape&             shp,
+                        const band_data&              bnd,
+                        const ConstVectorView&        f_grid,
+                        const AtmPoint&               atm,
+                        const QuantumLevelIdentifier& level,
+                        const ZeemanPolarization      pol);
+
+  void dline_core_calc(const QuantumIdentifier& qid,
+                       const band_shape&        shp,
+                       const band_data&         bnd,
+                       const ConstVectorView&   f_grid,
+                       const AtmPoint&          atm,
+                       const line_key&          key,
+                       const ZeemanPolarization pol);
+
   //! Sets dshape and dscl
   void df_core_calc(const band_shape& shp, const band_data& bnd, const ConstVectorView& f_grid, const AtmPoint& atm);
 

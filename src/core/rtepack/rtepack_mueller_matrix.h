@@ -4,13 +4,17 @@
 #include <matpack.h>
 #include <xml.h>
 
+#include <algorithm>
+
 #include "rtepack_common.h"
 
 namespace rtepack {
 
 //! A 4x4 matrix of Numeric values to be used as a Mueller Matrix
 struct muelmat final : Matrix44 {
-  constexpr muelmat(Numeric tau = 1.0) noexcept : Matrix44{tau, 0, 0, 0, 0, tau, 0, 0, 0, 0, tau, 0, 0, 0, 0, tau} {}
+  explicit constexpr muelmat(Numeric tau) noexcept : Matrix44{tau, 0, 0, 0, 0, tau, 0, 0, 0, 0, tau, 0, 0, 0, 0, tau} {}
+
+  constexpr muelmat() : muelmat(1.0) {}
 
   constexpr muelmat(Numeric m00,
                     Numeric m01,
@@ -30,7 +34,25 @@ struct muelmat final : Matrix44 {
                     Numeric m33) noexcept
       : Matrix44{m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33} {}
 
-  constexpr muelmat(std::array<Numeric, 16> data) noexcept : Matrix44{data} {}
+  template <matpack::exact_md<Numeric, 2> T> explicit constexpr muelmat(const T &input) noexcept {
+    assert(input.extent(0) == 4 and input.extent(1) == 4);
+    stdr::copy(input, data.begin());
+  }
+
+  template <stdr::forward_range T> requires std::is_convertible_v<stdr::range_value_t<T>, Numeric>
+  explicit constexpr muelmat(const T &input) noexcept {
+    assert(stdr::size(input) == 16);
+    stdr::copy(input, data.begin());
+  }
+
+  template <matpack::exact_md<Numeric, 2> T> constexpr muelmat &operator=(const T &input) noexcept {
+    return *this = muelmat{input};
+  }
+
+  template <stdr::forward_range T> requires std::is_convertible_v<stdr::range_value_t<T>, Numeric>
+  constexpr muelmat &operator=(const T &input) noexcept {
+    return *this = muelmat{input};
+  }
 
   //! The identity matrix
   static constexpr muelmat id() { return muelmat{1.0}; }
@@ -104,6 +126,16 @@ struct muelmat final : Matrix44 {
                     a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33};
   }
 
+  constexpr muelmat &operator*=(const Numeric &b) {
+    for (auto &x : data) { x *= b; }
+    return *this;
+  }
+
+  constexpr muelmat &operator/=(const Numeric &b) {
+    for (auto &x : data) { x /= b; }
+    return *this;
+  }
+
   constexpr muelmat operator-() const {
     return muelmat{-data[0],
                    -data[1],
@@ -129,35 +161,16 @@ struct muelmat final : Matrix44 {
   }
 };
 
-//! Addition between muelmat matrices
 constexpr muelmat operator+(muelmat a, const muelmat &b) { return a += b; }
-
-constexpr muelmat operator+(Numeric a, muelmat b) { return muelmat{a} + b; }
-
-//! Subtraction between muelmat matrices
 constexpr muelmat operator-(muelmat a, const muelmat &b) { return a -= b; }
-
-constexpr muelmat operator-(Numeric a, muelmat b) { return muelmat{a} - b; }
-
-//! Scaling a muelmat matrix
 constexpr muelmat operator*(muelmat a, const Numeric &b) { return a *= b; }
-
-//! Scaling a muelmat matrix
-constexpr muelmat operator*(const Numeric &a, muelmat b) { return b * a; }
-
-//! Scaling a muelmat matrix
-constexpr muelmat operator/(muelmat a, const Numeric &b) {
-  a /= b;
-  return a;
-}
-
-//! Scaling a muelmat matrix
+constexpr muelmat operator*(const Numeric &a, muelmat b) { return b *= a; }
+constexpr muelmat operator/(muelmat a, const Numeric &b) { return a /= b; }
 constexpr muelmat operator*(muelmat a, const muelmat &b) { return a *= b; }
 
 //! Take the average of two muelmat matrices
 constexpr muelmat avg(muelmat a, const muelmat &b) {
-  a += b;
-  a *= 0.5;
+  for (Size i = 0; i < 16; ++i) { a.data[i] = std::midpoint(a.data[i], b.data[i]); }
   return a;
 }
 

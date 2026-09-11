@@ -41,7 +41,7 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
   using AbsorptionVectorDataLabFrame = AbsorptionVectorData<Scalar, Format::ARO, Representation::Gridded>;
 
   constexpr static Index n_stokes_coeffs = absorption::get_n_mat_elems(Format::TRO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   using matpack::data_t<Scalar, 3>::operator[];
 
@@ -91,10 +91,12 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
 
   AbsorptionVectorData<Scalar, Format::ARO, repr> to_lab_frame(std::shared_ptr<const Vector> za_inc_grid) const {
     AbsorptionVectorData<Scalar, Format::ARO, repr> av_new{t_grid_, f_grid_, za_inc_grid};
+    auto                                            coeffs = av_new.get_coeff_vector_view();
     for (Size t_ind = 0; t_ind < t_grid_->size(); ++t_ind) {
       for (Size f_ind = 0; f_ind < f_grid_->size(); ++f_ind) {
         for (Size za_inc_ind = 0; za_inc_ind < za_inc_grid->size(); ++za_inc_ind) {
-          av_new[t_ind, f_ind, za_inc_ind, 0] = this->operator[](t_ind, f_ind, 0);
+          coeffs[t_ind, f_ind, za_inc_ind] = typename AbsorptionVectorData<Scalar, Format::ARO, repr>::CoeffVector{
+              this->operator[](t_ind, f_ind, 0), 0.0};
         }
       }
     }
@@ -112,17 +114,22 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
     auto                 coeffs_this = get_const_coeff_vector_view();
     auto                 coeffs_res  = result.get_coeff_vector_view();
     for (Index i_t = 0; i_t < static_cast<Index>(weights.t_grid_weights.size()); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t  = weights.t_grid_weights[i_t];
+      Numeric     w_t_l = gp_t.fd[1];
+      Numeric     w_t_r = gp_t.fd[0];
+      const Index it0   = std::clamp<Index>(gp_t.idx, 0, n_temps_ - 1);
+      const Index it1   = std::min(it0 + 1, n_temps_ - 1);
       for (Index i_f = 0; i_f < static_cast<Index>(weights.f_grid_weights.size()); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
-        coeffs_res[i_t, i_f] =
-            (w_t_l * w_f_l * coeffs_this[gp_t.idx, gp_f.idx] + w_t_l * w_f_r * coeffs_this[gp_t.idx, gp_f.idx + 1] +
-             w_t_r * w_f_l * coeffs_this[gp_t.idx + 1, gp_f.idx] +
-             w_t_r * w_f_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1]);
+        GridPos     gp_f     = weights.f_grid_weights[i_f];
+        Numeric     w_f_l    = gp_f.fd[1];
+        Numeric     w_f_r    = gp_f.fd[0];
+        const Index if0      = std::clamp<Index>(gp_f.idx, 0, n_freqs_ - 1);
+        const Index if1      = std::min(if0 + 1, n_freqs_ - 1);
+        coeffs_res[i_t, i_f] = CoeffVector{};
+        if (w_t_l > 0.0 and w_f_l > 0.0) coeffs_res[i_t, i_f] += w_t_l * w_f_l * coeffs_this[it0, if0];
+        if (w_t_l > 0.0 and w_f_r > 0.0) coeffs_res[i_t, i_f] += w_t_l * w_f_r * coeffs_this[it0, if1];
+        if (w_t_r > 0.0 and w_f_l > 0.0) coeffs_res[i_t, i_f] += w_t_r * w_f_l * coeffs_this[it1, if0];
+        if (w_t_r > 0.0 and w_f_r > 0.0) coeffs_res[i_t, i_f] += w_t_r * w_f_r * coeffs_this[it1, if1];
       }
     }
     return result;
@@ -161,7 +168,7 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
 
  public:
   constexpr static Index n_stokes_coeffs = absorption::get_n_mat_elems(Format::ARO);
-  using CoeffVector                      = Eigen::Matrix<Scalar, 1, n_stokes_coeffs>;
+  using CoeffVector                      = matpack::cdata_t<Scalar, n_stokes_coeffs>;
 
   AbsorptionVectorData() {};
   /** Create a new AbsorptionVectorData container.
@@ -224,27 +231,30 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
     auto                 coeffs_this = get_const_coeff_vector_view();
     auto                 coeffs_res  = result.get_coeff_vector_view();
     for (Index i_t = 0; i_t < static_cast<Index>(weights.t_grid_weights.size()); ++i_t) {
-      GridPos gp_t  = weights.t_grid_weights[i_t];
-      Numeric w_t_l = gp_t.fd[1];
-      Numeric w_t_r = gp_t.fd[0];
+      GridPos     gp_t    = weights.t_grid_weights[i_t];
+      const Index t_upper = std::min<Index>(gp_t.idx + 1, coeffs_this.extent(0) - 1);
+      Numeric     w_t_l   = gp_t.fd[1];
+      Numeric     w_t_r   = gp_t.fd[0];
       for (Index i_f = 0; i_f < static_cast<Index>(weights.f_grid_weights.size()); ++i_f) {
-        GridPos gp_f  = weights.f_grid_weights[i_f];
-        Numeric w_f_l = gp_f.fd[1];
-        Numeric w_f_r = gp_f.fd[0];
+        GridPos     gp_f    = weights.f_grid_weights[i_f];
+        const Index f_upper = std::min<Index>(gp_f.idx + 1, coeffs_this.extent(1) - 1);
+        Numeric     w_f_l   = gp_f.fd[1];
+        Numeric     w_f_r   = gp_f.fd[0];
         for (Index i_za_inc = 0; i_za_inc < static_cast<Index>(weights.za_inc_grid_weights.size()); ++i_za_inc) {
-          GridPos gp_za_inc  = weights.za_inc_grid_weights[i_za_inc];
-          Numeric w_za_inc_l = gp_za_inc.fd[1];
-          Numeric w_za_inc_r = gp_za_inc.fd[0];
+          GridPos     gp_za_inc    = weights.za_inc_grid_weights[i_za_inc];
+          const Index za_inc_upper = std::min<Index>(gp_za_inc.idx + 1, coeffs_this.extent(2) - 1);
+          Numeric     w_za_inc_l   = gp_za_inc.fd[1];
+          Numeric     w_za_inc_r   = gp_za_inc.fd[0];
           coeffs_res[i_t, i_f, i_za_inc] =
               (w_t_l * w_f_l * w_za_inc_l * coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx] +
-               w_t_l * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx, gp_za_inc.idx + 1] +
-               w_t_l * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx] +
-               w_t_l * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx + 1, gp_za_inc.idx + 1] +
+               w_t_l * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx, gp_f.idx, za_inc_upper] +
+               w_t_l * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx, f_upper, gp_za_inc.idx] +
+               w_t_l * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx, f_upper, za_inc_upper] +
 
-               w_t_r * w_f_l * w_za_inc_l * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx] +
-               w_t_r * w_f_l * w_za_inc_r * coeffs_this[gp_t.idx + 1, gp_f.idx, gp_za_inc.idx + 1] +
-               w_t_r * w_f_r * w_za_inc_l * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx] +
-               w_t_r * w_f_r * w_za_inc_r * coeffs_this[gp_t.idx + 1, gp_f.idx + 1, gp_za_inc.idx + 1]);
+               w_t_r * w_f_l * w_za_inc_l * coeffs_this[t_upper, gp_f.idx, gp_za_inc.idx] +
+               w_t_r * w_f_l * w_za_inc_r * coeffs_this[t_upper, gp_f.idx, za_inc_upper] +
+               w_t_r * w_f_r * w_za_inc_l * coeffs_this[t_upper, f_upper, gp_za_inc.idx] +
+               w_t_r * w_f_r * w_za_inc_r * coeffs_this[t_upper, f_upper, za_inc_upper]);
         }
       }
     }
@@ -252,7 +262,7 @@ template <std::floating_point Scalar, Representation repr> class AbsorptionVecto
   }
 
   AbsorptionVectorData regrid(const ScatteringDataGrids& grids) const {
-    auto weights = calc_regrid_weights(t_grid_, f_grid_, za_inc_grid_, nullptr, nullptr, nullptr, grids);
+    auto weights = calc_regrid_weights(t_grid_, f_grid_, nullptr, za_inc_grid_, nullptr, nullptr, grids);
     return regrid(grids, weights);
   }
 

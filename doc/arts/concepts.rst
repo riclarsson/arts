@@ -1,18 +1,16 @@
-Underpinning concepts and background
-====================================
+Mathematics and physical concepts
+=================================
 
-This section explains some concepts that are used implicitly in ARTS.
-It is useful to understand how different components of ARTS are intended to work together.
-It is a non-exhaustive overview of these concepts, and it is not intended to cover
-implementation details.
-
-The subsections below are given in no particular order.
+These pages explain the equations, physical definitions, and approximations
+behind ARTS calculations.  See :doc:`users` for interface terminology and
+usage, and :doc:`devs` for build and implementation details.
 
 .. toctree::
    :maxdepth: 2
    
    concept.absorption
    concept.radiative_transfer
+   concept.tmatrix
    concept.disort
+   concept.heating
    concept.oem
-   concept.physical_grids

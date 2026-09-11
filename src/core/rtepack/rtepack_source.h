@@ -4,6 +4,16 @@
 #include "rtepack_stokes_vector.h"
 
 namespace rtepack {
+/** Physical emission vector at one atmospheric level.
+
+ * Combines polarized LTE emission from the absorption vector with the
+ * additive non-LTE emission returned by the propagation-matrix agenda.
+ */
+[[nodiscard]] stokvec level_emission(const stokvec &absorption,
+                                     const stokvec &nlte,
+                                     Numeric        frequency,
+                                     Numeric        temperature);
+
 struct SourceVector {
   stokvec_matrix  J{};
   stokvec_tensor3 dJ{};

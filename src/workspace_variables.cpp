@@ -186,6 +186,59 @@ When Bath is selected, all species are used.  Otherwise, this variable should co
       .type = "ArrayOfScatteringSpecies",
   };
 
+  wsv_data["mc_antenna"] = {
+      .desc = R"--(Transmit and receive antenna pattern for Monte Carlo calculations.
+)--",
+      .type = "MCAntenna",
+  };
+
+  wsv_data["mc_spectral_rad"] = {
+      .desc = R"(Passive Monte Carlo spectral radiance at one frequency.)",
+      .type = "Stokvec",
+  };
+
+  wsv_data["mc_error"] = {
+      .desc = R"(Standard error of *mc_spectral_rad*.)",
+      .type = "Stokvec",
+  };
+
+  wsv_data["mc_iteration_count"] = {
+      .desc = R"(Number of photon histories used by *MCGeneral*.)",
+      .type = "Index",
+  };
+
+  wsv_data["radar_signal"] = {
+      .desc = R"--(Monte Carlo radar return with one Stokes vector per range bin.
+)--",
+      .type = "StokvecVector",
+  };
+
+  wsv_data["radar_error"] = {
+      .desc = R"--(Component-wise standard error of *radar_signal* for each range bin.
+)--",
+      .type = "StokvecVector",
+  };
+
+  wsv_data["radar_range_limits"] = {
+      .desc = R"--(Range-gate limits for active-radar measurements.
+
+The matrix has one row per element of *measurement_sensor* and two columns
+holding the lower and upper edge.  The coordinate represented by the limits is
+selected by the radar forward method (altitude, one-way distance, or
+round-trip time).
+)--",
+      .type = "Matrix",
+  };
+
+  wsv_data["radar_aux"] = {
+      .desc = R"--(Auxiliary active-radar quantities.
+
+Rows follow the requested auxiliary-variable names and columns follow
+*measurement_vec*.
+)--",
+      .type = "Matrix",
+  };
+
   //! Atmosphere
 
   wsv_data["atm_field"] = {
@@ -646,6 +699,21 @@ For more information, see :doc:`user.surf_field`.
       .type = "SurfaceField",
   };
 
+  wsv_data["tessem_neth"] = {
+      .desc = R"--(TESSEM neural network for horizontal-polarization emissivity.)--",
+      .type = "TessemNN",
+  };
+
+  wsv_data["tessem_netv"] = {
+      .desc = R"--(TESSEM neural network for vertical-polarization emissivity.)--",
+      .type = "TessemNN",
+  };
+
+  wsv_data["telsem_atlas"] = {
+      .desc = R"--(TELSEM monthly land-surface emissivity atlas.)--",
+      .type = "TelsemAtlas",
+  };
+
   //! Subsurface
 
   wsv_data["subsurf_field"] = {
@@ -1034,6 +1102,10 @@ describes how its contiguous block of *measurement_sensor* /
 
 The start index of each block is not stored explicitly; it is the
 cumulative sum of ``count()`` from preceding elements.
+
+An entry can carry the observation time of its block. This is used to retain
+the acquisition-time grouping independently of the flattened measurement
+vector ordering.
 )",
       .type = "ArrayOfSensorMetaInfo",
   };

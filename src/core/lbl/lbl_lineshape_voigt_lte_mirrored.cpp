@@ -116,6 +116,26 @@ Complex dline_strength_calc_dT(
          (2 * T * (dlm * s + lm * ds) * f0 - 2 * T * df0 * lm * s - f0 * lm * s) / (2 * T * f0);
 }
 
+Complex dline_strength_calc_dP(
+    const Numeric inv_gd, const Numeric f0, const SpeciesIsotope& spec, const line& line, const AtmPoint& atm) {
+  const auto s = line.s(atm.temperature, PartitionFunctions::Q(atm.temperature, spec));
+
+  const Numeric G   = line.ls.G(atm);
+  const Numeric Y   = line.ls.Y(atm);
+  const Numeric dG  = line.ls.dG_dP(atm);
+  const Numeric dY  = line.ls.dY_dP(atm);
+  const Numeric dD0 = line.ls.dD0_dP(atm);
+  const Numeric dDV = line.ls.dDV_dP(atm);
+
+  const Numeric df0 = dD0 + dDV;
+  const Complex lm{1 + G, -Y};
+  const Complex dlm{dG, -dY};
+  const Numeric r = atm[spec];
+  const Numeric x = atm[spec.spec];
+
+  return Constant::inv_sqrt_pi * inv_gd * r * x * s * (dlm - (df0 / f0) * lm);
+}
+
 Numeric line_center_calc(const line& line, const AtmPoint& atm) { return line.f0 + line.ls.D0(atm) + line.ls.DV(atm); }
 
 Numeric dline_center_calc_dT(const line& line, const AtmPoint& atm) {
@@ -219,51 +239,37 @@ single_shape::zFdF single_shape::all(const Numeric f) const { return {z(f), zm(f
 
 Complex single_shape::df(const Numeric f) const { return s * inv_gd * dF(f); }
 
+Complex single_shape::dparameter(const Complex ds, const Complex dz, const Numeric dz_fac, const Numeric f) const {
+  const auto [zp, zm, Fp, Fm, dFp, dFm] = all(f);
+  const Complex dzm{-dz.real(), dz.imag()};
+  return ds * (Fp + Fm) + s * ((dz + dz_fac * zp) * dFp + (dzm + dz_fac * zm) * dFm);
+}
+
 Complex single_shape::df0(const Complex ds_df0, const Complex dz_df0, const Numeric dz_df0_fac, const Numeric f) const {
-  const auto [zp_, zm_, Fp_, Fm_, dFp_, dFm_] = all(f);
-  const Complex z_                            = zp_ - zm_;
-  const Complex F_                            = Fp_ + Fm_;
-  const Complex dF_                           = dFp_ + dFm_;
-  return ds_df0 * F_ + s * (dz_df0 + dz_df0_fac * z_) * dF_;
+  return dparameter(ds_df0, dz_df0, dz_df0_fac, f);
 }
 
 Complex single_shape::dDV(const Complex ds_dDV, const Complex dz_dDV, const Numeric dz_dDV_fac, const Numeric f) const {
-  const auto [zp_, zm_, Fp_, Fm_, dFp_, dFm_] = all(f);
-  const Complex z_                            = zp_ - zm_;
-  const Complex F_                            = Fp_ + Fm_;
-  const Complex dF_                           = dFp_ + dFm_;
-  return ds_dDV * F_ + s * (dz_dDV + dz_dDV_fac * z_) * dF_;
+  return dparameter(ds_dDV, dz_dDV, dz_dDV_fac, f);
 }
 
 Complex single_shape::dD0(const Complex ds_dD0, const Complex dz_dD0, const Numeric dz_dD0_fac, const Numeric f) const {
-  const auto [zp_, zm_, Fp_, Fm_, dFp_, dFm_] = all(f);
-  const Complex z_                            = zp_ - zm_;
-  const Complex F_                            = Fp_ + Fm_;
-  const Complex dF_                           = dFp_ + dFm_;
-  return ds_dD0 * F_ + s * (dz_dD0 + dz_dD0_fac * z_) * dF_;
+  return dparameter(ds_dD0, dz_dD0, dz_dD0_fac, f);
 }
 
 Complex single_shape::dG0(const Complex dz_dG0, const Numeric f) const { return s * dz_dG0 * dF(f); }
 
-Complex single_shape::dH(const Complex dz_dH, const Numeric f) const { return s * dz_dH * dF(f); }
+Complex single_shape::dH(const Complex dz_dH, const Numeric f) const { return dparameter(0.0, dz_dH, 0.0, f); }
 
 Complex single_shape::dVMR(const Complex ds_dVMR,
                            const Complex dz_dVMR,
                            const Numeric dz_dVMR_fac,
                            const Numeric f) const {
-  const auto [zp_, zm_, Fp_, Fm_, dFp_, dFm_] = all(f);
-  const Complex z_                            = zp_ - zm_;
-  const Complex F_                            = Fp_ + Fm_;
-  const Complex dF_                           = dFp_ + dFm_;
-  return ds_dVMR * F_ + s * (dz_dVMR + dz_dVMR_fac * z_) * dF_;
+  return dparameter(ds_dVMR, dz_dVMR, dz_dVMR_fac, f);
 }
 
 Complex single_shape::dT(const Complex ds_dT, const Complex dz_dT, const Numeric dz_dT_fac, const Numeric f) const {
-  const auto [zp_, zm_, Fp_, Fm_, dFp_, dFm_] = all(f);
-  const Complex z_                            = zp_ - zm_;
-  const Complex F_                            = Fp_ + Fm_;
-  const Complex dF_                           = dFp_ + dFm_;
-  return ds_dT * F_ + s * (dz_dT + dz_dT_fac * z_) * dF_;
+  return dparameter(ds_dT, dz_dT, dz_dT_fac, f);
 }
 
 Complex single_shape::da(const Complex ds_da, const Numeric f) const { return ds_da * F(f); }
@@ -816,6 +822,35 @@ void ComputeData::dt_core_calc(const SpeciesIsotope&    spec,
   }
 }
 
+void ComputeData::dp_core_calc(const SpeciesIsotope&    spec,
+                               const band_shape&        shp,
+                               const band_data&         bnd,
+                               const ConstVectorView&   f_grid,
+                               const AtmPoint&          atm,
+                               const ZeemanPolarization pol) {
+  std::transform(scl.begin(), scl.end(), dscl.begin(), [P = atm.pressure](auto x) { return x / P; });
+
+  for (Size i = 0; i < pos.size(); i++) {
+    const auto&   line = bnd.lines[pos[i].line];
+    const auto&   lshp = shp.lines[i];
+    const Numeric df0  = line.ls.dD0_dP(atm) + line.ls.dDV_dP(atm);
+
+    dz_fac[i] = -df0 / lshp.f0;
+    ds[i] = line.z.Strength(line.qn, pol, pos[i].iz) * dline_strength_calc_dP(lshp.inv_gd, lshp.f0, spec, line, atm);
+    dz[i] = lshp.inv_gd * Complex{-df0, line.ls.dG0_dP(atm)};
+  }
+
+  if (bnd.cutoff.type != LineByLineCutoffType::None) {
+    shp.dVMR(dcut, ds, dz, dz_fac);
+    std::transform(f_grid.begin(), f_grid.end(), dshape.begin(), [this, &shp](Numeric f) {
+      return shp.dVMR(dcut, ds, dz, dz_fac, f);
+    });
+  } else {
+    std::transform(
+        f_grid.begin(), f_grid.end(), dshape.begin(), [this, &shp](Numeric f) { return shp.dVMR(ds, dz, dz_fac, f); });
+  }
+}
+
 //! Sets dshape and dscl
 void ComputeData::df_core_calc(const band_shape&      shp,
                                const band_data&       bnd,
@@ -1188,7 +1223,13 @@ void compute_derivative(PropmatVectorView        dpm,
             zeeman::scale(com_data.npm, com_data.dscl[i] * com_data.shape[i] + com_data.scl[i] * com_data.dshape[i]);
       }
       break;
-    case p: ARTS_USER_ERROR("Not implemented, pressure derivative"); break;
+    case p:
+      com_data.dp_core_calc(spec, shape, bnd, f_grid, atm, pol);
+      for (Size i = 0; i < f_grid.size(); i++) {
+        dpm[i] +=
+            zeeman::scale(com_data.npm, com_data.dscl[i] * com_data.shape[i] + com_data.scl[i] * com_data.dshape[i]);
+      }
+      break;
     case mag_u:
       com_data.dmag_u_core_calc(shape, bnd, f_grid, atm, pol);
       for (Size i = 0; i < f_grid.size(); i++) {
@@ -1285,7 +1326,7 @@ void compute_derivative(PropmatVectorView        dpm,
         dpm[i] += zeeman::scale(com_data.npm, com_data.scl[i] * com_data.dshape[i]);
       }
       return;
-    case LineByLineVariable::unused: return;
+    case LineByLineVariable::unused: break;
   }
 
   switch (deriv.ls_var) {

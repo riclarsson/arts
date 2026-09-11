@@ -111,6 +111,22 @@ struct MCAntenna {
                                                       const Vector2&           bore_sight_los) const;
 };
 
+template <> struct std::formatter<MCAntenna> {
+  format_tags tags;
+
+  [[nodiscard]] constexpr auto& inner_fmt() { return *this; }
+  [[nodiscard]] constexpr auto& inner_fmt() const { return *this; }
+
+  constexpr std::format_parse_context::iterator parse(std::format_parse_context& ctx) {
+    return parse_format_tags(tags, ctx);
+  }
+
+  template <class FmtContext> FmtContext::iterator format(const MCAntenna& x, FmtContext& ctx) const {
+    const auto sep = tags.sep();
+    return tags.format(ctx, x.atype, sep, x.sigma_za, sep, x.sigma_aa, sep, x.za_grid, sep, x.aa_grid, sep, x.G_lookup);
+  }
+};
+
 template <> struct xml_io_stream_name<MCAntenna> {
   static constexpr std::string_view name = "MCAntenna";
 };

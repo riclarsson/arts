@@ -4,6 +4,7 @@
 #include <matpack.h>
 
 #include <optional>
+#include <unordered_map>
 
 #include "atm.h"
 #include "enums.h"
@@ -11,6 +12,25 @@
 #include "utils.h"
 
 namespace scattering {
+
+struct PSDData {
+  Vector                                                values;
+  std::unordered_map<ScatteringSpeciesProperty, Vector> derivatives;
+};
+
+/** A single-particle population scaled by an atmospheric number-density field. */
+struct MonodispersePSD {
+  ScatteringSpeciesProperty number_density;
+  Numeric                   t_min = 0.0;
+  Numeric                   t_max = 350.0;
+
+  MonodispersePSD() = default;
+  MonodispersePSD(ScatteringSpeciesProperty number_density_, Numeric t_min_ = 0.0, Numeric t_max_ = 350.0);
+
+  static constexpr SizeParameter get_size_parameter() { return SizeParameter::DVeq; }
+  Vector                         evaluate(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+  PSDData                        evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+};
 
 /*** Single-moment modified gamma distribution
  *
@@ -57,6 +77,119 @@ struct MGDSingleMoment {
                   const Vector&   particle_sizes,
                   const Numeric&  scat_species_a,
                   const Numeric&  scat_species_b) const;
+
+  PSDData evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+};
+
+/** Modified-gamma distribution constrained by particle mass density.
+ *
+ * Exactly one of n0 and lambda must be NaN.  The missing parameter is derived
+ * from the mass moment and the supplied mass-size relationship m=a*x^b.
+ */
+struct MGDMass {
+  ScatteringSpeciesProperty mass;
+  Numeric                   n0;
+  Numeric                   mu;
+  Numeric                   lambda;
+  Numeric                   gamma;
+  Numeric                   t_min;
+  Numeric                   t_max;
+  bool                      picky;
+
+  MGDMass() = default;
+  MGDMass(ScatteringSpeciesProperty, Numeric, Numeric, Numeric, Numeric, Numeric, Numeric, bool);
+
+  static constexpr SizeParameter get_size_parameter() { return SizeParameter::DVeq; }
+  Vector                         evaluate(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+  PSDData                        evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+};
+
+enum class MGDTwoMomentType : char { MassMeanSize, MassNumberDensity };
+
+/** Modified-gamma distribution constrained by mass and a second moment. */
+struct MGDTwoMoment {
+  ScatteringSpeciesProperty mass;
+  ScatteringSpeciesProperty second_moment;
+  MGDTwoMomentType          type;
+  Numeric                   mu;
+  Numeric                   gamma;
+  Numeric                   t_min;
+  Numeric                   t_max;
+  bool                      picky;
+
+  MGDTwoMoment() = default;
+  MGDTwoMoment(
+      ScatteringSpeciesProperty, ScatteringSpeciesProperty, MGDTwoMomentType, Numeric, Numeric, Numeric, Numeric, bool);
+
+  static constexpr SizeParameter get_size_parameter() { return SizeParameter::DVeq; }
+  Vector                         evaluate(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+  PSDData                        evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+};
+
+/** Delanoe et al. (2014) normalized ice PSD. */
+struct DelanoeEtAl14 {
+  ScatteringSpeciesProperty mass;
+  ScatteringSpeciesProperty intercept_parameter;
+  ScatteringSpeciesProperty mean_size;
+  Numeric                   rho;
+  Numeric                   alpha;
+  Numeric                   beta;
+  Numeric                   t_min;
+  Numeric                   t_max;
+  Numeric                   dm_min;
+  bool                      picky;
+
+  DelanoeEtAl14() = default;
+  DelanoeEtAl14(ScatteringSpeciesProperty, Numeric, Numeric, Numeric, Numeric, Numeric, Numeric, bool);
+  DelanoeEtAl14(ScatteringSpeciesProperty,
+                ScatteringSpeciesProperty,
+                ScatteringSpeciesProperty,
+                Numeric,
+                Numeric,
+                Numeric,
+                Numeric,
+                Numeric,
+                Numeric,
+                bool);
+
+  static constexpr SizeParameter get_size_parameter() { return SizeParameter::DVeq; }
+  Vector                         evaluate(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+  PSDData                        evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+};
+
+/** Field et al. (2007) tropical or midlatitude ice PSD. */
+struct FieldEtAl07 {
+  ScatteringSpeciesProperty mass;
+  bool                      tropical;
+  Numeric                   t_min;
+  Numeric                   t_max;
+  Numeric                   t_min_psd;
+  Numeric                   t_max_psd;
+  bool                      picky;
+
+  FieldEtAl07() = default;
+  FieldEtAl07(ScatteringSpeciesProperty, std::string, Numeric, Numeric, Numeric, Numeric, bool);
+
+  static constexpr SizeParameter get_size_parameter() { return SizeParameter::DVeq; }
+  Vector                         evaluate(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+  PSDData                        evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+};
+
+/** McFarquhar and Heymsfield (1997) cloud-ice PSD. */
+struct McFarquharHeymsfield97 {
+  ScatteringSpeciesProperty mass;
+  Numeric                   t_min;
+  Numeric                   t_max;
+  Numeric                   t_min_psd;
+  Numeric                   t_max_psd;
+  bool                      picky;
+
+  McFarquharHeymsfield97() = default;
+  McFarquharHeymsfield97(ScatteringSpeciesProperty, Numeric, Numeric, Numeric, Numeric, bool);
+
+  static constexpr SizeParameter get_size_parameter() { return SizeParameter::DVeq; }
+  Vector                         evaluate(const AtmPoint&, const Vector&, Numeric, Numeric) const;
+  PSDData                        evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
 };
 
 /*** Binned PSD
@@ -82,6 +215,8 @@ struct BinnedPSD {
                   const Vector&   particle_sizes,
                   const Numeric& /*scat_species_a*/,
                   const Numeric& /*scat_species_b*/) const;
+
+  PSDData evaluate_with_derivatives(const AtmPoint&, const Vector&, Numeric, Numeric) const;
 };
 
 }  // namespace scattering

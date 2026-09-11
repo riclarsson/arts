@@ -95,6 +95,15 @@ auto bind_phase_matrix_data_tro_spectral(py::module_& m, const std::string& clas
   return s;
 }
 
+template <typename Scalar> [[nodiscard]]
+auto bind_phase_matrix_data_aro_gridded(py::module_& m, const std::string& class_name) {
+  using PMD = scattering::PhaseMatrixData<Scalar, scattering::Format::ARO, scattering::Representation::Gridded>;
+
+  py::class_<PMD, matpack::data_t<Scalar, 6>> s(m, class_name.c_str());
+  s.def(py::init<>());
+  return s;
+}
+
 template <typename Scalar, scattering::Representation repr> [[nodiscard]]
 auto bind_absorption_vector_data_tro(py::module_& m, const std::string& name) {
   using AVD = scattering::AbsorptionVectorData<Scalar, scattering::Format::TRO, repr>;
@@ -280,14 +289,81 @@ void py_scattering_species(py::module_& m) try {
   //       std::variant<scattering::BulkScatteringProperties<
   //           scattering::Format::ARO,
   //           scattering::Representation::Spectral>>;
-  //   using BulkScatteringPropertiesAROGridded =
-  //       std::variant<scattering::BulkScatteringProperties<
-  //           scattering::Format::ARO,
-  //           scattering::Representation::Gridded>>;
+  using BulkScatteringPropertiesAROGridded =
+      std::variant<scattering::BulkScatteringProperties<scattering::Format::ARO, scattering::Representation::Gridded>>;
 
   //
   // Modified gamma PSD
   //
+
+  py::class_<scattering::AirSimpleGasScattering>(m, "AirSimpleGasScattering").def(py::init<>()).doc() =
+      "AirSimple molecular scattering coefficient model";
+
+  py::class_<scattering::ConstantGasScattering>(m, "ConstantGasScattering")
+      .def(py::init<Numeric>(), "cross_section"_a)
+      .def_rw("cross_section",
+              &scattering::ConstantGasScattering::cross_section,
+              "Molecular scattering cross-section [m^2]\n\n.. :class:`Numeric`")
+      .doc() = "Constant molecular scattering cross-section model";
+
+  py::class_<scattering::IsotropicGasScattering>(m, "IsotropicGasScattering").def(py::init<>()).doc() =
+      "Isotropic unpolarized gas-scattering phase matrix";
+
+  py::class_<scattering::RayleighGasScattering>(m, "RayleighGasScattering")
+      .def(py::init<Numeric>(), "depolarization_factor"_a = 0.0)
+      .def_rw("depolarization_factor",
+              &scattering::RayleighGasScattering::depolarization_factor,
+              "Rayleigh depolarization factor\n\n.. :class:`Numeric`")
+      .doc() = "Polarized Rayleigh gas-scattering phase matrix";
+
+  py::class_<GasScatterer>(m, "GasScatterer")
+      .def(py::init<>())
+      .def(py::init<scattering::GasScatteringCoefficient, scattering::GasScatteringPhaseMatrix>(),
+           "coefficient"_a,
+           "phase_matrix"_a)
+      .def_rw("coefficient",
+              &GasScatterer::coefficient,
+              "Gas-scattering coefficient model\n\n.. :class:`AirSimpleGasScattering` or "
+              ":class:`ConstantGasScattering`")
+      .def_rw("phase_matrix",
+              &GasScatterer::phase_matrix,
+              "Gas-scattering phase-matrix model\n\n.. :class:`IsotropicGasScattering` or "
+              ":class:`RayleighGasScattering`")
+      .def_static(
+          "air_simple_rayleigh",
+          [](Numeric depolarization_factor) {
+            return GasScatterer{scattering::AirSimpleGasScattering{},
+                                scattering::RayleighGasScattering{depolarization_factor}};
+          },
+          "depolarization_factor"_a = 0.0,
+          "Create an AirSimple coefficient model with a Rayleigh phase matrix.")
+      .def_static(
+          "constant_isotropic",
+          [](Numeric cross_section) {
+            return GasScatterer{scattering::ConstantGasScattering{cross_section}, scattering::IsotropicGasScattering{}};
+          },
+          "cross_section"_a,
+          "Create a constant-cross-section model with an isotropic phase matrix.")
+      .def(
+          "get_bulk_scattering_properties_tro_gridded",
+          [](const GasScatterer&         scatterer,
+             const AtmPoint&             atm_point,
+             const Vector&               f_grid,
+             scattering::ZenithAngleGrid za_grid) {
+            return BulkScatteringPropertiesTROGridded{scatterer.get_bulk_scattering_properties_tro_gridded(
+                atm_point, f_grid, std::make_shared<scattering::ZenithAngleGrid>(std::move(za_grid)))};
+          },
+          "atm_point"_a,
+          "f_grid"_a,
+          "za_grid"_a,
+          "Get bulk scattering properties")
+      .def("get_bulk_scattering_properties_tro_spectral",
+           &GasScatterer::get_bulk_scattering_properties_tro_spectral,
+           "atm_point"_a,
+           "f_grid"_a,
+           "degree"_a,
+           "Get bulk scattering properties")
+      .doc() = "A molecular gas-scattering species";
 
   py::class_<HenyeyGreensteinScatterer>(m, "HenyeyGreensteinScatterer")
       .def(py::init<ExtSSACallback, Numeric>(), "func"_a, "g"_a)
@@ -377,28 +453,28 @@ void py_scattering_species(py::module_& m) try {
           "atm_point"_a,
           "f_grid"_a,
           "za_grid"_a,
+          "Get bulk scattering properties")
+      .def(
+          "get_bulk_scattering_properties_aro_gridded",
+          [](const ArrayOfScatteringSpecies& aoss,
+             const AtmPoint&                 atm_point,
+             const Vector&                   f_grid,
+             const Vector&                   za_inc_grid,
+             const Vector&                   delta_aa_grid,
+             scattering::ZenithAngleGrid     za_scat_grid) {
+            return BulkScatteringPropertiesAROGridded{aoss.get_bulk_scattering_properties_aro_gridded(
+                atm_point,
+                f_grid,
+                za_inc_grid,
+                delta_aa_grid,
+                std::make_shared<scattering::ZenithAngleGrid>(std::move(za_scat_grid)))};
+          },
+          "atm_point"_a,
+          "f_grid"_a,
+          "za_inc_grid"_a,
+          "delta_aa_grid"_a,
+          "za_scat_grid"_a,
           "Get bulk scattering properties");
-  //   .def(
-  //       "get_bulk_scattering_properties_aro_gridded",
-  //       [](const ArrayOfScatteringSpecies& aoss,
-  //          const AtmPoint& atm_point,
-  //          const Vector& f_grid,
-  //          const Vector& za_inc_grid,
-  //          const Vector& delta_aa_grid,
-  //          scattering::ZenithAngleGrid za_scat_grid) {
-  //         return BulkScatteringPropertiesAROGridded{
-  //             aoss.get_bulk_scattering_properties_aro_gridded(atm_point,
-  //                                                             f_grid,
-  //                                                             za_inc_grid,
-  //                                                             delta_aa_grid,
-  //                                                             std::make_shared<scattering::ZenithAngleGrid>(std::move(za_scat_grid)))};
-  //       },
-  //       "atm_point"_a,
-  //       "f_grid"_a,
-  //       "za_inc_grid"_a,
-  //       "delta_aa_grid"_a,
-  //       "za_scat_grid"_a,
-  //       "Get bulk scattering properties")
   //   .def(
   //       "get_bulk_scattering_properties_aro_spectral",
   //       [](const ArrayOfScatteringSpecies& aoss,
@@ -422,6 +498,7 @@ void py_scattering_species(py::module_& m) try {
 
   bind_phase_matrix_data_tro_gridded<double>(m, "PhaseMatrixDataTROGridded4").doc()   = "Phase matrix data";
   bind_phase_matrix_data_tro_spectral<double>(m, "PhaseMatrixDataTROSpectral4").doc() = "Phase matrix data";
+  bind_phase_matrix_data_aro_gridded<double>(m, "PhaseMatrixDataAROGridded4").doc()   = "Phase matrix data";
 
   bind_absorption_vector_data_tro<double, scattering::Representation::Gridded>(m, "AbsorptionVectorDataGriddedTRO4")
       .doc() = "Absorption vector data";
@@ -440,6 +517,17 @@ void py_scattering_species(py::module_& m) try {
       .doc() = "Extinction matrix data";
   bind_extinction_matrix_data_aro<double, scattering::Representation::Spectral>(m, "ExtinctionMatrixDataSpectralARO4")
       .doc() = "Extinction matrix data";
+
+  // ForwardscatterMatrixData is an alias of BackscatterMatrixData. Bind each
+  // format once so both existing SSD endpoint properties are usable in Python.
+  py::class_<scattering::BackscatterMatrixData<Numeric, scattering::Format::TRO>, Tensor3>(m,
+                                                                                           "BackscatterMatrixDataTRO")
+      .doc() =
+      "Forward or backward TRO scattering data, with axes temperature, frequency, compact Mueller coefficient.";
+  py::class_<scattering::BackscatterMatrixData<Numeric, scattering::Format::ARO>, Tensor4>(m,
+                                                                                           "BackscatterMatrixDataARO")
+      .doc() =
+      "Forward or backward ARO scattering data, with axes temperature, frequency, incident zenith, Mueller coefficient.";
 
   py::class_<scattering::ParticleProperties>(m, "ParticleProperties")
       .def(py::init<>())
@@ -473,9 +561,63 @@ void py_scattering_species(py::module_& m) try {
   bind_bulk_scattering_properties<scattering::Format::TRO, scattering::Representation::Spectral>(
       m, "BulkScatteringPropertiesTROSpectral4")
       .doc() = "Bulk scattering properties";
+  bind_bulk_scattering_properties<scattering::Format::ARO, scattering::Representation::Gridded>(
+      m, "BulkScatteringPropertiesAROGridded4")
+      .doc() = "Bulk scattering properties";
 
   py::class_<ParticleHabit>(m, "ParticleHabit")
+      .def_static("tmatrix",
+                  &ParticleHabit::tmatrix,
+                  "t_grid"_a,
+                  "f_grid"_a,
+                  "diameters"_a,
+                  "refractive_index"_a,
+                  "density"_a,
+                  "aspect_ratio"_a,
+                  "shape"_a    = -1,
+                  "angles"_a   = 181,
+                  "accuracy"_a = 0.001,
+                  R"(Generate an in-memory, totally randomly oriented particle habit.
+
+Temperatures are in K, frequencies in Hz, volume-equivalent diameters in m,
+and material density in kg/m^3. Grids must be positive and strictly increasing.
+refractive_index is a complex matrix with shape (temperature, frequency),
+using a nonnegative imaginary part. shape=-1 is a spheroid (horizontal to
+rotational axis ratio); shape=-2 is a cylinder (diameter to length ratio).
+The angle grid contains angles equally spaced from 0 to 180 degrees.
+
+Each diameter represents one particle size; combine the resulting habit with
+an ARTS PSD using ScatteringHabit. No external scattering files are needed.
+See :doc:`user.tmatrix` for usage and :doc:`dev.tmatrix` for build requirements.
+)",
+                  py::call_guard<py::gil_scoped_release>())
+      .def_static(
+          "sphere",
+          [](Vector                             t,
+             Vector                             f,
+             Vector                             d,
+             const scattering::ZenithAngleGrid& za,
+             const ComplexMatrix&               m,
+             Numeric                            density) { return ParticleHabit::sphere(t, f, d, za, m, density); },
+          "t_grid"_a,
+          "f_grid"_a,
+          "diameters"_a,
+          "za_scat_grid"_a,
+          "refractive_index"_a,
+          "density"_a,
+          "Create a Mie sphere habit. Supply temperature [K], frequency [Hz], diameters [m], density [kg/m3], and complex refractive indices with axes (temperature, frequency). Imaginary parts must be nonnegative.")
+      .def_static(
+          "liquid_sphere",
+          [](Vector t_grid, Vector f_grid, Vector diameters, const scattering::ZenithAngleGrid& za_scat_grid) {
+            return ParticleHabit::liquid_sphere(t_grid, f_grid, diameters, za_scat_grid);
+          },
+          "t_grid"_a,
+          "f_grid"_a,
+          "diameters"_a,
+          "za_scat_grid"_a,
+          "Create a totally-random liquid-sphere habit with ARTS' Mie solver")
       .def_static("from_legacy_tro", &ParticleHabit::from_legacy_tro, "ssd"_a, "smd"_a, "Create from legacy TRO")
+      .def_static("from_legacy_aro", &ParticleHabit::from_legacy_aro, "ssd"_a, "smd"_a, "Create from legacy ARO")
       .def("to_tro_spectral",
            &ParticleHabit::to_tro_spectral,
            "t_grid"_a,

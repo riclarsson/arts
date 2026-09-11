@@ -71,30 +71,37 @@ RegridWeights calc_regrid_weights(std::shared_ptr<const Vector>          t_grid,
   if (!f_grid) { ARTS_USER_ERROR("The old f_grid must be provided for calculating regridding weights."); }
   if (!new_grids.f_grid) { ARTS_USER_ERROR("The new f_grid must be provided for calculating regridding weights."); }
 
+  const auto positions = [](ArrayOfGridPos &out, const Vector &old_grid, const Vector &new_grid) {
+    if (old_grid.size() == 1) {
+      stdr::fill(out, GridPos{.idx = 0, .fd = {0.0, 1.0}});
+    } else {
+      gridpos(out, old_grid, new_grid, 1e99);
+    }
+  };
+
   res.t_grid_weights = ArrayOfGridPos(new_grids.t_grid->size());
-  gridpos(res.t_grid_weights, *t_grid, *new_grids.t_grid, 1e99);
+  positions(res.t_grid_weights, *t_grid, *new_grids.t_grid);
   res.f_grid_weights = ArrayOfGridPos(new_grids.f_grid->size());
-  gridpos(res.f_grid_weights, *f_grid, *new_grids.f_grid, 1e99);
+  positions(res.f_grid_weights, *f_grid, *new_grids.f_grid);
 
   if ((aa_inc_grid) && (new_grids.aa_inc_grid)) {
     res.aa_inc_grid_weights = ArrayOfGridPos(new_grids.aa_inc_grid->size());
-    gridpos(res.aa_inc_grid_weights, *aa_inc_grid, *new_grids.aa_inc_grid, 1e99);
+    positions(res.aa_inc_grid_weights, *aa_inc_grid, *new_grids.aa_inc_grid);
   }
   if ((za_inc_grid) && (new_grids.za_inc_grid)) {
     res.za_inc_grid_weights = ArrayOfGridPos(new_grids.za_inc_grid->size());
-    gridpos(res.za_inc_grid_weights, *za_inc_grid, *new_grids.za_inc_grid, 1e99);
+    positions(res.za_inc_grid_weights, *za_inc_grid, *new_grids.za_inc_grid);
   }
   if ((aa_scat_grid) && (new_grids.aa_scat_grid)) {
     res.aa_scat_grid_weights = ArrayOfGridPos(new_grids.aa_scat_grid->size());
-    gridpos(res.aa_scat_grid_weights, *aa_scat_grid, *new_grids.aa_scat_grid, 1e99);
+    positions(res.aa_scat_grid_weights, *aa_scat_grid, *new_grids.aa_scat_grid);
   }
   if ((za_scat_grid) && (new_grids.za_scat_grid)) {
     res.za_scat_grid_weights =
         ArrayOfGridPos(std::visit([](const auto &grd) { return grd.angles.size(); }, *new_grids.za_scat_grid));
-    gridpos(res.za_scat_grid_weights,
-            std::visit([](const auto &grd) { return static_cast<Vector>(grd.angles); }, *za_scat_grid),
-            std::visit([](const auto &grd) { return static_cast<Vector>(grd.angles); }, *new_grids.za_scat_grid),
-            1e99);
+    positions(res.za_scat_grid_weights,
+              std::visit([](const auto &grd) { return static_cast<Vector>(grd.angles); }, *za_scat_grid),
+              std::visit([](const auto &grd) { return static_cast<Vector>(grd.angles); }, *new_grids.za_scat_grid));
   }
   return res;
 }
