@@ -13,7 +13,7 @@ struct Targets;
 
 namespace lbl::voigt::ecs {
 struct ComputeData {
-  Numeric gd_fac{};  //! Doppler broadening factor of a band
+  Numeric gd_fac{};  //! Gaussian 1/e half-width divided by line frequency
 
   //! Size of line shapes
   Vector       pop{};
@@ -34,6 +34,13 @@ struct ComputeData {
   //! [1, or broadening species] x size of line shapes x size of line shapes
   ComplexTensor3 Ws{};
   ComplexTensor3 Vs{};
+
+  //! Reciprocal condition number of each equivalent-line eigenvector matrix.
+  Vector eigenvector_rcond{};
+
+  //! Per-broadener max |sum_j dipr[j] W[j,i]| / sum_j |dipr[j] W[j,i]|.
+  //! A finite truncated band need not satisfy the optical sum rule exactly.
+  Vector sum_rule_residual{};
 
   //! Size of frequency
   Vector        scl{};
@@ -62,6 +69,14 @@ struct ComputeData {
                    const LinemixingSpeciesEcsData& rovib_data,
                    const AtmPoint&                 atm,
                    const bool                      presorted = false);
+
+ private:
+  void adapt(const QuantumIdentifier&        bnd_qid,
+             const band_data&                bnd,
+             const LinemixingSpeciesEcsData& rovib_data,
+             const AtmPoint&                 atm,
+             bool                            presorted,
+             bool                            per_broadener);
 };
 
 void calculate(PropmatVectorView               pm,

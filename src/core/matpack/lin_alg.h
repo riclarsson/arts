@@ -21,6 +21,16 @@ void lubacksub(VectorView x, ConstMatrixView LU, ConstVectorView b, const ArrayO
 // Solve linear system
 void solve(VectorView x, ConstMatrixView A, ConstVectorView b);
 
+/** Solve A*x=b and return an estimate of the reciprocal 1-norm condition
+ * number. Inputs are preserved, except that x may alias b. Strided views are
+ * supported. Throws for singular/nonfinite inputs or rcond < min_rcond, and
+ * leaves x unchanged on failure. An empty system returns 1.
+ */
+Numeric solve(StridedComplexVectorView      x,
+              StridedConstComplexMatrixView A,
+              StridedConstComplexVectorView b,
+              Numeric                       min_rcond = 0);
+
 /** A = U Sigma V^T, via LAPACK. s contains the min(m,n) singular values.
  * U and V are square when full_matrices is true; otherwise both have min(m,n)
  * columns. Input is preserved.
@@ -106,11 +116,13 @@ struct diagonalize_workdata {
 struct complex_diagonalize_workdata {
   Index         N{};
   ComplexMatrix matrix;
+  ComplexMatrix eigenvectors;
+  ComplexVector eigenvalues;
   ComplexVector work;
   Vector        rwork;
 
   complex_diagonalize_workdata() = default;
-  explicit complex_diagonalize_workdata(Index n) : N(n), matrix(n, n), work(2 * n + n * n), rwork(2 * n) {}
+  explicit complex_diagonalize_workdata(Index n);
 };
 
 // Matrix diagonalization with lapack
@@ -125,11 +137,15 @@ void diagonalize_inplace(MatrixView P, VectorView WR, VectorView WI, MatrixView 
 // Same as diagonalize but inplace manilpulation of input with destructive consqeuences
 void diagonalize_inplace(MatrixView P, VectorView WR, VectorView WI, MatrixView A, diagonalize_workdata& wo);
 
-// Matrix diagonalization with lapack
-void diagonalize(ComplexMatrixView P, ComplexVectorView W, const ConstComplexMatrixView A);
-void diagonalize(ComplexMatrixView             P,
-                 ComplexVectorView             W,
-                 ConstComplexMatrixView        A,
+/** Complex eigendecomposition A*P=P*diag(W), with right eigenvectors in the
+ * columns of P. Supports strided views and preserves A unless it aliases an
+ * output. Throws on invalid dimensions, nonfinite values, or LAPACK failure;
+ * outputs are unchanged on failure. Empty matrices are accepted.
+ */
+void diagonalize(StridedComplexMatrixView P, StridedComplexVectorView W, StridedConstComplexMatrixView A);
+void diagonalize(StridedComplexMatrixView      P,
+                 StridedComplexVectorView      W,
+                 StridedConstComplexMatrixView A,
                  complex_diagonalize_workdata& workdata);
 
 // Exponential of a Matrix

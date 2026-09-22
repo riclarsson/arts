@@ -5,6 +5,10 @@
 
 namespace lbl::linemixing {
 Numeric species_data::Q(const Rational J, const Numeric T, const Numeric T0, const Numeric energy) const {
+  ARTS_USER_ERROR_IF(not std::isfinite(Numeric(J)) or J <= 0,
+                     "ECS basis rates require a positive angular transfer; Q(0) is undefined")
+  ARTS_USER_ERROR_IF(not std::isfinite(T) or T <= 0 or not std::isfinite(T0) or T0 <= 0 or not std::isfinite(energy),
+                     "ECS basis rates require positive finite temperatures and finite energy")
   return std::exp(-beta(T0, T) * energy / (Constant::k * T)) * scaling(T0, T) / powr(J * (J + 1), lambda(T0, T));
 }
 
@@ -14,12 +18,16 @@ Numeric species_data::Omega(const Numeric T,
                             const Numeric other_mass,
                             const Numeric energy_x,
                             const Numeric energy_xm2) const {
-  using Constant::h;
   using Constant::h_bar;
   using Constant::k;
   using Constant::m_u;
   using Constant::pi;
   using Math::pow2;
+
+  ARTS_USER_ERROR_IF(not std::isfinite(T) or T <= 0 or not std::isfinite(T0) or T0 <= 0 or not std::isfinite(mass) or
+                         mass <= 0 or not std::isfinite(other_mass) or other_mass <= 0 or not std::isfinite(energy_x) or
+                         not std::isfinite(energy_xm2),
+                     "ECS adiabatic factors require positive finite temperatures and masses and finite energies")
 
   // Constants for the expression
   constexpr Numeric fac = 8 * k / (m_u * pi);

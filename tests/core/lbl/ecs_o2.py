@@ -1,3 +1,9 @@
+"""Exercise atmospheric O2 ECS with an approximate catalogue Bath model.
+
+MeanAir averages ECS parameter coefficients to populate AIR/Bath; the catalogue
+AIR and self-broadening coefficients remain unchanged.
+"""
+
 import pyarts3 as pyarts
 import numpy as np
 import matplotlib.pyplot as plt
@@ -46,6 +52,7 @@ ws.jac_targetsInit()
 
 ws.abs_ecs_dataInit()
 ws.abs_ecs_dataAddMakarov2020()
+# Approximate Bath parameters for the existing catalogue AIR broadener.
 ws.abs_ecs_dataAddMeanAir(vmrs=[1], species=["N2"])
 
 
@@ -96,6 +103,7 @@ ws.abs_speciesSet(species=["O2-PWR98", "H2O-PWR98"])
 ws.ReadCatalogData()
 plt.semilogy(ws.freq_grid / 1e9, calc(ws), label="PWR98")
 
+plt.title("Atmospheric O2: approximate Bath ECS parameters")
 plt.legend()
 
 # Test here if we can save and load the workspace

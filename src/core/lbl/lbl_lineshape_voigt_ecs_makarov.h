@@ -15,6 +15,9 @@ namespace lbl::voigt::ecs::makarov {
  */
 Numeric reduced_dipole(const Rational Ju, const Rational Jl, const Rational N);
 
+//! Validate the O2-66 spin-triplet, constant-N microwave model domain.
+void validate_band(const QuantumIdentifier& bnd_qid, const band_data& bnd);
+
 void relaxation_matrix_offdiagonal(MatrixView&                     W,
                                    const QuantumIdentifier&        bnd_qid,
                                    const band_data&                bnd,
