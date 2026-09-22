@@ -13,7 +13,7 @@
 #include <parameters.h>
 #include <workspace.h>
 #include <workspace_groups.h>
-#include <xpy_auto_wsg_wsv_implicit.h>
+#include <py_auto_wsg_wsv_implicit.h>
 
 #include <algorithm>
 #include <exception>

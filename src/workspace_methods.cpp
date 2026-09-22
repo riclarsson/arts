@@ -28,33 +28,6 @@ namespace stdr = std::ranges;
 #pragma clang optimize off
 #endif
 
-std::string WorkspaceMethodInternalRecord::docstring() const try {
-  std::string doc = std::format("/** {}\n", desc);
-  if (pass_workspace) doc += "  @param[in] ws Workspace reference\n";
-
-  for (auto& str : out) {
-    if (std::any_of(in.begin(), in.end(), [&str](auto& var) { return str == var; }))
-      doc += std::format("  @param[inout] {} As WSV\n", str);
-    else
-      doc += std::format("  @param[out] {} As WSV\n", str);
-  }
-
-  for (std::size_t i = 0; i < gout.size(); i++) { doc += std::format("  @param[out] {} {}\n", gout[i], gout_desc[i]); }
-
-  for (auto& str : in) {
-    if (std::any_of(out.begin(), out.end(), [&str](auto& var) { return str == var; })) continue;
-    doc += std::format("  @param[in] {} As WSV\n", str);
-  }
-
-  for (std::size_t i = 0; i < gin.size(); i++) { doc += std::format("  @param[in] {} {}\n", gin[i], gin_desc[i]); }
-
-  doc += " */";
-
-  return doc;
-} catch (std::exception& e) {
-  throw std::runtime_error("Error in meta-function docstring():\n\n" + std::string(e.what()));
-}
-
 std::string WorkspaceMethodInternalRecord::generic_type(const std::string& type, bool output) {
   // A method that accepts every workspace group takes the type-erased workspace
   // value itself.  A variant over all groups would instead have to be built in
