@@ -192,6 +192,108 @@ Numeric closure_residual(ConstMatrixView W, ConstVectorView d) {
 }
 }  // namespace
 
+void prepare_rotational_ladder(energy_data& energies, const int count, Numeric (*energy)(Rational)) {
+  ARTS_USER_ERROR_IF(count < 0 or energy == nullptr, "Invalid ECS reference-rotor preparation")
+  energies.rotational.resize(count);
+  energies.rotational_minus_two.resize(count);
+  for (Index L = 0; L < count; ++L) {
+    energies.rotational[L]           = energy(Rational{L});
+    energies.rotational_minus_two[L] = energy(Rational{L - 2});
+  }
+}
+
+basis_data prepare_basis(const int                       count,
+                         const energy_data&              energies,
+                         const linemixing::species_data& collision,
+                         const Numeric                   T0,
+                         const SpeciesIsotope&           isot,
+                         const SpeciesEnum               broadener,
+                         const AtmPoint&                 atm) {
+  ARTS_USER_ERROR_IF(count < 0 or energies.rotational.size() < static_cast<Size>(count) or
+                         energies.rotational_minus_two.size() < static_cast<Size>(count),
+                     "Incomplete ECS reference-rotor energies for {}",
+                     isot)
+  basis_data    out{.Q = Vector(count, 0.0), .Omega = Vector(count)};
+  const Numeric mass = broadener == SpeciesEnum::Bath ? atm.mean_mass() : atm.mean_mass(broadener);
+  for (Index L = 0; L < count; ++L) {
+    out.Omega[L] =
+        collision.Omega(atm.temperature, T0, mass, isot.mass, energies.rotational[L], energies.rotational_minus_two[L]);
+  }
+  // The power law is undefined at L=0. Keep positive channels from L=1,
+  // including channels not selected by a particular species' angular sum.
+  for (Index L = 1; L < count; ++L) {
+    out.Q[L] = collision.Q(Rational{L}, atm.temperature, T0, energies.rotational[L]);
+  }
+  for (Index L = 0; L < count; ++L) {
+    ARTS_USER_ERROR_IF(not std::isfinite(out.Omega[L]) or out.Omega[L] <= 0 or not std::isfinite(out.Q[L]),
+                       "Invalid ECS basis rate or adiabaticity factor at L={} for {} and {}",
+                       L,
+                       isot,
+                       broadener)
+  }
+  return out;
+}
+
+void apply_sum_rule(MatrixView W, ConstVectorView dipr, ConstVectorView e0, Numeric T) {
+  const Size n = dipr.size();
+  ARTS_USER_ERROR_IF(W.nrows() != static_cast<Index>(n) or W.ncols() != static_cast<Index>(n) or e0.size() != n,
+                     "Inconsistent ECS sum-rule dimensions")
+  ARTS_USER_ERROR_IF(not std::isfinite(T) or T <= 0, "ECS sum-rule correction requires positive finite temperature")
+
+  // The sequential correction retains the historical truncated-band closure.
+  // In particular it cannot enforce the final column's sum rule. Do not hide
+  // overflow or invalid rates by treating a non-finite denominator as zero.
+  for (Size i = 0; i < n; ++i) {
+    ARTS_USER_ERROR_IF(not std::isfinite(dipr[i]), "Non-finite ECS reduced dipole for matrix line {}", i)
+    ARTS_USER_ERROR_IF(not std::isfinite(e0[i]), "Non-finite ECS sum-rule energy for matrix line {}", i)
+    for (Size j = 0; j < n; ++j) {
+      ARTS_USER_ERROR_IF(not std::isfinite(W[j, i]),
+                         "Non-finite ECS relaxation matrix element ({}, {}) before sum-rule correction",
+                         j,
+                         i)
+    }
+  }
+
+  for (Size i = 0; i < n; ++i) {
+    Numeric sumlw = 0.0;
+    Numeric sumup = 0.0;
+
+    for (Size j = 0; j < n; ++j) {
+      if (j > i) {
+        sumlw += dipr[j] * W[j, i];
+      } else {
+        sumup += dipr[j] * W[j, i];
+      }
+    }
+
+    ARTS_USER_ERROR_IF(
+        not std::isfinite(sumlw) or not std::isfinite(sumup), "Non-finite ECS sum-rule sums for matrix line {}", i)
+    ARTS_USER_ERROR_IF(sumlw != 0 and not std::isfinite(-sumup / sumlw),
+                       "ECS sum-rule correction overflows for matrix line {}; the supplied band and widths "
+                       "do not define a stable correction.",
+                       i)
+
+    for (Size j = i + 1; j < n; ++j) {
+      if (sumlw == 0) {
+        W[j, i] = 0.0;
+        W[i, j] = 0.0;
+      } else {
+        W[j, i] *= -sumup / sumlw;
+        W[i, j]  = W[j, i] * std::exp((e0[i] - e0[j]) / (Constant::k * T));
+      }
+    }
+  }
+
+  for (Size i = 0; i < n; ++i) {
+    for (Size j = 0; j < n; ++j) {
+      ARTS_USER_ERROR_IF(not std::isfinite(W[j, i]),
+                         "Non-finite ECS relaxation matrix element ({}, {}) after sum-rule correction",
+                         j,
+                         i)
+    }
+  }
+}
+
 void ComputeData::adapt_multi(const QuantumIdentifier&        bnd_qid,
                               const band_data&                bnd,
                               const LinemixingSpeciesEcsData& rovib_data,
@@ -300,6 +402,25 @@ void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
     dipr = reorder(dipr);
   }
 
+  // Prepare kernel inputs once in matrix order. The kernels never access the
+  // catalogue or its permutation; optical populations above retain catalogue e0.
+  rotational_lines.resize(n);
+  for (Size i = 0; i < n; ++i) {
+    const auto& ln      = bnd.lines[sort[i]];
+    const auto& J       = ln.qn.at(QuantumNumberType::J);
+    rotational_lines[i] = {.Ju = J.upper, .Jl = J.lower};
+    if (bnd.lineshape == LineByLineLineshape::VP_ECS_MAKAROV) {
+      const auto& N          = ln.qn.at(QuantumNumberType::N);
+      rotational_lines[i].Nu = N.upper;
+      rotational_lines[i].Nl = N.lower;
+    }
+  }
+  if (bnd.lineshape == LineByLineLineshape::VP_ECS_HARTMANN) {
+    hartmann::prepare_energies(energies, bnd_qid, rotational_lines);
+  } else {
+    makarov::prepare_energies(energies, bnd_qid, rotational_lines);
+  }
+
   Vector fractions(broadener_count);
   get_vmrs(fractions, models, atm);
   if (per_broadener)
@@ -329,7 +450,7 @@ void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
       Wimag[k, k]               = width;
       real_val(Ws[page][k, k]) += weight * shift;
     }
-    kernel(Wimag, bnd_qid, bnd, sort, spec, data->second, dipr, atm);
+    kernel(Wimag, bnd_qid, rotational_lines, bnd.front().ls.T0, spec, data->second, dipr, energies, atm);
     sum_rule_residual[i] = closure_residual(Wimag, dipr);
     for (Size r = 0; r < n; ++r) {
       for (Size c = 0; c < n; ++c) { imag_val(Ws[page][r, c]) += weight * Wimag[r, c]; }

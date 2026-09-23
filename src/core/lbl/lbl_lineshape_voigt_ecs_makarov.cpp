@@ -5,6 +5,8 @@
 
 #include <cmath>
 
+#include "lbl_lineshape_voigt_ecs.h"
+
 namespace lbl::voigt::ecs::makarov {
 #if DO_FAST_WIGNER
 #define WIGNER3 fw3jja6
@@ -30,6 +32,23 @@ void validate_rotational_pair(const Rational Ju, const Rational Jl, const Ration
                      Jl);
 }
 
+void validate_band_id(const QuantumIdentifier& bnd_qid) {
+  ARTS_USER_ERROR_IF(bnd_qid.isot != "O2-66"_isot, "Makarov ECS currently supports only O2-66, got {}", bnd_qid.isot);
+  const auto& S = bnd_qid.state.at(QuantumNumberType::S);
+  ARTS_USER_ERROR_IF(S.upper != 1 or S.lower != 1,
+                     "Makarov O2-66 ECS requires electron spin S=1 in both states; got upper={}, lower={}",
+                     S.upper,
+                     S.lower);
+}
+
+void validate_rotational_line(const rotational_line& ln) {
+  ARTS_USER_ERROR_IF(ln.Nu != ln.Nl,
+                     "Makarov O2-66 ECS implements microwave transitions with unchanged N; got upper={}, lower={}",
+                     ln.Nu,
+                     ln.Nl);
+  validate_rotational_pair(ln.Ju, ln.Jl, ln.Nu);
+}
+
 Numeric wig3(
     const Rational& a, const Rational& b, const Rational& c, const Rational& d, const Rational& e, const Rational& f) {
   return WIGNER3(a.toInt(2), b.toInt(2), c.toInt(2), d.toInt(2), e.toInt(2), f.toInt(2));
@@ -39,157 +58,27 @@ Numeric wig6(
     const Rational& a, const Rational& b, const Rational& c, const Rational& d, const Rational& e, const Rational& f) {
   return WIGNER6(a.toInt(2), b.toInt(2), c.toInt(2), d.toInt(2), e.toInt(2), f.toInt(2));
 }
-}  // namespace
-
-Numeric reduced_dipole(const Rational Ju, const Rational Jl, const Rational N) {
-  validate_rotational_pair(Ju, Jl, N);
-  return (iseven(Jl + N) ? 1 : -1) * sqrtr(6 * (2 * Jl + 1) * (2 * Ju + 1)) *
-         wigner6j(Rational{1}, Rational{1}, Rational{1}, Jl, Ju, N);
-};
-
-namespace {
-/*! Compute the rotational energy of ground-state O2 at N and J
- * 
- * If the template argument evaluates true, the erot<false>(1, 0)
- * energy is removed from the output of erot<false>(N, J).
- * 
- * @param[in] N Main rotational number
- * @param[in] j Main rotational number plus spin (if j < 0 then J=N)
- * @return Rotational energy in Joule
- */
-template <bool rescale_pure_rotational = true>
-constexpr Numeric erot(const Rational N, const Rational j = Rational{-1}) try {
-  const Rational J = j < 0 ? N : j;
-
-  if constexpr (rescale_pure_rotational) {
-    return erot<false>(N, J) - erot<false>(Rational{1}, Rational{0});
-  } else {
-    using Conversion::mhz2joule;
-    using Math::pow2;
-    using Math::pow3;
-
-    constexpr Numeric B0  = 43100.4425e0;
-    constexpr Numeric D0  = .145123e0;
-    constexpr Numeric H0  = 3.8e-08;
-    constexpr Numeric xl0 = 59501.3435e0;
-    constexpr Numeric xg0 = -252.58633e0;
-    constexpr Numeric xl1 = 0.058369e0;
-    constexpr Numeric xl2 = 2.899e-07;
-    constexpr Numeric xg1 = -2.4344e-04;
-    constexpr Numeric xg2 = -1.45e-09;
-
-    const Numeric XN      = static_cast<Numeric>(N);
-    const Numeric XX      = XN * (XN + 1);
-    const Numeric xlambda = xl0 + xl1 * XX + xl2 * pow2(XX);
-    const Numeric xgama   = xg0 + xg1 * XX + xg2 * pow2(XX);
-    const Numeric C1      = B0 * XX - D0 * pow2(XX) + H0 * pow3(XX);
-
-    if (J < N) {
-      if (N == 1)  // erot<false>(1, 0)
-        return mhz2joule(C1 - (xlambda + B0 * (2. * XN - 1.) + xgama * XN));
-      return mhz2joule(C1 - (xlambda + B0 * (2. * XN - 1.) + xgama * XN) +
-                       std::sqrt(pow2(B0 * (2. * XN - 1.)) + pow2(xlambda) - 2. * B0 * xlambda));
-    }
-    if (J > N)
-      return mhz2joule(C1 - (xlambda - B0 * (2. * XN + 3.) - xgama * (XN + 1.)) -
-                       std::sqrt(pow2(B0 * (2. * XN + 3.)) + pow2(xlambda) - 2. * B0 * xlambda));
-    return mhz2joule(C1);
-  }
-}
-ARTS_METHOD_ERROR_CATCH
-}  // namespace
-
-void validate_band(const QuantumIdentifier& bnd_qid, const band_data& bnd) {
-  ARTS_USER_ERROR_IF(bnd_qid.isot != "O2-66"_isot, "Makarov ECS currently supports only O2-66, got {}", bnd_qid.isot);
-  const auto& S = bnd_qid.state.at(QuantumNumberType::S);
-  ARTS_USER_ERROR_IF(S.upper != 1 or S.lower != 1,
-                     "Makarov O2-66 ECS requires electron spin S=1 in both states; got upper={}, lower={}",
-                     S.upper,
-                     S.lower);
-  for (const auto& ln : bnd) {
-    const auto& J = ln.qn.at(QuantumNumberType::J);
-    const auto& N = ln.qn.at(QuantumNumberType::N);
-    ARTS_USER_ERROR_IF(N.upper != N.lower,
-                       "Makarov O2-66 ECS implements microwave transitions with unchanged N; got upper={}, lower={}",
-                       N.upper,
-                       N.lower);
-    validate_rotational_pair(J.upper, J.lower, N.upper);
-  }
-}
-
-void relaxation_matrix_offdiagonal(MatrixView&                     W,
-                                   const QuantumIdentifier&        bnd_qid,
-                                   const band_data&                bnd,
-                                   const ArrayOfIndex&             sorting,
-                                   const SpeciesEnum               broadening_species,
-                                   const linemixing::species_data& rovib_data,
-                                   const Vector&                   dipr,
-                                   const AtmPoint&                 atm) try {
+// Fill all off-diagonal pairs and manage Wigner scratch for the complete loop.
+void coupling_kernel(MatrixView                       W,
+                     std::span<const rotational_line> lines,
+                     const Rational                   Si,
+                     const Rational                   Sf,
+                     const basis_data&                basis,
+                     const Vector&                    e0,
+                     const Numeric                    T,
+                     const int                        maxL) {
   using Conversion::kelvin2joule;
-
-  if (bnd.size() == 0) return;
-  validate_band(bnd_qid, bnd);
-
-  const auto bk = [](const Rational& r) -> Numeric { return sqrtr(2 * r + 1); };
-
-  const auto n = bnd.size();
-
-  auto&          S  = bnd_qid.state.at(QuantumNumberType::S);
-  const Rational Si = S.upper;
-  const Rational Sf = S.lower;
-
-  const std::array rats{bnd.max(QuantumNumberType::J), bnd.max(QuantumNumberType::N), Si, Sf};
-  const int        maxL = wigner_init_size(rats);
-
-  const auto Om = [&, maxL]() {
-    Vector out(maxL);
-    for (Index i = 0; i < maxL; i++)
-      out[i] = rovib_data.Omega(
-          atm.temperature,
-          bnd.front().ls.T0,
-          broadening_species == SpeciesEnum::Bath ? atm.mean_mass() : atm.mean_mass(broadening_species),
-          bnd_qid.isot.mass,
-          erot(Rational{i}),
-          erot(Rational{i - 2}));
-    return out;
-  }();
-
-  const auto Q = [&, maxL]() {
-    Vector out(maxL, 0.0);
-    // The Makarov sum starts at L=2; the power law is undefined at L=0.
-    for (Index i = 1; i < maxL; i++)
-      out[i] = rovib_data.Q(Rational{i}, atm.temperature, bnd.front().ls.T0, erot(Rational{i}));
-    return out;
-  }();
-
-  for (Index L = 0; L < maxL; ++L) {
-    ARTS_USER_ERROR_IF(not std::isfinite(Om[L]) or Om[L] <= 0 or not std::isfinite(Q[L]),
-                       "Invalid ECS basis rate or adiabaticity factor at L={} for {} and {}",
-                       L,
-                       bnd_qid.isot,
-                       broadening_species)
-  }
+  const auto& [Q, Om] = basis;
+  const auto bk       = [](const Rational& r) -> Numeric { return sqrtr(2 * r + 1); };
+  const Size n        = lines.size();
 
   arts_wigner_thread_init(maxL);
   for (Size i = 0; i < n; i++) {
-    auto& J = bnd.lines[sorting[i]].qn.at(QuantumNumberType::J);
-    auto& N = bnd.lines[sorting[i]].qn.at(QuantumNumberType::N);
-
-    const Rational Ji = J.upper;
-    const Rational Jf = J.lower;
-    const Rational Ni = N.upper;
-    const Rational Nf = N.lower;
+    const auto& [Ji, Jf, Ni, Nf] = lines[i];
 
     for (Size j = 0; j < n; j++) {
       if (i == j) continue;
-
-      auto& J_p = bnd.lines[sorting[j]].qn.at(QuantumNumberType::J);
-      auto& N_p = bnd.lines[sorting[j]].qn.at(QuantumNumberType::N);
-
-      const Rational Ji_p = J_p.upper;
-      const Rational Jf_p = J_p.lower;
-      const Rational Ni_p = N_p.upper;
-      const Rational Nf_p = N_p.lower;
+      const auto& [Ji_p, Jf_p, Ni_p, Nf_p] = lines[j];
 
       if (Jf_p > Jf) continue;
 
@@ -210,68 +99,137 @@ void relaxation_matrix_offdiagonal(MatrixView&                     W,
       }
       sum *= scl * Om[Ni.toIndex()];
 
-      // Add to W and rescale to upwards element by the populations
+      // Add to W and rescale to upwards element by the populations.
       W[i, j] = sum;
-      W[j, i] = sum * std::exp((bnd.lines[sorting[j]].e0 - bnd.lines[sorting[i]].e0) / kelvin2joule(atm.temperature));
+      W[j, i] = sum * std::exp((e0[j] - e0[i]) / kelvin2joule(T));
     }
   }
   arts_wigner_thread_free();
 
   ARTS_USER_ERROR_IF(errno == EDOM, "Cannot compute the wigner symbols")
+}
+}  // namespace
 
-  // The sequential correction retains the historical truncated-band closure.
-  // In particular it cannot enforce the final column's sum rule.  Do not hide
-  // overflow or invalid rates by treating a non-finite denominator as zero.
-  for (Size i = 0; i < n; ++i) {
-    ARTS_USER_ERROR_IF(not std::isfinite(dipr[i]), "Non-finite ECS reduced dipole for line {}", sorting[i])
-    for (Size j = 0; j < n; ++j) {
-      ARTS_USER_ERROR_IF(not std::isfinite(W[j, i]),
-                         "Non-finite ECS relaxation matrix element ({}, {}) before sum-rule correction",
-                         j,
-                         i)
-    }
+Numeric reduced_dipole(const Rational Ju, const Rational Jl, const Rational N) {
+  validate_rotational_pair(Ju, Jl, N);
+  return (iseven(Jl + N) ? 1 : -1) * sqrtr(6 * (2 * Jl + 1) * (2 * Ju + 1)) *
+         wigner6j(Rational{1}, Rational{1}, Rational{1}, Jl, Ju, N);
+};
+
+namespace {
+// O2-66 constants in MHz, from Tretyakov et al., JMS 231 (2005), Table 3.
+constexpr Numeric B0 = 43100.4425;
+
+constexpr Numeric rotational_energy_mhz(const Rational N) {
+  const Numeric X = Numeric(N * (N + 1));
+  return B0 * X - 0.145123 * Math::pow2(X) + 3.8e-08 * Math::pow3(X);
+}
+
+// Approximate spin-triplet expressions. These retain the existing treatment
+// of centrifugal distortion and spin rotation; they are not a replacement
+// for catalogue transition frequencies (low-N residuals reach about 24 MHz).
+constexpr Numeric level_energy_mhz(const Rational N, const Rational J) {
+  const Numeric XN         = Numeric(N);
+  const Numeric X          = XN * (XN + 1);
+  const Numeric lambda     = 59501.3435 + 0.058369 * X + 2.899e-07 * Math::pow2(X);
+  const Numeric gamma      = -252.58633 - 2.4344e-04 * X - 1.45e-09 * Math::pow2(X);
+  const Numeric rotational = rotational_energy_mhz(N);
+
+  if (J < N) {
+    // J=0 has no N=-1 mixing partner. Its energy is rotational - 2*lambda - gamma.
+    // Van Vleck (1947), p. 414, footnote 3: doi:10.1103/PhysRev.71.413.
+    // The old special case dropped the lambda-B0 contribution, putting the
+    // N=1, J=1 <- J=0 splitting at 102.349 GHz instead of 118.750 GHz.
+    if (N == 1) return rotational - 2 * lambda - gamma;
+    return rotational - (lambda + B0 * (2 * XN - 1) + gamma * XN) +
+           std::sqrt(Math::pow2(B0 * (2 * XN - 1)) + Math::pow2(lambda) - 2 * B0 * lambda);
+  }
+  if (J > N)
+    return rotational - (lambda - B0 * (2 * XN + 3) - gamma * (XN + 1)) -
+           std::sqrt(Math::pow2(B0 * (2 * XN + 3)) + Math::pow2(lambda) - 2 * B0 * lambda);
+  return rotational;
+}
+
+constexpr Numeric ground_energy_mhz = level_energy_mhz(Rational{1}, Rational{0});
+}  // namespace
+
+Numeric rotational_energy(const Rational N) {
+  // The ECS reference rotor has no resolved spin splitting. Preserve a common
+  // ground-state zero with level_energy, including in Q's absolute energy.
+  return Conversion::mhz2joule(rotational_energy_mhz(N) - ground_energy_mhz);
+}
+
+Numeric level_energy(const Rational N, const Rational J) {
+  ARTS_USER_ERROR_IF(N.denom != 1 or N <= 0 or iseven(N) or J.denom != 1 or J < 0 or abs(J - N) > 1,
+                     "O2-66 level energies require positive odd integer N and integer J >= 0 with |J-N| <= 1; "
+                     "got N={}, J={}",
+                     N,
+                     J)
+  return Conversion::mhz2joule(level_energy_mhz(N, J) - ground_energy_mhz);
+}
+
+void prepare_energies(energy_data& energies, const QuantumIdentifier& qid, std::span<const rotational_line> lines) {
+  validate_band_id(qid);
+  const auto& S = qid.state.at(QuantumNumberType::S);
+  Rational    maxJ{0}, maxN{0};
+  energies.e0.resize(lines.size());
+  for (Size i = 0; i < lines.size(); ++i) {
+    const auto& ln = lines[i];
+    validate_rotational_line(ln);
+    maxJ           = std::max({maxJ, ln.Ju, ln.Jl});
+    maxN           = std::max({maxN, ln.Nu, ln.Nl});
+    energies.e0[i] = level_energy(ln.Nl, ln.Jl);
+  }
+  const std::array rats{maxJ, maxN, Rational{S.upper}, Rational{S.lower}};
+  const int        maxL = wigner_init_size(rats);
+  prepare_rotational_ladder(energies, maxL, rotational_energy);
+}
+
+void validate_band(const QuantumIdentifier& bnd_qid, const band_data& bnd) {
+  validate_band_id(bnd_qid);
+  for (const auto& ln : bnd) {
+    const auto& J = ln.qn.at(QuantumNumberType::J);
+    const auto& N = ln.qn.at(QuantumNumberType::N);
+    validate_rotational_line({J.upper, J.lower, N.upper, N.lower});
+  }
+}
+
+void relaxation_matrix_offdiagonal(MatrixView&                      W,
+                                   const QuantumIdentifier&         bnd_qid,
+                                   std::span<const rotational_line> lines,
+                                   Numeric                          T0,
+                                   const SpeciesEnum                broadening_species,
+                                   const linemixing::species_data&  rovib_data,
+                                   const Vector&                    dipr,
+                                   const energy_data&               energies,
+                                   const AtmPoint&                  atm) try {
+  if (lines.empty()) return;
+  validate_band_id(bnd_qid);
+  const auto& e0 = energies.e0;
+
+  const auto n = lines.size();
+  ARTS_USER_ERROR_IF(
+      e0.size() != n or dipr.size() != n or W.nrows() != static_cast<Index>(n) or W.ncols() != static_cast<Index>(n),
+      "Inconsistent Makarov ECS kernel dimensions")
+
+  auto&          S  = bnd_qid.state.at(QuantumNumberType::S);
+  const Rational Si = S.upper;
+  const Rational Sf = S.lower;
+
+  Rational maxJ{0}, maxN{0};
+  for (const auto& ln : lines) {
+    validate_rotational_line(ln);
+    maxJ = std::max({maxJ, ln.Ju, ln.Jl});
+    maxN = std::max({maxN, ln.Nu, ln.Nl});
   }
 
-  // Sum rule correction
-  for (Size i = 0; i < n; i++) {
-    Numeric sumlw = 0.0;
-    Numeric sumup = 0.0;
+  const std::array rats{maxJ, maxN, Si, Sf};
+  const int        maxL  = wigner_init_size(rats);
+  const auto       basis = prepare_basis(maxL, energies, rovib_data, T0, bnd_qid.isot, broadening_species, atm);
 
-    for (Size j = 0; j < n; j++) {
-      if (j > i) {
-        sumlw += dipr[j] * W[j, i];
-      } else {
-        sumup += dipr[j] * W[j, i];
-      }
-    }
+  coupling_kernel(W, lines, Si, Sf, basis, e0, atm.temperature, maxL);
 
-    ARTS_USER_ERROR_IF(
-        not std::isfinite(sumlw) or not std::isfinite(sumup), "Non-finite ECS sum-rule sums for line {}", sorting[i])
-    ARTS_USER_ERROR_IF(sumlw != 0 and not std::isfinite(-sumup / sumlw),
-                       "ECS sum-rule correction overflows for line {}; the supplied band and widths "
-                       "do not define a stable correction.",
-                       sorting[i])
-
-    for (Size j = i + 1; j < n; j++) {
-      if (sumlw == 0) {
-        W[j, i] = 0.0;
-        W[i, j] = 0.0;
-      } else {
-        W[j, i] *= -sumup / sumlw;
-        W[i, j] =
-            W[j, i] * std::exp((bnd.lines[sorting[i]].e0 - bnd.lines[sorting[j]].e0) / kelvin2joule(atm.temperature));
-      }
-    }
-  }
-
-  for (Size i = 0; i < n; ++i) {
-    for (Size j = 0; j < n; ++j) {
-      ARTS_USER_ERROR_IF(not std::isfinite(W[j, i]),
-                         "Non-finite ECS relaxation matrix element ({}, {}) after sum-rule correction",
-                         j,
-                         i)
-    }
-  }
+  apply_sum_rule(W, dipr, e0, atm.temperature);
 }
 ARTS_METHOD_ERROR_CATCH
 }  // namespace lbl::voigt::ecs::makarov

@@ -12,6 +12,41 @@ struct Targets;
 }  // namespace Jacobian
 
 namespace lbl::voigt::ecs {
+//! Rotational quantum numbers of a line, prepared in matrix order.
+//! N is only used by the Makarov kernel.
+struct rotational_line {
+  Rational Ju{}, Jl{}, Nu{}, Nl{};
+};
+
+//! Energies [J] prepared from one species model before evaluating collision partners.
+struct energy_data {
+  //! Resolved lower-state energies, in matrix line order.
+  Vector e0{};
+  //! Reference-rotor energies E(L) and E(L-2), indexed by angular momentum.
+  //! These also supply the line-side adiabatic factors at J (CO2) or N (O2).
+  Vector rotational{}, rotational_minus_two{};
+};
+
+//! Fill the reference ladder from the species energy model, independently of line order.
+void prepare_rotational_ladder(energy_data& energies, int count, Numeric (*energy)(Rational));
+
+//! Collision-partner basis rates, indexed by angular momentum; Q[0] is unused and zero.
+struct basis_data {
+  Vector Q{}, Omega{};
+};
+
+//! Evaluate and validate the common ECS basis from the prepared reference energies.
+basis_data prepare_basis(int                             count,
+                         const energy_data&              energies,
+                         const linemixing::species_data& collision,
+                         Numeric                         T0,
+                         const SpeciesIsotope&           isot,
+                         SpeciesEnum                     broadener,
+                         const AtmPoint&                 atm);
+
+//! Sequential truncated-band correction; vectors follow the matrix ordering.
+void apply_sum_rule(MatrixView W, ConstVectorView dipr, ConstVectorView e0, Numeric T);
+
 struct ComputeData {
   Numeric gd_fac{};  //! Gaussian 1/e half-width divided by line frequency
 
@@ -20,6 +55,10 @@ struct ComputeData {
   Vector       dip{};
   Vector       dipr{};
   ArrayOfIndex sort{};
+
+  //! Collision energies share a species model; optical pop retains catalogue e0.
+  energy_data                  energies{};
+  std::vector<rotational_line> rotational_lines{};
 
   //! Size of line shapes x size of line shapes
   Matrix Wimag{};

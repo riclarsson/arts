@@ -736,11 +736,27 @@ The reduced dipole is
     \sqrt{6(2J_l+1)(2J_u+1)}
     \begin{Bmatrix} 1 & 1 & 1 \\ J_l & J_u & N \end{Bmatrix}.
 
-The kernel is specific to O\ :sub:`2`-66.  Its rotational energy function uses
-ground-state rotational, centrifugal-distortion, spin–rotation, and spin–spin
-constants.  The basis rates use the :math:`J=N` branch of this function.  The
-Boltzmann factors relating opposite matrix elements use the catalogued lower-state
-energies of the lines.  These are distinct roles for the energy data.
+The kernel is specific to O\ :sub:`2`-66.  A single set of molecular constants
+:cite:p:`tretyakov05:_60-ghz_jms` supplies two energy functions:
+``rotational_energy(N)`` for the reference rotor and ``level_energy(N, J)``
+for the resolved spin-triplet levels.  Both use the :math:`N=1, J=0` ground
+state as their energy zero.
+
+The reference rotor contains the rotational and centrifugal-distortion terms.
+Its energies enter :math:`Q(L)` and the :math:`N\leftrightarrow N-2` spacings
+in :math:`\Omega`.  This retains the ECS approximation of a spinless reference
+rotor; the angular factors recouple it to the spin-triplet states.  The resolved
+level function also includes the spin--rotation and spin--spin terms.  Evaluated
+at each line's actual lower :math:`(N_l,J_l)`, it supplies the Boltzmann factors
+relating opposite matrix elements and the sum-rule correction.
+
+The resolved energies retain approximate spin-triplet expressions.  The
+:math:`N=1,J=0` special case has the spin correction :math:`-2\lambda-\gamma`,
+giving a :math:`J=1\leftarrow0` splitting of 118.750334 GHz, compared with the
+measured 118.750340 GHz.  Other tested :math:`N=1,3,5` branches differ from the
+measured frequencies by up to about 24 MHz.  These energies therefore do not
+replace catalogue line frequencies.  The common ground-state reference also
+enters the absolute energy in :math:`Q`, where a reference shift does not cancel.
 
 .. _lbl-ecs-sumrule:
 
@@ -767,6 +783,17 @@ the contribution from the diagonal and entries already fixed:
 When :math:`s_\downarrow\ne 0`, the remaining entries are rescaled by
 :math:`-s_\uparrow/s_\downarrow`, and their reverse couplings are updated using
 the Boltzmann relation above.
+
+The per-line rotational quantum numbers and energies are prepared once in matrix
+order and reused for every collision partner.  The kernels receive these arrays
+directly, without a catalogue-order permutation.  Hartmann evaluates its level
+energy at each line's original lower :math:`J`; Makarov uses the resolved
+:math:`(N_l,J_l)` level energy.  Both the raw reverse couplings and this correction
+use the same prepared ``e0`` vector, including when Hartmann interchanges its
+angular labels.  Separate reference-rotor arrays :math:`E_L` and :math:`E_{L-2}`
+are prepared from the same species model and remain indexed by angular momentum,
+independently of line sorting.  These collision energies do not replace the
+catalogue energies used to calculate the optical populations.
 
 This sequential prescription cannot generally enforce every column: the final
 column has no remaining entries to adjust, and zero or nearly cancelling sums

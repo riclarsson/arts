@@ -1,12 +1,15 @@
 #include <arts_constants.h>
+#include <arts_conversions.h>
 #include <atm.h>
 #include <jacobian.h>
 #include <lbl_lineshape_voigt_ecs.h>
+#include <lbl_lineshape_voigt_ecs_hartmann.h>
 #include <lbl_lineshape_voigt_ecs_makarov.h>
 #include <lbl_lineshape_voigt_lte.h>
 #include <physics_funcs.h>
 #include <wigner_functions.h>
 
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -296,6 +299,208 @@ void explicit_partner_mixture() {
     require(has_coupling, "Mixture fixture must exercise off-diagonal ECS couplings");
   }
 }
+
+void oxygen_energy_levels() {
+  using namespace lbl::voigt::ecs;
+  require(makarov::level_energy(Rational{1}, Rational{0}) == 0, "O2 ground-state energy must be zero");
+
+  // Independent spectroscopic reference: measured 1- at 118.750340 GHz;
+  // the other centers are from the Tretyakov et al. (2005) table used in TRE05.cc
+  // (doi:10.1016/j.jms.2004.11.011). The retained approximate level model is
+  // accurate only to about 25 MHz for these other branches, not catalog accuracy.
+  struct Reference {
+    Index   N;
+    Numeric minus, plus;
+  };
+  constexpr std::array reference{Reference{1, 118.750340e9, 56.264774e9},
+                                 Reference{3, 62.486253e9, 58.446588e9},
+                                 Reference{5, 60.306056e9, 59.590983e9}};
+  for (const auto& [n, minus, plus] : reference) {
+    const Rational N{n};
+    const Numeric  middle      = makarov::level_energy(N, N);
+    const Numeric  lower_minus = makarov::level_energy(N, N - 1);
+    const Numeric  lower_plus  = makarov::level_energy(N, N + 1);
+    const Numeric  tolerance   = n == 1 ? 1e4 : 3e7;
+    require(std::abs(Conversion::joule2hz(middle - lower_minus) - minus) < tolerance,
+            "O2 N- level splitting disagrees with the spectroscopic reference");
+    require(std::abs(Conversion::joule2hz(middle - lower_plus) - plus) < 3e7,
+            "O2 N+ level splitting exceeds the approximate model's 30 MHz tolerance");
+    near(makarov::rotational_energy(N),
+         middle,
+         2e-14,
+         "O2 reference rotor and resolved levels must use the same energy zero");
+    require(lower_minus != lower_plus, "O2 resolved energies must distinguish the two fine-structure branches");
+  }
+
+  QuantumIdentifier id{"O2-66"_isot};
+  id.state[QuantumNumberType::S] = {.upper = Rational{1}, .lower = Rational{1}};
+  std::array<rotational_line, 2> lines{
+      {{Rational{3}, Rational{2}, Rational{3}, Rational{3}}, {Rational{3}, Rational{4}, Rational{3}, Rational{3}}}};
+  energy_data energies;
+  makarov::prepare_energies(energies, id, lines);
+  near(energies.e0[0],
+       makarov::level_energy(Rational{3}, Rational{2}),
+       2e-14,
+       "O2 N- preparation lost the resolved lower J");
+  near(energies.e0[1],
+       makarov::level_energy(Rational{3}, Rational{4}),
+       2e-14,
+       "O2 N+ preparation lost the resolved lower J");
+  require(energies.e0[0] != energies.e0[1], "O2 preparation collapsed distinct fine-structure branches");
+  std::swap(lines[0], lines[1]);
+  energy_data reversed;
+  makarov::prepare_energies(reversed, id, lines);
+  near(reversed.e0[0], energies.e0[1], 2e-14, "O2 resolved energies must follow line ordering");
+  near(reversed.e0[1], energies.e0[0], 2e-14, "O2 resolved energies must follow line ordering");
+  require(reversed.rotational.size() == energies.rotational.size(), "Sorting changed the O2 basis size");
+  for (Size i = 0; i < energies.rotational.size(); ++i) {
+    near(reversed.rotational[i], energies.rotational[i], 2e-14, "Sorting changed the O2 reference ladder");
+    near(reversed.rotational_minus_two[i],
+         energies.rotational_minus_two[i],
+         2e-14,
+         "Sorting changed the O2 shifted reference ladder");
+  }
+}
+
+void sum_rule_energy_preparation() {
+  AtmPoint atm;
+  atm.pressure               = 1e5;
+  atm.temperature            = 296;
+  atm[SpeciesEnum::Nitrogen] = 1;
+  const auto   rates         = collision_data();
+  const Vector catalogue_e0{Constant::k * 100, Constant::k * 150, Constant::k * 125};
+  const Vector rotational_e0{0, Conversion::kaycm2joule(0.39021 * 6), Conversion::kaycm2joule(0.39021 * 20)};
+
+  for (Index model = 0; model < 3; ++model) {
+    const bool makarov = model == 2;
+    auto       id      = makarov ? QuantumIdentifier{"O2-66"_isot} : co2_id();
+    auto       band    = co2_band();
+    if (makarov) {
+      id.state[QuantumNumberType::S] = {.upper = Rational{1}, .lower = Rational{1}};
+      band.lineshape                 = LineByLineLineshape::VP_ECS_MAKAROV;
+    } else if (model == 1) {
+      // The angular kernel swaps its J roles; closure must still use original lower J.
+      id.state[QuantumNumberType::l2].upper = Rational{1};
+    }
+    const auto prototype = band.front();
+    band.lines.clear();
+    for (Index i = 0; i < 3; ++i) {
+      auto ln                      = prototype;
+      ln.f0                       += Numeric(i) * 1e7;
+      ln.a                        *= Numeric(i + 1);
+      ln.e0                        = catalogue_e0[i];
+      ln.qn[QuantumNumberType::J]  = {.upper = Rational{2 * i + 1}, .lower = Rational{2 * i}};
+      if (makarov) ln.qn[QuantumNumberType::N] = {.upper = Rational{2 * i + 1}, .lower = Rational{2 * i + 1}};
+      band.lines.push_back(ln);
+    }
+
+    lbl::voigt::ecs::ComputeData data({}, atm);
+    const auto                   check = [&] {
+      bool has_coupling = false;
+      for (Index i = 0; i < 3; ++i) {
+        const auto&   line = band.lines[data.sort[i]];
+        const auto&   qn   = data.rotational_lines[i];
+        const Numeric expected =
+            makarov ? lbl::voigt::ecs::makarov::level_energy(qn.Nl, qn.Jl) : rotational_e0[data.sort[i]];
+        near(data.energies.e0[i], expected, 2e-14, "Wrong prepared sum-rule energy or ordering");
+        near(data.Ws[0][i, i].real(), line.f0, 2e-14, "Energy preparation changed the catalogue line frequency");
+        const auto& J = line.qn.at(QuantumNumberType::J);
+        require(qn.Ju == static_cast<Rational>(J.upper) and qn.Jl == static_cast<Rational>(J.lower),
+                "Prepared J does not follow matrix ordering");
+        if (makarov) {
+          const auto& N = line.qn.at(QuantumNumberType::N);
+          require(qn.Nu == static_cast<Rational>(N.upper) and qn.Nl == static_cast<Rational>(N.lower),
+                  "Prepared N does not follow matrix ordering");
+        }
+        require(band.lines[i].e0 == catalogue_e0[i], "Preparing sum-rule energies changed catalogue energies");
+        for (Index j = i + 1; j < 3; ++j) {
+          const Numeric reverse  = data.Ws[0][j, i].imag();
+          has_coupling          |= reverse != 0;
+          const Numeric balance =
+              std::exp((data.energies.e0[i] - data.energies.e0[j]) / (Constant::k * atm.temperature));
+          near(data.Ws[0][i, j].imag(), reverse * balance, 2e-14, "Sum-rule detailed balance uses wrong energies");
+        }
+      }
+      require(has_coupling, "Sum-rule energy fixture needs coupled lines");
+      const auto& energies = data.energies;
+      require(energies.e0.size() == band.size() and
+                  energies.rotational.size() == energies.rotational_minus_two.size() and energies.rotational.size() > 5,
+              "Prepared energy dimensions do not cover the line and angular bases");
+      for (Size i = 0; i < energies.rotational.size(); ++i) {
+        const Rational L{static_cast<Index>(i)};
+        const auto     rotor =
+            makarov ? lbl::voigt::ecs::makarov::rotational_energy : lbl::voigt::ecs::hartmann::rotational_energy;
+        near(energies.rotational[i], rotor(L), 2e-14, "Reference-rotor energy must be indexed by angular momentum");
+        near(energies.rotational_minus_two[i],
+             rotor(L - 2),
+             2e-14,
+             "Shifted reference-rotor energy must use angular momentum minus two");
+      }
+    };
+    data.adapt_single(id, band, rates, atm);
+    require(data.sort[0] != 0, "Sum-rule energy fixture needs nontrivial strength sorting");
+    check();
+
+    const Vector        original_pop{data.pop};
+    const ComplexMatrix original_matrix{data.Ws[0]};
+    const ArrayOfIndex  original_sort{data.sort};
+    auto                shifted = band;
+    const Numeric       offset  = Constant::k * 83;
+    for (auto& ln : shifted.lines) ln.e0 += offset;
+    data.adapt_single(id, shifted, rates, atm);
+    for (Index i = 0; i < 3; ++i) {
+      require(data.sort[i] == original_sort[i], "Common energy offset changed line ordering");
+      near(data.pop[i],
+           original_pop[i] * std::exp(-offset / (Constant::k * atm.temperature)),
+           2e-14,
+           "Optical populations must retain absolute catalogue energies");
+      for (Index j = 0; j < 3; ++j)
+        near(data.Ws[0][i, j], original_matrix[i, j], 5e-14, "Common energy offset changed collision matrix");
+    }
+
+    data.sort = ArrayOfIndex{1, 2, 0};
+    data.adapt_single(id, band, rates, atm, true);
+    check();
+
+    const auto kernel = makarov ? lbl::voigt::ecs::makarov::relaxation_matrix_offdiagonal
+                                : lbl::voigt::ecs::hartmann::relaxation_matrix_offdiagonal;
+    const auto matrix = [&](const lbl::voigt::ecs::energy_data& energies) {
+      Matrix W(3, 3);
+      W = 0;
+      for (Index i = 0; i < 3; ++i) W[i, i] = atm.pressure;
+      kernel(W,
+             id,
+             data.rotational_lines,
+             band.front().ls.T0,
+             SpeciesEnum::Nitrogen,
+             rates.at(SpeciesEnum::Nitrogen),
+             data.dipr,
+             energies,
+             atm);
+      return W;
+    };
+    const Matrix original          = matrix(data.energies);
+    auto         changed_energies  = data.energies;
+    changed_energies.e0[0]        += offset;
+    const Matrix changed           = matrix(changed_energies);
+    require(original[1, 0] != 0 and original[2, 0] != 0 and changed[2, 0] != 0,
+            "Prepared-energy regression needs two couplings in its first column");
+    // Column normalization preserves this raw ratio, exposing the energy input
+    // even for Hartmann's swapped angular states.
+    near(changed[1, 0] / changed[2, 0],
+         original[1, 0] / original[2, 0] * std::exp(offset / (Constant::k * atm.temperature)),
+         5e-14,
+         "Raw relaxation matrix must use the prepared energies");
+    for (Index i = 0; i < 3; ++i) {
+      for (Index j = i + 1; j < 3; ++j)
+        near(changed[i, j],
+             changed[j, i] *
+                 std::exp((changed_energies.e0[i] - changed_energies.e0[j]) / (Constant::k * atm.temperature)),
+             2e-14,
+             "Sum-rule correction must use the same prepared energies as the raw kernel");
+    }
+  }
+}
 }  // namespace
 
 int main() try {
@@ -307,6 +512,8 @@ int main() try {
   makarov_and_presorting();
   validation_and_mixtures();
   explicit_partner_mixture();
+  oxygen_energy_levels();
+  sum_rule_energy_preparation();
   wigner.unload();
   std::cout << "ECS numerical regression tests passed\n";
 } catch (const std::exception& e) {
