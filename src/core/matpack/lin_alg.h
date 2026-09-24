@@ -31,6 +31,16 @@ Numeric solve(StridedComplexVectorView      x,
               StridedConstComplexVectorView b,
               Numeric                       min_rcond = 0);
 
+/** Solve A*X=B for all right-hand-side columns with one LU factorization and
+ * return the reciprocal 1-norm condition estimate. Supports strided views and
+ * X aliasing B. Throws for singular/nonfinite inputs or rcond < min_rcond and
+ * leaves X unchanged on failure. An empty matrix A returns 1.
+ */
+Numeric solve(StridedComplexMatrixView      X,
+              StridedConstComplexMatrixView A,
+              StridedConstComplexMatrixView B,
+              Numeric                       min_rcond = 0);
+
 /** A = U Sigma V^T, via LAPACK. s contains the min(m,n) singular values.
  * U and V are square when full_matrices is true; otherwise both have min(m,n)
  * columns. Input is preserved.
@@ -147,6 +157,49 @@ void diagonalize(StridedComplexMatrixView      P,
                  StridedComplexVectorView      W,
                  StridedConstComplexMatrixView A,
                  complex_diagonalize_workdata& workdata);
+
+/** Complex eigendecomposition and its directional derivative for dA.
+ * Requires distinct eigenvalues and a well-conditioned eigenvector basis;
+ * throws when the eigenvalue gaps are numerically unresolved or rcond(P)<1e-12.
+ * The derivative uses the unit-norm, parallel-transport gauge P_i^H*dP_i=0.
+ * Thus dP need not differentiate LAPACK's phase convention; phase-invariant
+ * quantities and dW are independent of that convention. Supports strided views,
+ * preserves inputs unless they alias outputs, and leaves outputs unchanged on
+ * failure. The four outputs must not overlap each other.
+ */
+void diagonalize(StridedComplexMatrixView      P,
+                 StridedComplexVectorView      W,
+                 StridedComplexMatrixView      dP,
+                 StridedComplexVectorView      dW,
+                 StridedConstComplexMatrixView A,
+                 StridedConstComplexMatrixView dA);
+void diagonalize(StridedComplexMatrixView      P,
+                 StridedComplexVectorView      W,
+                 StridedComplexMatrixView      dP,
+                 StridedComplexVectorView      dW,
+                 StridedConstComplexMatrixView A,
+                 StridedConstComplexMatrixView dA,
+                 complex_diagonalize_workdata& workdata);
+
+/** Batched version: dA[q,:,:] and dP[q,:,:] are matrix directions and
+ * eigenvector derivatives, while dW[q,:] contains eigenvalue derivatives.
+ * Computes the eigendecomposition and eigenvector LU factorization once for
+ * all directions. With zero directions, this is ordinary diagonalization.
+ * The scalar overload above delegates to a one-direction batch.
+ */
+void diagonalize(StridedComplexMatrixView       P,
+                 StridedComplexVectorView       W,
+                 StridedComplexTensor3View      dP,
+                 StridedComplexMatrixView       dW,
+                 StridedConstComplexMatrixView  A,
+                 StridedConstComplexTensor3View dA);
+void diagonalize(StridedComplexMatrixView       P,
+                 StridedComplexVectorView       W,
+                 StridedComplexTensor3View      dP,
+                 StridedComplexMatrixView       dW,
+                 StridedConstComplexMatrixView  A,
+                 StridedConstComplexTensor3View dA,
+                 complex_diagonalize_workdata&  workdata);
 
 // Exponential of a Matrix
 void matrix_exp(MatrixView F, ConstMatrixView A, const Index& q = 10);

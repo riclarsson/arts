@@ -476,7 +476,11 @@ void sum_rule_energy_preparation() {
              rates.at(SpeciesEnum::Nitrogen),
              data.dipr,
              energies,
-             atm);
+             atm,
+             {},
+             {},
+             {},
+             {});
       return W;
     };
     const Matrix original          = matrix(data.energies);

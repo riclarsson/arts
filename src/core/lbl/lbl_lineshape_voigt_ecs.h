@@ -44,8 +44,10 @@ basis_data prepare_basis(int                             count,
                          SpeciesEnum                     broadener,
                          const AtmPoint&                 atm);
 
-//! Sequential truncated-band correction; vectors follow the matrix ordering.
-void apply_sum_rule(MatrixView W, ConstVectorView dipr, ConstVectorView e0, Numeric T);
+//! Sequential truncated-band correction, including every target page of dW.
+//! Energies and reduced dipoles are fixed quantum-state data in matrix order.
+void apply_sum_rule(
+    MatrixView W, ConstVectorView dipr, ConstVectorView e0, Numeric T, Tensor3View dW = {}, ConstVectorView dT = {});
 
 struct ComputeData {
   Numeric gd_fac{};  //! Gaussian 1/e half-width divided by line frequency
@@ -74,6 +76,16 @@ struct ComputeData {
   ComplexTensor3 Ws{};
   ComplexTensor3 Vs{};
 
+  //! Jacobian target x line x line, for the combined collision matrix.
+  ComplexTensor3 dW{};
+  //! Jacobian target x line: optical inputs and equivalent-line derivatives.
+  Matrix        dpop{}, ddip{};
+  ComplexMatrix deqv_strs{}, deqv_vals{};
+  //! Doppler-factor and frequency derivatives in Jacobian target order.
+  Vector dgd_fac{}, df{};
+  //! Jacobian target x frequency.
+  ComplexMatrix dshape{};
+
   //! Reciprocal condition number of each equivalent-line eigenvector matrix.
   Vector eigenvector_rcond{};
 
@@ -88,7 +100,7 @@ struct ComputeData {
   //! The orientation of the polarization
   Propmat npm{};
 
-  //! Sizes scl, dscl, shape, dshape.  Sets scl, npm, dnpm_du, dnpm_dv, dnpm_dw
+  //! Prepare the density/stimulated-emission scaling and polarization orientation.
   ComputeData(const ConstVectorView&   f_grid,
               const AtmPoint&          atm,
               const Vector2&           los = {},
@@ -109,13 +121,22 @@ struct ComputeData {
                    const AtmPoint&                 atm,
                    const bool                      presorted = false);
 
+  //! Prepare all requested Jacobians together for the combined collision matrix.
+  void adapt_single(const QuantumIdentifier&        qid,
+                    const band_data&                band,
+                    const LinemixingSpeciesEcsData& data,
+                    const AtmPoint&                 atm,
+                    const Jacobian::Targets&        targets,
+                    bool                            presorted = false);
+
  private:
   void adapt(const QuantumIdentifier&        bnd_qid,
              const band_data&                bnd,
              const LinemixingSpeciesEcsData& rovib_data,
              const AtmPoint&                 atm,
              bool                            presorted,
-             bool                            per_broadener);
+             bool                            per_broadener,
+             const Jacobian::Targets&        targets);
 };
 
 void calculate(PropmatVectorView               pm,

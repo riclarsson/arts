@@ -36,6 +36,7 @@ Numeric level_energy(Rational N, Rational J);
 void prepare_energies(energy_data& energies, const QuantumIdentifier& qid, std::span<const rotational_line> lines);
 
 //! All per-line inputs follow the matrix ordering.
+//! Optional dW holds all target derivatives, with diagonal derivatives already supplied.
 void relaxation_matrix_offdiagonal(MatrixView&                      W,
                                    const QuantumIdentifier&         bnd_qid,
                                    std::span<const rotational_line> lines,
@@ -44,5 +45,9 @@ void relaxation_matrix_offdiagonal(MatrixView&                      W,
                                    const linemixing::species_data&  rovib_data,
                                    const Vector&                    dipr,
                                    const energy_data&               energies,
-                                   const AtmPoint&                  atm);
+                                   const AtmPoint&                  atm,
+                                   Tensor3View                      dW     = {},
+                                   ConstVectorView                  dT     = {},
+                                   ConstMatrixView                  dQ     = {},
+                                   ConstMatrixView                  dOmega = {});
 }  // namespace lbl::voigt::ecs::makarov

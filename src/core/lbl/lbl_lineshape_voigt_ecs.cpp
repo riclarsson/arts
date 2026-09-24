@@ -10,7 +10,6 @@
 #include <physics_funcs.h>
 #include <sorting.h>
 
-#include <Faddeeva.hh>
 #include <algorithm>
 #include <cmath>
 #include <exception>
@@ -22,6 +21,7 @@
 #include "lbl_lineshape_model.h"
 #include "lbl_lineshape_voigt_ecs_hartmann.h"
 #include "lbl_lineshape_voigt_ecs_makarov.h"
+#include "lbl_lineshape_voigt_lte.h"
 
 #undef WIGNER3
 #undef WIGNER6
@@ -49,23 +49,31 @@ void ComputeData::update_zeeman(const Vector2& los, const Vector3& mag, const Ze
 
 void ComputeData::core_calc_eqv() {
   // The kernels use a row-rate convention; the spectral operator is Ws^T.
-  // Preserve Ws and Vs so evaluation is repeatable after a single adaptation.
-  // A resolvent derivative can use dR = R (dM) R without differentiating V.
-  const auto n = pop.size();
-  const auto m = vmrs.size();
+  const Size n = pop.size(), m = vmrs.size(), nt = dW.npages();
   ARTS_USER_ERROR_IF(dip.size() != n or Ws.npages() != static_cast<Index>(m) or Ws.nrows() != static_cast<Index>(n) or
                          Ws.ncols() != static_cast<Index>(n),
                      "Inconsistent ECS matrix and population dimensions")
+  ARTS_USER_ERROR_IF(nt and (m != 1 or dW.nrows() != static_cast<Index>(n) or dW.ncols() != static_cast<Index>(n) or
+                             dpop.nrows() != static_cast<Index>(nt) or dpop.ncols() != static_cast<Index>(n) or
+                             ddip.shape() != dpop.shape()),
+                     "Inconsistent ECS Jacobian dimensions")
   eqv_strs.resize(m, n);
   eqv_vals.resize(m, n);
   Vs.resize(m, n, n);
+  deqv_strs.resize(nt, n);
+  deqv_vals.resize(nt, n);
   eigenvector_rcond.resize(m);
   eqv_strs          = 0;
+  deqv_strs         = 0;
+  deqv_vals         = 0;
   eigenvector_rcond = 1;
   if (n == 0) return;
 
-  ComplexVector rhs(n), coefficients(n);
-  for (Size j = 0; j < n; ++j) { rhs[j] = pop[j] * dip[j]; }
+  ComplexVector  rhs(n), coefficients(n);
+  ComplexMatrix  derivative_rhs(n, nt), derivative_coefficients(n, nt);
+  ComplexTensor3 dV(nt, n, n), dA(nt, n, n);
+  Vector         dcenter(nt);
+  for (Size j = 0; j < n; ++j) rhs[j] = pop[j] * dip[j];
   complex_diagonalize_workdata workspace(n);
 
   for (Size k = 0; k < m; ++k) {
@@ -73,57 +81,101 @@ void ComputeData::core_calc_eqv() {
     ComplexMatrix W{transpose(Ws[k])};
     auto          eqv_str = eqv_strs[k];
     auto          eqv_val = eqv_vals[k];
-
-    // Remove the optical carrier before solving for much smaller shifts/widths.
-    const Numeric center = W[0, 0].real();
-    for (Size j = 0; j < n; ++j) { W[j, j] -= center; }
+    const Numeric center  = W[0, 0].real();
+    for (Size j = 0; j < n; ++j) W[j, j] -= center;
     Numeric matrix_norm = 0;
     for (Size i = 0; i < n; ++i) {
       Numeric row_sum = 0;
-      for (Size j = 0; j < n; ++j) { row_sum += std::abs(W[i, j]); }
+      for (Size j = 0; j < n; ++j) row_sum += std::abs(W[i, j]);
       matrix_norm = std::max(matrix_norm, row_sum);
     }
     ARTS_USER_ERROR_IF(not std::isfinite(matrix_norm), "ECS centered matrix norm overflowed")
 
-    diagonalize(V, eqv_val, W, workspace);
-    // Nearly defective modes have unstable individual residues even when their
-    // sum is finite. Do not silently return spectra from such a decomposition.
+    bool changes_operator = false;
+    if (nt) {
+      for (Size t = 0; t < nt; ++t) {
+        dA[t]      = transpose(dW[t]);
+        dcenter[t] = dA[t, 0, 0].real();
+        for (Size j = 0; j < n; ++j) dA[t, j, j] -= dcenter[t];
+        for (Size i = 0; i < n; ++i)
+          for (Size j = 0; j < n; ++j) changes_operator |= dA[t, i, j] != Complex{};
+      }
+    }
+    if (changes_operator) {
+      diagonalize(V, eqv_val, dV, deqv_vals, W, dA, workspace);
+    } else {
+      // Fixed operators (e.g. frequency or population-only targets) do not
+      // require derivatives of an eigenbasis, even if modes are degenerate.
+      diagonalize(V, eqv_val, W, workspace);
+      dV = 0;
+    }
     eigenvector_rcond[k]            = solve(coefficients, V, rhs, 1e-12);
     const Numeric damping_tolerance = 64 * std::numeric_limits<Numeric>::epsilon() * matrix_norm;
     for (Size i = 0; i < n; ++i) {
       ARTS_USER_ERROR_IF(eqv_val[i].imag() < -damping_tolerance,
                          "ECS relaxation matrix has a negative damping eigenvalue: {} Hz",
                          eqv_val[i])
-      if (eqv_val[i].imag() < 0) eqv_val[i].imag(0);
+      if (eqv_val[i].imag() < 0) {
+        eqv_val[i].imag(0);
+        for (Size t = 0; t < nt; ++t) deqv_vals[t, i].imag(0);
+      }
       eqv_val[i]         += center;
       Complex projection  = 0;
-      for (Size j = 0; j < n; ++j) { projection += dip[j] * V[j, i]; }
+      for (Size j = 0; j < n; ++j) projection += dip[j] * V[j, i];
       eqv_str[i] = projection * coefficients[i];
       ARTS_USER_ERROR_IF(not std::isfinite(eqv_str[i].real()) or not std::isfinite(eqv_str[i].imag()),
                          "Non-finite ECS equivalent-line strength")
+    }
+    for (Size t = 0; t < nt; ++t) {
+      for (Size i = 0; i < n; ++i) {
+        derivative_rhs[i, t] = dpop[t, i] * dip[i] + pop[i] * ddip[t, i];
+        for (Size j = 0; j < n; ++j) derivative_rhs[i, t] -= dV[t, i, j] * coefficients[j];
+      }
+    }
+    if (nt) solve(derivative_coefficients, V, derivative_rhs, 1e-12);
+    for (Size t = 0; t < nt; ++t) {
+      for (Size i = 0; i < n; ++i) {
+        deqv_vals[t, i]    += dcenter[t];
+        Complex projection = 0, derivative_projection = 0;
+        for (Size j = 0; j < n; ++j) {
+          projection            += dip[j] * V[j, i];
+          derivative_projection += ddip[t, j] * V[j, i] + dip[j] * dV[t, j, i];
+        }
+        deqv_strs[t, i] = derivative_projection * coefficients[i] + projection * derivative_coefficients[i, t];
+        ARTS_USER_ERROR_IF(not std::isfinite(deqv_strs[t, i].real()) or not std::isfinite(deqv_strs[t, i].imag()),
+                           "Non-finite ECS equivalent-line strength derivative")
+      }
     }
   }
 }
 
 void ComputeData::core_calc(const ConstVectorView& f_grid) try {
+  ARTS_USER_ERROR_IF(dgd_fac.size() != static_cast<Size>(dW.npages()) or df.size() != dgd_fac.size(),
+                     "Inconsistent ECS profile Jacobian dimensions")
   core_calc_eqv();
-
-  const auto m = vmrs.size();
-  const auto n = f_grid.size();
-  shape.resize(n);
+  const Size m = vmrs.size(), nf = f_grid.size(), nt = dW.npages();
+  shape.resize(nf);
   shape = 0;
-
-  for (Size k = 0; k < m; k++) {
+  dshape.resize(nt, nf);
+  dshape = 0;
+  for (Size k = 0; k < m; ++k) {
     if (vmrs[k] == 0) continue;
-    for (Size i = 0; i < eqv_strs[k].size(); i++) {
-      const Numeric gamd = gd_fac * eqv_vals[k][i].real();
+    for (Size i = 0; i < eqv_strs[k].size(); ++i) {
+      const Numeric gamd = gd_fac * eqv_vals[k, i].real();
       ARTS_USER_ERROR_IF(not std::isfinite(gamd) or gamd <= 0,
                          "ECS Gaussian 1/e half-width must be positive and finite, got {} Hz",
                          gamd)
-      const Numeric cte = 1 / gamd;
-      for (Size iv = 0; iv < n; iv++) {
-        const Complex z  = (eqv_vals[k][i] - f_grid[iv]) * cte;
-        shape[iv]       += vmrs[k] * eqv_strs[k][i] * Faddeeva::w(z) / gamd;
+      const Numeric inv_gamd = 1 / gamd;
+      for (Size iv = 0; iv < nf; ++iv) {
+        const Complex z   = (eqv_vals[k, i] - f_grid[iv]) * inv_gamd;
+        const Complex w   = lte::single_shape::F(z);
+        shape[iv]        += vmrs[k] * eqv_strs[k, i] * w * inv_gamd;
+        const Complex dw  = nt ? lte::single_shape::dF(z, w) : Complex{};
+        for (Size t = 0; t < nt; ++t) {
+          const Numeric dgamd  = dgd_fac[t] * eqv_vals[k, i].real() + gd_fac * deqv_vals[t, i].real();
+          const Complex dz     = (deqv_vals[t, i] - df[t] - z * dgamd) * inv_gamd;
+          dshape[t, iv]       += (deqv_strs[t, i] * w + eqv_strs[k, i] * (dw * dz - w * dgamd * inv_gamd)) * inv_gamd;
+        }
       }
     }
   }
@@ -149,6 +201,109 @@ void get_vmrs(VectorView vmrs, const line_shape::model::map_t& mod, const AtmPoi
   }
   // With no bath and no present collision partners the collision matrix is zero,
   // matching ordinary line-shape mixing, rather than producing 0/0.
+}
+
+// Composition derivatives include normalization in the same convention as get_vmrs.
+void get_dvmrs(MatrixView                      out,
+               ConstVectorView                 fractions,
+               const line_shape::model::map_t& models,
+               const AtmPoint&                 atm,
+               const Jacobian::Targets&        targets) {
+  out              = 0;
+  const bool bath  = models.contains(SpeciesEnum::Bath);
+  Numeric    total = 0;
+  for (auto spec : models | stdv::keys)
+    if (spec != SpeciesEnum::Bath and atm.has(spec)) total += atm[spec];
+  for (const auto& target : targets.atm) {
+    const auto* species = std::get_if<SpeciesEnum>(&target.type);
+    if (not species or *species == SpeciesEnum::Bath or not models.contains(*species)) continue;
+    Size i = 0;
+    for (auto spec : models | stdv::keys) {
+      if (bath) {
+        out[target.target_pos, i] =
+            spec == SpeciesEnum::Bath ? Numeric(total <= 1 ? -1 : 0) : Numeric(spec == *species);
+      } else if (total > 0) {
+        out[target.target_pos, i] = (Numeric(spec == *species) - fractions[i]) / total;
+      } else {
+        ARTS_USER_ERROR("ECS VMR derivatives require a nonzero total broadener VMR when no Bath is present")
+      }
+      ++i;
+    }
+  }
+}
+
+Numeric broadener_mass_derivative(const AtmPoint& atm, SpeciesEnum broadener, const AtmKeyVal& key) {
+  if (const auto* species = std::get_if<SpeciesEnum>(&key)) {
+    if (broadener != SpeciesEnum::Bath or *species == SpeciesEnum::Bath) return 0;
+    Numeric total = 0;
+    for (const auto& [spec, vmr] : atm.specs) total += vmr;
+    return (atm.mean_mass(*species) - atm.mean_mass()) / total;
+  }
+  if (const auto* isot = std::get_if<SpeciesIsotope>(&key)) {
+    if (isot->is_joker() or isot->is_predefined() or (broadener != SpeciesEnum::Bath and broadener != isot->spec))
+      return 0;
+    Numeric ratio = 0;
+    for (const auto& [other, value] : atm.isots)
+      if (other.spec == isot->spec and not(other.is_joker() or other.is_predefined())) ratio += value;
+    Numeric derivative = (isot->mass - atm.mean_mass(isot->spec)) / ratio;
+    if (broadener == SpeciesEnum::Bath) {
+      Numeric total = 0;
+      for (const auto& [spec, vmr] : atm.specs) total += vmr;
+      derivative *= atm.has(isot->spec) ? atm[isot->spec] / total : 0;
+    }
+    return derivative;
+  }
+  return 0;
+}
+
+// Target dispatch is kept outside the angular loops. The kernels consume flat
+// derivative arrays for every target, just as they consume Q and Omega.
+void prepare_basis_jacobian(MatrixView                      dQ,
+                            MatrixView                      dOmega,
+                            const energy_data&              energies,
+                            const linemixing::species_data& collision,
+                            Numeric                         T0,
+                            const SpeciesIsotope&           isot,
+                            SpeciesEnum                     broadener,
+                            const AtmPoint&                 atm,
+                            const Jacobian::Targets&        targets) {
+  dQ     = 0;
+  dOmega = 0;
+  if (dQ.nrows() == 0) return;
+  const Numeric T            = atm.temperature;
+  const Numeric mass         = broadener == SpeciesEnum::Bath ? atm.mean_mass() : atm.mean_mass(broadener);
+  const Numeric inverse_mass = 1 / mass + 1 / isot.mass;
+  const Numeric velocity2    = 8 * Constant::k * T * inverse_mass / (Constant::m_u * Constant::pi);
+  const Numeric scaling = collision.scaling(T0, T), beta = collision.beta(T0, T), lambda = collision.lambda(T0, T),
+                distance = collision.collisional_distance(T0, T);
+  for (const auto& target : targets.atm) {
+    Numeric dT = 0, ds = 0, db = 0, dl = 0, dd = 0;
+    if (const auto* key = std::get_if<AtmKey>(&target.type)) {
+      switch (*key) {
+        case AtmKey::t:
+          dT = 1;
+          ds = collision.scaling.dT(T0, T);
+          db = collision.beta.dT(T0, T);
+          dl = collision.lambda.dT(T0, T);
+          dd = collision.collisional_distance.dT(T0, T);
+          break;
+        default: break;
+      }
+    }
+    const Numeric dm                 = broadener_mass_derivative(atm, broadener, target.type);
+    const Numeric relative_velocity2 = dT / T - dm / (mass * mass * inverse_mass);
+    for (Index L = 0; L < dQ.ncols(); ++L) {
+      const Numeric gap = (energies.rotational[L] - energies.rotational_minus_two[L]) / Constant::h_bar;
+      const Numeric x   = Math::pow2(gap * distance) / (24 * velocity2);
+      const Numeric dx  = gap * gap * (2 * distance * dd - distance * distance * relative_velocity2) / (24 * velocity2);
+      dOmega[target.target_pos, L] = -2 * dx / Math::pow3(1 + x);
+      if (L == 0) continue;
+      const Numeric e          = energies.rotational[L] / (Constant::k * T);
+      const Numeric angular    = Numeric(L) * Numeric(L + 1);
+      dQ[target.target_pos, L] = std::exp(-beta * e) / std::pow(angular, lambda) *
+                                 (ds + scaling * (-db * e + beta * e * dT / T - dl * std::log(angular)));
+    }
+  }
 }
 
 using Offdiagonal = decltype(&hartmann::relaxation_matrix_offdiagonal);
@@ -234,11 +389,19 @@ basis_data prepare_basis(const int                       count,
   return out;
 }
 
-void apply_sum_rule(MatrixView W, ConstVectorView dipr, ConstVectorView e0, Numeric T) {
-  const Size n = dipr.size();
+void apply_sum_rule(
+    MatrixView W, ConstVectorView dipr, ConstVectorView e0, Numeric T, Tensor3View dW, ConstVectorView dT) {
+  const Size  n  = dipr.size();
+  const Index nq = dW.npages();
   ARTS_USER_ERROR_IF(W.nrows() != static_cast<Index>(n) or W.ncols() != static_cast<Index>(n) or e0.size() != n,
                      "Inconsistent ECS sum-rule dimensions")
+  ARTS_USER_ERROR_IF((nq != 0 and (dW.nrows() != W.nrows() or dW.ncols() != W.ncols())) or
+                         (not dT.empty() and dT.size() != static_cast<Size>(nq)),
+                     "Inconsistent ECS sum-rule derivative dimensions")
   ARTS_USER_ERROR_IF(not std::isfinite(T) or T <= 0, "ECS sum-rule correction requires positive finite temperature")
+  for (const Numeric seed : dT) {
+    ARTS_USER_ERROR_IF(not std::isfinite(seed), "Non-finite ECS sum-rule temperature derivative")
+  }
 
   // The sequential correction retains the historical truncated-band closure.
   // In particular it cannot enforce the final column's sum rule. Do not hide
@@ -251,18 +414,30 @@ void apply_sum_rule(MatrixView W, ConstVectorView dipr, ConstVectorView e0, Nume
                          "Non-finite ECS relaxation matrix element ({}, {}) before sum-rule correction",
                          j,
                          i)
+      for (Index q = 0; q < nq; ++q) {
+        ARTS_USER_ERROR_IF(not std::isfinite(dW[q, j, i]),
+                           "Non-finite ECS relaxation matrix derivative ({}, {}, {}) before sum-rule correction",
+                           q,
+                           j,
+                           i)
+      }
     }
   }
 
+  Vector dsumlw(nq), dsumup(nq), dscale(nq);
   for (Size i = 0; i < n; ++i) {
     Numeric sumlw = 0.0;
     Numeric sumup = 0.0;
+    dsumlw        = 0;
+    dsumup        = 0;
 
     for (Size j = 0; j < n; ++j) {
       if (j > i) {
         sumlw += dipr[j] * W[j, i];
+        for (Index q = 0; q < nq; ++q) dsumlw[q] += dipr[j] * dW[q, j, i];
       } else {
         sumup += dipr[j] * W[j, i];
+        for (Index q = 0; q < nq; ++q) dsumup[q] += dipr[j] * dW[q, j, i];
       }
     }
 
@@ -272,14 +447,38 @@ void apply_sum_rule(MatrixView W, ConstVectorView dipr, ConstVectorView e0, Nume
                        "ECS sum-rule correction overflows for matrix line {}; the supplied band and widths "
                        "do not define a stable correction.",
                        i)
+    for (Index q = 0; q < nq; ++q) {
+      ARTS_USER_ERROR_IF(not std::isfinite(dsumlw[q]) or not std::isfinite(dsumup[q]),
+                         "Non-finite ECS sum-rule derivative sums for target {}, matrix line {}",
+                         q,
+                         i)
+      dscale[q] = sumlw == 0 ? 0.0 : -(dsumup[q] + (-sumup / sumlw) * dsumlw[q]) / sumlw;
+      ARTS_USER_ERROR_IF(not std::isfinite(dscale[q]),
+                         "ECS sum-rule derivative correction overflows for target {}, matrix line {}",
+                         q,
+                         i)
+    }
 
     for (Size j = i + 1; j < n; ++j) {
       if (sumlw == 0) {
         W[j, i] = 0.0;
         W[i, j] = 0.0;
+        for (Index q = 0; q < nq; ++q) {
+          dW[q, j, i] = 0.0;
+          dW[q, i, j] = 0.0;
+        }
       } else {
+        for (Index q = 0; q < nq; ++q) { dW[q, j, i] = dW[q, j, i] * (-sumup / sumlw) + W[j, i] * dscale[q]; }
         W[j, i] *= -sumup / sumlw;
         W[i, j]  = W[j, i] * std::exp((e0[i] - e0[j]) / (Constant::k * T));
+        if (nq != 0) {
+          const Numeric exponent = (e0[i] - e0[j]) / (Constant::k * T);
+          const Numeric balance  = std::exp(exponent);
+          for (Index q = 0; q < nq; ++q) {
+            const Numeric dexponent = dT.empty() ? 0.0 : -exponent * dT[q] / T;
+            dW[q, i, j]             = (dW[q, j, i] + W[j, i] * dexponent) * balance;
+          }
+        }
       }
     }
   }
@@ -290,6 +489,13 @@ void apply_sum_rule(MatrixView W, ConstVectorView dipr, ConstVectorView e0, Nume
                          "Non-finite ECS relaxation matrix element ({}, {}) after sum-rule correction",
                          j,
                          i)
+      for (Index q = 0; q < nq; ++q) {
+        ARTS_USER_ERROR_IF(not std::isfinite(dW[q, j, i]),
+                           "Non-finite ECS relaxation matrix derivative ({}, {}, {}) after sum-rule correction",
+                           q,
+                           j,
+                           i)
+      }
     }
   }
 }
@@ -299,7 +505,7 @@ void ComputeData::adapt_multi(const QuantumIdentifier&        bnd_qid,
                               const LinemixingSpeciesEcsData& rovib_data,
                               const AtmPoint&                 atm,
                               const bool                      presorted) {
-  adapt(bnd_qid, bnd, rovib_data, atm, presorted, true);
+  adapt(bnd_qid, bnd, rovib_data, atm, presorted, true, {});
 }
 
 void ComputeData::adapt_single(const QuantumIdentifier&        bnd_qid,
@@ -307,7 +513,16 @@ void ComputeData::adapt_single(const QuantumIdentifier&        bnd_qid,
                                const LinemixingSpeciesEcsData& rovib_data,
                                const AtmPoint&                 atm,
                                const bool                      presorted) {
-  adapt(bnd_qid, bnd, rovib_data, atm, presorted, false);
+  adapt(bnd_qid, bnd, rovib_data, atm, presorted, false, {});
+}
+
+void ComputeData::adapt_single(const QuantumIdentifier&        qid,
+                               const band_data&                band,
+                               const LinemixingSpeciesEcsData& data,
+                               const AtmPoint&                 atm,
+                               const Jacobian::Targets&        targets,
+                               bool                            presorted) {
+  adapt(qid, band, data, atm, presorted, false, targets);
 }
 
 void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
@@ -315,7 +530,8 @@ void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
                         const LinemixingSpeciesEcsData& rovib_data,
                         const AtmPoint&                 atm,
                         const bool                      presorted,
-                        const bool                      per_broadener) try {
+                        const bool                      per_broadener,
+                        const Jacobian::Targets&        targets) try {
   const Size n = bnd.size();
   ARTS_USER_ERROR_IF(n == 0, "Cannot adapt an empty ECS band")
   ARTS_USER_ERROR_IF(
@@ -353,6 +569,20 @@ void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
       ARTS_USER_ERROR_IF(indices[i] != static_cast<Index>(i), "Invalid ECS sorting permutation")
     }
   }
+
+  const Size nt = targets.target_count();
+  dW.resize(nt, n, n);
+  dpop.resize(nt, n);
+  ddip.resize(nt, n);
+  dgd_fac.resize(nt);
+  df.resize(nt);
+  dW      = 0;
+  dpop    = 0;
+  ddip    = 0;
+  dgd_fac = 0;
+  df      = 0;
+  Vector  dT(nt, 0.0);
+  Tensor3 dWimag(nt, n, n);
 
   pop.resize(n);
   dip.resize(n);
@@ -402,6 +632,52 @@ void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
     dipr = reorder(dipr);
   }
 
+  const Numeric dQT = nt ? PartitionFunctions::dQdT(atm.temperature, bnd_qid.isot) : 0;
+  for (const auto& target : targets.atm) {
+    ARTS_USER_ERROR_IF(target.target_pos >= nt, "Invalid ECS Jacobian target position")
+    const auto* key = std::get_if<AtmKey>(&target.type);
+    if (not key) continue;
+    switch (*key) {
+      case AtmKey::t:
+        dT[target.target_pos]      = 1;
+        dgd_fac[target.target_pos] = gd_fac / (2 * atm.temperature);
+        for (Size k = 0; k < n; ++k) {
+          const auto& ln             = bnd.lines[sort[k]];
+          dpop[target.target_pos, k] = pop[k] * (ln.e0 / (Constant::k * Math::pow2(atm.temperature)) - dQT / QT);
+        }
+        break;
+      case AtmKey::wind_u:
+      case AtmKey::wind_v:
+      case AtmKey::wind_w:
+        // Like the other LBL profiles, return the frequency derivative here;
+        // propagation applies the wind projection and Doppler conversion.
+        df[target.target_pos] = 1;
+        break;
+      default: break;
+    }
+  }
+  for (const auto& target : targets.line) {
+    ARTS_USER_ERROR_IF(target.target_pos >= nt, "Invalid ECS Jacobian target position")
+    const auto& key = target.type;
+    if (key.band != bnd_qid) continue;
+    for (Size k = 0; k < n; ++k) {
+      if (key.line != static_cast<Size>(sort[k])) continue;
+      const auto& ln = bnd.lines[sort[k]];
+      switch (key.var) {
+        case LineByLineVariable::f0:
+          ddip[target.target_pos, k] = -1.5 * dip[k] / ln.f0;
+          dW[target.target_pos, k, k].real(1);
+          break;
+        case LineByLineVariable::e0: dpop[target.target_pos, k] = -pop[k] / (Constant::k * atm.temperature); break;
+        case LineByLineVariable::a:
+          ARTS_USER_ERROR_IF(ln.a == 0, "ECS Einstein-A derivatives require a positive Einstein A")
+          ddip[target.target_pos, k] = dip[k] / (2 * ln.a);
+          break;
+        case LineByLineVariable::unused: break;
+      }
+    }
+  }
+
   // Prepare kernel inputs once in matrix order. The kernels never access the
   // catalogue or its permutation; optical populations above retain catalogue e0.
   rotational_lines.resize(n);
@@ -428,17 +704,23 @@ void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
   else
     vmrs = 1;
 
-  Size i = 0;
+  Matrix dfractions(nt, broadener_count);
+  get_dvmrs(dfractions, fractions, models, atm, targets);
+  Matrix dQ(nt, energies.rotational.size()), dOmega(nt, energies.rotational.size());
+  Size   i = 0;
   for (auto spec : models | stdv::keys) {
     const Size    page   = per_broadener ? i : 0;
     const Numeric weight = per_broadener ? 1 : fractions[i];
-    if (weight == 0) {
+    bool          active = weight != 0;
+    for (Size t = 0; t < nt; ++t) active |= dfractions[t, i] != 0;
+    if (not active) {
       ++i;
       continue;
     }
     const auto data = rovib_data.find(spec);
     ARTS_USER_ERROR_IF(data == rovib_data.end(), "No ECS collision data for species {}", spec)
-    Wimag = 0;
+    Wimag  = 0;
+    dWimag = 0;
     for (Size k = 0; k < n; ++k) {
       const auto&   ln    = bnd.lines[sort[k]];
       const auto&   model = ln.ls.single_models.at(spec);
@@ -448,12 +730,62 @@ void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
                          "Invalid ECS pressure width or shift for species {}",
                          spec)
       Wimag[k, k]               = width;
-      real_val(Ws[page][k, k]) += weight * shift;
+      real_val(Ws[page, k, k]) += weight * shift;
+      for (Size t = 0; t < nt; ++t) real_val(dW[t, k, k]) += dfractions[t, i] * shift;
+      for (const auto& target : targets.atm) {
+        const auto* key = std::get_if<AtmKey>(&target.type);
+        if (not key) continue;
+        Numeric dw = 0, ds = 0;
+        switch (*key) {
+          case AtmKey::t:
+            dw = model.dG0_dT(ln.ls.T0, atm.temperature, atm.pressure);
+            ds = model.dD0_dT(ln.ls.T0, atm.temperature, atm.pressure);
+            break;
+          case AtmKey::p:
+            dw = model.dG0_dP(ln.ls.T0, atm.temperature, atm.pressure);
+            ds = model.dD0_dP(ln.ls.T0, atm.temperature, atm.pressure);
+            break;
+          default: break;
+        }
+        dWimag[target.target_pos, k, k]        = dw;
+        real_val(dW[target.target_pos, k, k]) += weight * ds;
+      }
+      for (const auto& target : targets.line) {
+        const auto& key = target.type;
+        if (key.band != bnd_qid or key.line != static_cast<Size>(sort[k]) or key.spec != spec) continue;
+        switch (key.ls_var) {
+          case LineShapeModelVariable::G0:
+            dWimag[target.target_pos, k, k] = model.dG0_dX(ln.ls.T0, atm.temperature, atm.pressure, key.ls_coeff);
+            break;
+          case LineShapeModelVariable::D0:
+            real_val(dW[target.target_pos, k, k]) +=
+                weight * model.dD0_dX(ln.ls.T0, atm.temperature, atm.pressure, key.ls_coeff);
+            break;
+          default: break;
+        }
+      }
     }
-    kernel(Wimag, bnd_qid, rotational_lines, bnd.front().ls.T0, spec, data->second, dipr, energies, atm);
+    prepare_basis_jacobian(dQ, dOmega, energies, data->second, bnd.front().ls.T0, bnd_qid.isot, spec, atm, targets);
+    kernel(Wimag,
+           bnd_qid,
+           rotational_lines,
+           bnd.front().ls.T0,
+           spec,
+           data->second,
+           dipr,
+           energies,
+           atm,
+           dWimag,
+           dT,
+           dQ,
+           dOmega);
     sum_rule_residual[i] = closure_residual(Wimag, dipr);
     for (Size r = 0; r < n; ++r) {
-      for (Size c = 0; c < n; ++c) { imag_val(Ws[page][r, c]) += weight * Wimag[r, c]; }
+      for (Size c = 0; c < n; ++c) {
+        imag_val(Ws[page, r, c]) += weight * Wimag[r, c];
+        for (Size t = 0; t < nt; ++t)
+          imag_val(dW[t, r, c]) += weight * dWimag[t, r, c] + dfractions[t, i] * Wimag[r, c];
+      }
     }
     ++i;
   }
@@ -461,8 +793,8 @@ void ComputeData::adapt(const QuantumIdentifier&        bnd_qid,
 }
 ARTS_METHOD_ERROR_CATCH
 
-void calculate(PropmatVectorView pm_,
-               PropmatMatrixView,
+void calculate(PropmatVectorView               pm_,
+               PropmatMatrixView               dpm_,
                ComputeData&                    com_data,
                const ConstVectorView           f_grid_,
                const Range&                    f_range,
@@ -483,19 +815,53 @@ void calculate(PropmatVectorView pm_,
   PropmatVectorView     pm     = pm_[f_range];
   const ConstVectorView f_grid = f_grid_[f_range];
 
-  ARTS_USER_ERROR_IF(jac_targets.target_count() > 0, "No Jacobian support.")
+  ARTS_USER_ERROR_IF(dpm_.nrows() != static_cast<Index>(jac_targets.target_count()) or
+                         dpm_.ncols() != static_cast<Index>(f_grid_.size()),
+                     "Inconsistent ECS propagation Jacobian dimensions")
 
   if (bnd.size() == 0) return;
 
-  com_data.adapt_single(bnd_qid, bnd, rovib_data, atm);
+  com_data.adapt_single(bnd_qid, bnd, rovib_data, atm, jac_targets);
 
   com_data.core_calc(f_grid);
 
+  const Size    nt        = jac_targets.target_count();
+  const Numeric abundance = atm[bnd_qid.isot.spec], ratio = atm[bnd_qid.isot];
+  const Numeric scale = Constant::inv_sqrt_pi * abundance * ratio;
+  const Numeric N     = number_density(atm.pressure, atm.temperature);
+  Matrix        dscale(nt, f_grid.size(), 0.0);
+  for (const auto& target : jac_targets.atm) {
+    if (const auto* key = std::get_if<AtmKey>(&target.type)) {
+      for (Size i = 0; i < f_grid.size(); ++i) {
+        const Numeric f = f_grid[i], r = Constant::h * f / (Constant::k * atm.temperature);
+        const Numeric e = std::expm1(-r);
+        switch (*key) {
+          case AtmKey::t:      dscale[target.target_pos, i] = -scale * N * f * (r * (e + 1) - e) / atm.temperature; break;
+          case AtmKey::p:      dscale[target.target_pos, i] = -scale * f * e / (Constant::k * atm.temperature); break;
+          case AtmKey::wind_u:
+          case AtmKey::wind_v:
+          case AtmKey::wind_w: dscale[target.target_pos, i] = scale * N * (r * (e + 1) - e); break;
+          default:             break;
+        }
+      }
+    } else if (const auto* species = std::get_if<SpeciesEnum>(&target.type)) {
+      if (*species == bnd_qid.isot.spec)
+        for (Size i = 0; i < f_grid.size(); ++i)
+          dscale[target.target_pos, i] = Constant::inv_sqrt_pi * ratio * com_data.scl[i];
+    } else if (const auto* isot = std::get_if<SpeciesIsotope>(&target.type)) {
+      if (*isot == bnd_qid.isot)
+        for (Size i = 0; i < f_grid.size(); ++i)
+          dscale[target.target_pos, i] = Constant::inv_sqrt_pi * abundance * com_data.scl[i];
+    }
+  }
   for (Size i = 0; i < f_grid.size(); ++i) {
-    const auto F =
-        Constant::inv_sqrt_pi * atm[bnd_qid.isot.spec] * atm[bnd_qid.isot] * com_data.scl[i] * com_data.shape[i];
+    const Complex F = scale * com_data.scl[i] * com_data.shape[i];
     if (no_negative_absorption and F.real() < 0) continue;
     pm[i] += zeeman::scale(com_data.npm, F);
+    for (Size t = 0; t < nt; ++t) {
+      const Complex dF     = dscale[t, i] * com_data.shape[i] + scale * com_data.scl[i] * com_data.dshape[t, i];
+      dpm_[t, f_range][i] += zeeman::scale(com_data.npm, dF);
+    }
   }
 }
 ARTS_METHOD_ERROR_CATCH

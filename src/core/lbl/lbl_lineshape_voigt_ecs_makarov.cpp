@@ -66,11 +66,21 @@ void coupling_kernel(MatrixView                       W,
                      const basis_data&                basis,
                      const Vector&                    e0,
                      const Numeric                    T,
-                     const int                        maxL) {
+                     const int                        maxL,
+                     Tensor3View                      dW,
+                     ConstVectorView                  dT,
+                     ConstMatrixView                  dQ,
+                     ConstMatrixView                  dOmega) {
   using Conversion::kelvin2joule;
-  const auto& [Q, Om] = basis;
-  const auto bk       = [](const Rational& r) -> Numeric { return sqrtr(2 * r + 1); };
-  const Size n        = lines.size();
+  const auto& Q       = basis.Q;
+  const auto& Om      = basis.Omega;
+  const Index nq      = dW.npages();
+  const auto  tangent = [](ConstMatrixView values, Index q, Index i) -> Numeric {
+    return values.empty() ? 0.0 : values[q, i];
+  };
+  Vector     dsum(nq);
+  const auto bk = [](const Rational& r) -> Numeric { return sqrtr(2 * r + 1); };
+  const Size n  = lines.size();
 
   arts_wigner_thread_init(maxL);
   for (Size i = 0; i < n; i++) {
@@ -84,7 +94,8 @@ void coupling_kernel(MatrixView                       W,
 
       // Tran etal 2006 symbol with modifications:
       //    1) [Ji] * [Ji_p] instead of [Ji_p] ^ 2 in partial accordance with Makarov etal 2013
-      Numeric       sum = 0;
+      Numeric sum       = 0;
+      dsum              = 0;
       const Numeric scl = (iseven(Ji_p + Ji + 1) ? 1 : -1) * bk(Ni) * bk(Nf) * bk(Nf_p) * bk(Ni_p) * bk(Jf) * bk(Jf_p) *
                           bk(Ji) * bk(Ji_p);
       const auto [L0, L1] =
@@ -96,12 +107,29 @@ void coupling_kernel(MatrixView                       W,
         const Numeric d  = wig6(L, Jf, Jf_p, Sf, Nf_p, Nf);
         const Numeric e  = wig6(L, Ji, Ji_p, Rational{1}, Jf_p, Jf);
         sum             += a * b * c * d * e * Numeric(2 * L + 1) * Q[L.toIndex()] / Om[L.toIndex()];
+        for (Index q = 0; q < nq; ++q) {
+          const Index idx  = L.toIndex();
+          dsum[q]         += a * b * c * d * e * Numeric(2 * L + 1) *
+                     (tangent(dQ, q, idx) / Om[idx] - Q[idx] / Om[idx] * (tangent(dOmega, q, idx) / Om[idx]));
+        }
+      }
+      for (Index q = 0; q < nq; ++q) {
+        dsum[q] = dsum[q] * (scl * Om[Ni.toIndex()]) + sum * (scl * tangent(dOmega, q, Ni.toIndex()));
       }
       sum *= scl * Om[Ni.toIndex()];
 
       // Add to W and rescale to upwards element by the populations.
       W[i, j] = sum;
       W[j, i] = sum * std::exp((e0[j] - e0[i]) / kelvin2joule(T));
+      if (nq != 0) {
+        const Numeric exponent = (e0[j] - e0[i]) / kelvin2joule(T);
+        const Numeric balance  = std::exp(exponent);
+        for (Index q = 0; q < nq; ++q) {
+          const Numeric dexponent = dT.empty() ? 0.0 : -exponent * dT[q] / T;
+          dW[q, i, j]             = dsum[q];
+          dW[q, j, i]             = (dsum[q] + sum * dexponent) * balance;
+        }
+      }
     }
   }
   arts_wigner_thread_free();
@@ -202,7 +230,14 @@ void relaxation_matrix_offdiagonal(MatrixView&                      W,
                                    const linemixing::species_data&  rovib_data,
                                    const Vector&                    dipr,
                                    const energy_data&               energies,
-                                   const AtmPoint&                  atm) try {
+                                   const AtmPoint&                  atm,
+                                   Tensor3View                      dW,
+                                   ConstVectorView                  dT,
+                                   ConstMatrixView                  dQ,
+                                   ConstMatrixView                  dOmega) try {
+  ARTS_USER_ERROR_IF((dW.npages() != 0 and (dW.nrows() != W.nrows() or dW.ncols() != W.ncols())) or
+                         (not dT.empty() and dT.size() != static_cast<Size>(dW.npages())),
+                     "Inconsistent Makarov ECS derivative dimensions")
   if (lines.empty()) return;
   validate_band_id(bnd_qid);
   const auto& e0 = energies.e0;
@@ -226,10 +261,15 @@ void relaxation_matrix_offdiagonal(MatrixView&                      W,
   const std::array rats{maxJ, maxN, Si, Sf};
   const int        maxL  = wigner_init_size(rats);
   const auto       basis = prepare_basis(maxL, energies, rovib_data, T0, bnd_qid.isot, broadening_species, atm);
+  ARTS_USER_ERROR_IF(
+      (not dQ.empty() and (dQ.nrows() != dW.npages() or dQ.ncols() != static_cast<Index>(basis.Q.size()))) or
+          (not dOmega.empty() and
+           (dOmega.nrows() != dW.npages() or dOmega.ncols() != static_cast<Index>(basis.Omega.size()))),
+      "Inconsistent Makarov ECS basis derivative dimensions")
 
-  coupling_kernel(W, lines, Si, Sf, basis, e0, atm.temperature, maxL);
+  coupling_kernel(W, lines, Si, Sf, basis, e0, atm.temperature, maxL, dW, dT, dQ, dOmega);
 
-  apply_sum_rule(W, dipr, e0, atm.temperature);
+  apply_sum_rule(W, dipr, e0, atm.temperature, dW, dT);
 }
 ARTS_METHOD_ERROR_CATCH
 }  // namespace lbl::voigt::ecs::makarov

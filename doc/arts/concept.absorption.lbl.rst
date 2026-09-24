@@ -561,6 +561,30 @@ where :math:`N` is the total number density of the absorbing species.
   Zeeman splitting within a band is not currently supported together with ECS
   line mixing.
 
+ECS Jacobians
+~~~~~~~~~~~~~
+
+Both supported ECS models evaluate the requested Jacobians together.  The
+combined collision matrix has a derivative tensor indexed by Jacobian target,
+row, and column.  The angular couplings and eigendecomposition are shared by
+all targets.  Temperature, pressure, composition, isotopologue ratios, line
+frequencies, lower-state energies, Einstein coefficients, and the ``G0``/``D0``
+model coefficients propagate through this tensor and the equivalent-line
+strengths.  Frequency derivatives follow the other LBL models' wind convention.
+Catalogue lower-state energy derivatives affect the optical population; the
+collision energies remain fixed by the species' quantum-state model.
+
+Targets that change the eigensystem require resolved, distinct modes and a
+well-conditioned eigenvector basis; unresolved degeneracies raise an error.
+Targets that leave the centered operator fixed reuse its eigenbasis.
+The final profile reuses the ordinary Voigt model's Faddeeva derivative
+routine, including its numerical approximation, rather than evaluating the
+cancellation-prone closed-form derivative.  Temperature finite-difference
+checks must stay within a partition-function interpolation interval to avoid
+crossing a derivative discontinuity at a table node.  Weak mixing perturbations
+also need steps large enough to resolve equivalent-line shifts against the
+carrier frequency in floating-point arithmetic.
+
 .. _lbl-ecs-relaxmat:
 
 Relaxation Matrix

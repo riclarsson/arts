@@ -45,10 +45,20 @@ void coupling_kernel(MatrixView                       W,
                      const basis_data&                basis,
                      const Vector&                    e0,
                      const Numeric                    T,
-                     const int                        maxL) {
+                     const int                        maxL,
+                     Tensor3View                      dW,
+                     ConstVectorView                  dT,
+                     ConstMatrixView                  dQ,
+                     ConstMatrixView                  dOmega) {
   using Conversion::kelvin2joule;
-  const auto& [Q, Om] = basis;
-  const Size n        = lines.size();
+  const auto& Q       = basis.Q;
+  const auto& Om      = basis.Omega;
+  const Index nq      = dW.npages();
+  const auto  tangent = [](ConstMatrixView values, Index q, Index i) -> Numeric {
+    return values.empty() ? 0.0 : values[q, i];
+  };
+  Vector     dsum(nq);
+  const Size n = lines.size();
 
   arts_wigner_thread_init(maxL);
   for (Size i = 0; i < n; i++) {
@@ -70,19 +80,38 @@ void coupling_kernel(MatrixView                       W,
       const Index Lf  = std::min((Ji + Ji_p).toIndex(), (Jf + Jf_p).toIndex());
 
       Numeric sum = 0;
+      dsum        = 0;
       for (; L <= Lf; L += 2) {
         const Numeric a  = wig3(Ji, Ji_p, Rational{L}, li, -li, Rational{0});
         const Numeric b  = wig3(Jf, Jf_p, Rational{L}, lf, -lf, Rational{0});
         const Numeric c  = wig6(Ji, Jf, Rational{1}, Jf_p, Ji_p, Rational{L});
         sum             += a * b * c * Numeric(2 * L + 1) * Q[L] / Om[L];
+        for (Index q = 0; q < nq; ++q) {
+          dsum[q] += a * b * c * Numeric(2 * L + 1) *
+                     (tangent(dQ, q, L) / Om[L] - Q[L] / Om[L] * (tangent(dOmega, q, L) / Om[L]));
+        }
       }
-      const Numeric ECS  = Om[Ji.toIndex()];
-      const Numeric scl  = ECS * Numeric(2 * Ji_p + 1) * sqrtr((2 * Jf + 1) * (2 * Jf_p + 1));
-      sum               *= scl;
+      const Numeric ECS = Om[Ji.toIndex()];
+      const Numeric scl = ECS * Numeric(2 * Ji_p + 1) * sqrtr((2 * Jf + 1) * (2 * Jf_p + 1));
+      for (Index q = 0; q < nq; ++q) {
+        const Numeric dscl =
+            tangent(dOmega, q, Ji.toIndex()) * Numeric(2 * Ji_p + 1) * sqrtr((2 * Jf + 1) * (2 * Jf_p + 1));
+        dsum[q] = dsum[q] * scl + sum * dscl;
+      }
+      sum *= scl;
 
       // Add to W and rescale to upwards element by the populations.
       W[j, i] = sum;
       W[i, j] = sum * std::exp((e0[j] - e0[i]) / kelvin2joule(T));
+      if (nq != 0) {
+        const Numeric exponent = (e0[j] - e0[i]) / kelvin2joule(T);
+        const Numeric balance  = std::exp(exponent);
+        for (Index q = 0; q < nq; ++q) {
+          const Numeric dexponent = dT.empty() ? 0.0 : -exponent * dT[q] / T;
+          dW[q, j, i]             = dsum[q];
+          dW[q, i, j]             = (dsum[q] + sum * dexponent) * balance;
+        }
+      }
     }
   }
   arts_wigner_thread_free();
@@ -136,7 +165,14 @@ void relaxation_matrix_offdiagonal(MatrixView&                      W,
                                    const linemixing::species_data&  rovib_data,
                                    const Vector&                    dipr,
                                    const energy_data&               energies,
-                                   const AtmPoint&                  atm) {
+                                   const AtmPoint&                  atm,
+                                   Tensor3View                      dW,
+                                   ConstVectorView                  dT,
+                                   ConstMatrixView                  dQ,
+                                   ConstMatrixView                  dOmega) {
+  ARTS_USER_ERROR_IF((dW.npages() != 0 and (dW.nrows() != W.nrows() or dW.ncols() != W.ncols())) or
+                         (not dT.empty() and dT.size() != static_cast<Size>(dW.npages())),
+                     "Inconsistent Hartmann ECS derivative dimensions")
   const Size n = lines.size();
   if (not n) return;
   validate_isotopologue(bnd_qid.isot);
@@ -182,9 +218,14 @@ void relaxation_matrix_offdiagonal(MatrixView&                      W,
   const std::array rats{maxJ, li, lf};
   const int        maxL  = wigner_init_size(rats);
   const auto       basis = prepare_basis(maxL, energies, rovib_data, T0, bnd_qid.isot, broadening_species, atm);
+  ARTS_USER_ERROR_IF(
+      (not dQ.empty() and (dQ.nrows() != dW.npages() or dQ.ncols() != static_cast<Index>(basis.Q.size()))) or
+          (not dOmega.empty() and
+           (dOmega.nrows() != dW.npages() or dOmega.ncols() != static_cast<Index>(basis.Omega.size()))),
+      "Inconsistent Hartmann ECS basis derivative dimensions")
 
-  coupling_kernel(W, lines, li, lf, swap_order, basis, e0, T, maxL);
+  coupling_kernel(W, lines, li, lf, swap_order, basis, e0, T, maxL, dW, dT, dQ, dOmega);
 
-  apply_sum_rule(W, dipr, e0, T);
+  apply_sum_rule(W, dipr, e0, T, dW, dT);
 }
 }  // namespace lbl::voigt::ecs::hartmann
