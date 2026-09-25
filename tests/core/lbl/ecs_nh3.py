@@ -172,6 +172,6 @@ fig.suptitle(
     "IOS + detailed balance; representative widths; solid: mixed, dashed: independent",
     fontsize=12,
 )
-fig.savefig("ecs_nh3.png", dpi=160)
+
 if "ARTS_HEADLESS" not in os.environ:
     plt.show()
