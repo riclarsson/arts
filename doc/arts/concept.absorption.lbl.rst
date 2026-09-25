@@ -54,7 +54,7 @@ and from this the full matrix is
 
   \mathbf{K}_{lbl} = \left[ \begin{array}{llll} K_{A, lbl}&0&0&0\\ 0&K_{A, lbl}&0&0\\0&0&K_{A, lbl}&0\\0&0&0&K_{A, lbl} \end{array} \right],
 
-where :math:`i` is the pseudo-index of the absorption line and ``lbl`` is the pseudo-index of the plain line-by-line absorption for the sake of :ref:`summing up absorption <eq-prop-mat-sumup>`.
+where :math:`i` is the pseudo-index of the absorption line and :math:`\mathrm{lbl}` is the pseudo-index of the plain line-by-line absorption for the sake of :ref:`summing up absorption <eq-prop-mat-sumup>`.
 
 .. note::
 
@@ -482,10 +482,10 @@ expression) is written in terms of the complex matrix :math:`\mathbf{K}` as
 
   \chi(\nu) \propto \mathrm{Im}\left[\mathbf{d}^T \left(\nu \mathbf{I} - \mathbf{K}\right)^{-1} \mathbf{p}\, \mathbf{d}\right],
 
-where :math:`\mathbf{K}=\mathbf{W}^T` accounts for the stored matrix convention
-used by the angular kernels in :ref:`lbl-ecs-relaxmat`.  The implementation uses
-the diagonal weights :math:`p_j=g_{u,j}\exp(-E_l^{(j)}/kT)/Q(T)` and signed
-amplitudes
+where :math:`\mathbf{K}=\mathbf{W}^T` converts the source-index-first convention
+of :ref:`lbl-ecs-relaxmat` to operator notation. The CO\ :sub:`2` and O\ :sub:`2`
+models use the diagonal weights :math:`p_j=g_{u,j}\exp(-E_l^{(j)}/kT)/Q(T)`
+and signed amplitudes
 
 .. math::
 
@@ -495,9 +495,9 @@ amplitudes
 Here :math:`g_{u,j}` is the upper-state statistical weight, :math:`A_j` the
 Einstein A coefficient, and :math:`d_{r,j}` the angular reduced dipole used by
 the sum-rule correction.  The weights :math:`p_j` therefore should not be
-interpreted as the total lower-state populations.  This states the current
-normalisation convention; changing it requires a consistent transformation of
-the amplitudes, weights, and angular kernels.
+interpreted as the total lower-state populations. A change of normalisation
+requires a consistent transformation of the amplitudes, weights, and angular
+kernels.
 
 The matrix is diagonalised as :math:`\mathbf{K} = \mathbf{V} \tilde{\boldsymbol{\nu}} \mathbf{V}^{-1}`,
 where :math:`\tilde{\boldsymbol{\nu}}` is the diagonal matrix of complex
@@ -511,10 +511,10 @@ Explicitly, the equivalent strength for line :math:`k` is
 
   \tilde{S}_k = \left(\sum_j d_j V_{jk}\right) \left(\sum_j p_j d_j V^{-1}_{kj}\right).
 
-The implementation evaluates the second factor by solving
-:math:`\mathbf{V}\mathbf{a}=\mathbf{p}\mathbf{d}` without explicitly forming
-:math:`\mathbf{V}^{-1}`.  It checks solver status, the conditioning of the
-eigenvectors, and the damping eigenvalues before using the equivalent lines.
+Equivalently, the second factor is :math:`a_k`, where
+:math:`\mathbf{V}\mathbf{a}=\mathbf{p}\mathbf{d}`. This representation requires
+a complete eigenvector basis; nonnegative damping is necessary for physical
+absorption profiles.
 
 The ECS line shape function is
 
@@ -556,34 +556,23 @@ then
 
 where :math:`N` is the total number density of the absorbing species.
 
-.. note::
-
-  Zeeman splitting within a band is not currently supported together with ECS
-  line mixing.
-
 ECS Jacobians
 ~~~~~~~~~~~~~
 
-Both supported ECS models evaluate the requested Jacobians together.  The
-combined collision matrix has a derivative tensor indexed by Jacobian target,
-row, and column.  The angular couplings and eigendecomposition are shared by
-all targets.  Temperature, pressure, composition, isotopologue ratios, line
-frequencies, lower-state energies, Einstein coefficients, and the ``G0``/``D0``
-model coefficients propagate through this tensor and the equivalent-line
-strengths.  Frequency derivatives follow the other LBL models' wind convention.
-Catalogue lower-state energy derivatives affect the optical population; the
-collision energies remain fixed by the species' quantum-state model.
+Derivatives of the absorption spectrum follow from the dependence of the
+collision matrix, optical populations, dipole amplitudes, and Doppler widths on
+the perturbed quantity. Temperature, pressure, composition, isotopic abundance,
+line frequencies, lower-state energies, Einstein coefficients, and collisional
+width and shift parameters can all contribute. A perturbation of a spectroscopic
+lower-state energy changes the optical population; the collision energies
+remain determined by the chosen rotational-state model unless that model is
+also perturbed.
 
-Targets that change the eigensystem require resolved, distinct modes and a
-well-conditioned eigenvector basis; unresolved degeneracies raise an error.
-Targets that leave the centered operator fixed reuse its eigenbasis.
-The final profile reuses the ordinary Voigt model's Faddeeva derivative
-routine, including its numerical approximation, rather than evaluating the
-cancellation-prone closed-form derivative.  Temperature finite-difference
-checks must stay within a partition-function interpolation interval to avoid
-crossing a derivative discontinuity at a table node.  Weak mixing perturbations
-also need steps large enough to resolve equivalent-line shifts against the
-carrier frequency in floating-point arithmetic.
+Derivatives of individual equivalent lines require resolved, distinct modes
+and a well-conditioned eigenvector basis. Degenerate modes require a coupled
+subspace treatment. Perturbations that leave the centered spectral operator
+fixed change the populations, amplitudes, or common frequency offset without
+changing its eigenvectors.
 
 .. _lbl-ecs-relaxmat:
 
@@ -613,7 +602,7 @@ where :math:`G_{P,0,i}` is the pressure-broadening half-width half-maximum.
 
 The off-diagonal elements are purely imaginary.  Write
 :math:`R_{ij}=\mathrm{Im}\,W_{ij}` for the real collisional coupling coefficients
-in the stored matrix convention.  Their construction from the ECS basis rates
+in the source-index-first convention. Their construction from the ECS basis rates
 is described below.
 
 .. _lbl-ecs-rates:
@@ -621,8 +610,8 @@ is described below.
 ECS Basis Rates
 ===============
 
-The ECS approach introduces two species-dependent functions of the integer angular
-momentum transfer channel :math:`L`:
+The CO\ :sub:`2` and O\ :sub:`2` ECS models introduce two species-dependent
+functions of the integer angular momentum transfer channel :math:`L`:
 
 **Basic rate** :math:`Q(L)`:
   This encodes the intrinsic probability of a collision transferring :math:`L` units of
@@ -634,7 +623,7 @@ momentum transfer channel :math:`L`:
 
   where :math:`E_L` is the rotational energy of level :math:`L`,
   and :math:`s(T)`, :math:`\beta(T)`, and :math:`\lambda(T)` are
-  temperature-dependent model parameters stored per broadening species
+  temperature-dependent model parameters specified per broadening species
   (see :ref:`lbl-line-shape-params` for the available temperature dependence forms).
 
 **Adiabatic factor** :math:`\Omega(L)`:
@@ -664,15 +653,15 @@ momentum transfer channel :math:`L`:
 Off-diagonal Elements
 =====================
 
-The off-diagonal elements of :math:`\mathbf{W}` are computed species-by-species.
-All variants follow the formal IOS structure: they are written as a sum over
-even angular momentum transfer channels :math:`L`, weighted by the ratio
+The CO\ :sub:`2` and O\ :sub:`2` off-diagonal elements follow the formal IOS
+structure: both models are written as a sum over even angular momentum transfer
+channels :math:`L`, weighted by the ratio
 :math:`Q(L)/\Omega(L)` and by Wigner 3-j and 6-j coupling coefficients.
 After the IOS computation a sum-rule rescaling is applied
 (see :ref:`lbl-ecs-sumrule`).
 
-The reverse coupling is assigned using the following Boltzmann relation in the
-stored matrix convention:
+For these two models, the reverse coupling is assigned using the following
+Boltzmann relation in the source-index-first convention:
 
 .. math::
 
@@ -681,9 +670,9 @@ stored matrix convention:
 where :math:`E_i` is the energy of the lower rotational state of line :math:`i`
 (using the same :math:`E_l` convention as in :ref:`lbl-lte`).
 
-ARTS provides two ECS line-shape models: ``VP_ECS_HARTMANN`` for the supported
-CO\ :sub:`2` band model and ``VP_ECS_MAKAROV`` for the O\ :sub:`2` microwave
-band model.  Their angular kernels and molecular data are described below.
+The Hartmann CO\ :sub:`2` band model and Makarov O\ :sub:`2` microwave band
+model have different angular couplings and molecular energy models, described
+below.
 
 Linear Molecules — Hartmann (CO\ :sub:`2`)
 ------------------------------------------
@@ -708,8 +697,8 @@ momentum triangle bounds,
 :math:`(\,\cdots)` denotes a Wigner 3-j symbol,
 and :math:`\{\,\cdots\}` a Wigner 6-j symbol.
 
-The implementation interchanges the upper and lower angular labels in this
-kernel when :math:`l_i>l_f`.  The angular reduced dipole used for the sign and
+The upper and lower angular labels in this expression are interchanged when
+:math:`l_i>l_f`.  The angular reduced dipole used for the sign and
 sum-rule correction is, in upper/lower state notation,
 
 .. math::
@@ -720,9 +709,8 @@ sum-rule correction is, in upper/lower state notation,
 The rotational energy entering :math:`Q` and :math:`\Omega` is the rigid-rotor
 expression :math:`E_J = hcB_0 J(J+1)`, with :math:`B_0=0.39021\,\mathrm{cm}^{-1}`
 for CO\ :sub:`2`-626.  This is currently the only isotopologue with a rotational
-energy model in the Hartmann kernel.  The CO\ :sub:`2` collision-parameter presets
-also populate CO\ :sub:`2`-628 and CO\ :sub:`2`-636, but those entries alone do not
-provide the missing rotational energy models.
+energy model considered here. Other isotopologues require their own consistent
+rotational energies as well as collision parameters.
 
 Linear Molecules with Electron Spin — Makarov (O\ :sub:`2`)
 -----------------------------------------------------------
@@ -762,8 +750,8 @@ The reduced dipole is
 
 The kernel is specific to O\ :sub:`2`-66.  A single set of molecular constants
 :cite:p:`tretyakov05:_60-ghz_jms` supplies two energy functions:
-``rotational_energy(N)`` for the reference rotor and ``level_energy(N, J)``
-for the resolved spin-triplet levels.  Both use the :math:`N=1, J=0` ground
+a reference-rotor energy depending on :math:`N`, and a resolved spin-triplet
+energy depending on both :math:`N` and :math:`J`.  Both use the :math:`N=1, J=0` ground
 state as their energy zero.
 
 The reference rotor contains the rotational and centrifugal-distortion terms.
@@ -782,14 +770,144 @@ measured frequencies by up to about 24 MHz.  These energies therefore do not
 replace catalogue line frequencies.  The common ground-state reference also
 enters the absolute energy in :math:`Q`, where a reference shift does not cancel.
 
+.. _lbl-ecs-nh3:
+
+Symmetric Tops with Inversion — Hadded (NH\ :sub:`3`)
+-----------------------------------------------------
+
+The angular couplings and energy corrections of :cite:t:`Hadded2002`
+(Eqs. 9--19) describe one parallel band: :math:`K_u=K_l`,
+:math:`|J_u-J_l|\leq1`, and opposite upper/lower inversion symmetry
+(:math:`a\leftarrow s` or :math:`s\leftarrow a`). This includes :math:`\nu_2`;
+perpendicular bands are outside its domain.
+
+The signed dipole and population must use the paper's common normalization:
+
+.. math::
+
+  \mu_i = (-1)^{J_{u,i}+K_i}\sqrt{2J_{u,i}+1}
+    \begin{pmatrix}J_{u,i}&1&J_{l,i}\\K_i&0&-K_i\end{pmatrix},
+  \qquad
+  \rho_i = \frac{g_i(2J_{l,i}+1)}{Z(T)}
+    \exp\!\left(-\frac{E_i}{kT}\right),
+
+where :math:`Z(T)` is the partition function and :math:`g_i` is 4 for ortho and
+2 for para states. Collisions do not couple the ortho and para nuclear-spin
+blocks.
+
+For the IOS angular kernel (Eq. 10), use unprimed quantum numbers for the
+source line :math:`i` and primed quantum numbers for the destination line
+:math:`j`. Subscripts :math:`l,u` denote each line's lower and upper state
+(the paper uses :math:`i,f` for these state labels). With
+:math:`R_{ij}=\langle j|\hat R|i\rangle`, the full expression is
+
+.. math::
+
+  R_{ij}^{\mathrm{IOS}} ={}&
+    -N_l N_u N'_l N'_u (2J'_l+1)
+    \sqrt{(2J'_u+1)(2J_u+1)} \\
+    &\times \sum_L (-1)^{J'_u+J_u+K'_u+K'_l+1+L}
+    \begin{Bmatrix}J_l&J_u&1\\J'_u&J'_l&L\end{Bmatrix}
+    \mathcal{A}_L,
+
+where the four products of Wigner 3-j symbols and dynamical factors are
+
+.. math::
+
+  \mathcal{A}_L ={}&
+    A_l A_u
+    \begin{pmatrix}J'_l&L&J_l\\K'_l&M_l^-&-K_l\end{pmatrix}
+    \begin{pmatrix}J'_u&L&J_u\\K'_u&M_u^-&-K_u\end{pmatrix}
+    Q(L,M_l^-,M_u^-) \\
+    &+ B_l A_u
+    \begin{pmatrix}J'_l&L&J_l\\-K'_l&M_l^+&-K_l\end{pmatrix}
+    \begin{pmatrix}J'_u&L&J_u\\K'_u&M_u^-&-K_u\end{pmatrix}
+    Q(L,M_l^+,M_u^-) \\
+    &+ A_l B_u
+    \begin{pmatrix}J'_l&L&J_l\\K'_l&M_l^-&-K_l\end{pmatrix}
+    \begin{pmatrix}J'_u&L&J_u\\-K'_u&M_u^+&-K_u\end{pmatrix}
+    Q(L,M_l^-,M_u^+) \\
+    &+ B_l B_u
+    \begin{pmatrix}J'_l&L&J_l\\-K'_l&M_l^+&-K_l\end{pmatrix}
+    \begin{pmatrix}J'_u&L&J_u\\-K'_u&M_u^+&-K_u\end{pmatrix}
+    Q(L,M_l^+,M_u^+).
+
+For :math:`x\in\{l,u\}`, the projections and inversion factors are
+
+.. math::
+
+  M_x^\pm &= K_x\pm K'_x, \qquad
+  P_x = (-1)^{J'_x+K'_x+J_x+K_x+L}, \\
+  A_x &= 1+\epsilon_x\epsilon'_x P_x, \qquad
+  B_x = \epsilon'_x+\epsilon_x P_x.
+
+The normalization and inversion sign for each state, and analogously for
+primed states, follow Eq. 5:
+
+.. math::
+
+  N_x =
+    \begin{cases}1,&K_x=0,\\1/\sqrt{2},&K_x>0,\end{cases}
+  \qquad
+  \epsilon_x =
+    \begin{cases}
+      0,&K_x=0,\\
+      (-1)^{J_x},&K_x>0\text{, antisymmetric }(a),\\
+      (-1)^{J_x+1},&K_x>0\text{, symmetric }(s).
+    \end{cases}
+
+The braces denote a Wigner 6-j symbol. The integer sum spans
+:math:`\max(|J_l-J'_l|,|J_u-J'_u|)\leq L\leq
+\min(J_l+J'_l,J_u+J'_u)`, subject to the 3-j projection conditions and the
+nonzero dynamical factors. Allowed odd and even :math:`L` are included;
+there is no additional :math:`(2L+1)` multiplier. The projections are signed
+multiples of 3 for NH\ :sub:`3`. Distinct :math:`Q(L,M_l,M_u)` factors cannot
+in general be identified by taking absolute values of the projections.
+
+For downward transfer from line :math:`i` to line :math:`j`, selected by
+:math:`E_j\leq E_i`, the ECS correction replaces :math:`Q` by
+:math:`Q'(L,M_l,M_u)=Q(L,M_l,M_u)\,\Omega(L,M_l)` inside the angular sum
+and divides the result by
+:math:`\Omega(J_{l,i},K_{l,i})`. Here the paper's convention is
+
+.. math::
+
+  \Omega = \left[1+\frac{(\tau\,\Delta E/\hbar)^2}{24}\right]^2,
+  \qquad \tau=\ell_c/\bar v,
+  \qquad \rho_i R_{ij}=\rho_j R_{ji}.
+
+Detailed balance therefore includes the lower-state rotational degeneracy in
+:math:`\rho`. This :math:`\Omega\geq1` is reciprocal to the
+CO\ :sub:`2`/O\ :sub:`2` convention above. Setting all factors to one gives IOS
+with detailed balance enforced. The energies :math:`E_i` and adiabatic gaps
+must come from one consistent molecular energy model. The gap connects a
+rotational level to an appropriate lower-energy level; its selection is part
+of the physical collision model.
+
+The diagonal widths are independent spectroscopic parameters in these studies.
+An alternative estimate follows from the optical sum rule
+:math:`\sum_j\mu_jR_{ij}=0`. Applied to a finite set of transitions, this
+estimate depends on which lines are retained. It differs from the
+CO\ :sub:`2`/O\ :sub:`2` rescaling described below, which adjusts off-diagonal
+couplings to supplied widths.
+
+The He study and its H\ :sub:`2`/Ar extension :cite:p:`Hadded2004` compare with
+room-temperature measurements. They do not establish a general calibrated
+H\ :sub:`2`/He temperature law for planetary atmospheres. Extension to other
+conditions requires appropriate collision factors, widths, collision duration,
+and their temperature dependence.
+
+Interface guidance and a plotted :math:`\nu_2` example are in :doc:`user.lbl`;
+implementation conventions are in :doc:`dev.lbl`.
+
 .. _lbl-ecs-sumrule:
 
-Sum-rule Correction
-===================
+CO\ :sub:`2`/O\ :sub:`2` Sum-rule Correction
+============================================
 
-The approximate angular couplings and supplied diagonal widths need not satisfy
-the optical sum rule on a finite set of lines.  The implemented rescaling seeks
-to impose
+For CO\ :sub:`2` and O\ :sub:`2`, the approximate angular couplings and supplied
+diagonal widths need not satisfy the optical sum rule on a finite set of lines.
+The rescaling seeks to impose
 
 .. math::
 
@@ -806,38 +924,31 @@ the contribution from the diagonal and entries already fixed:
 
 When :math:`s_\downarrow\ne 0`, the remaining entries are rescaled by
 :math:`-s_\uparrow/s_\downarrow`, and their reverse couplings are updated using
-the Boltzmann relation above.
+the CO\ :sub:`2`/O\ :sub:`2` Boltzmann relation above.
 
-The per-line rotational quantum numbers and energies are prepared once in matrix
-order and reused for every collision partner.  The kernels receive these arrays
-directly, without a catalogue-order permutation.  Hartmann evaluates its level
-energy at each line's original lower :math:`J`; Makarov uses the resolved
-:math:`(N_l,J_l)` level energy.  Both the raw reverse couplings and this correction
-use the same prepared ``e0`` vector, including when Hartmann interchanges its
-angular labels.  Separate reference-rotor arrays :math:`E_L` and :math:`E_{L-2}`
-are prepared from the same species model and remain indexed by angular momentum,
-independently of line sorting.  These collision energies do not replace the
-catalogue energies used to calculate the optical populations.
+Both the raw reverse couplings and this correction use each line's original
+lower-state rotational energy. Hartmann uses the lower :math:`J`, even when
+its angular labels are interchanged; Makarov uses the resolved
+:math:`(N_l,J_l)` energy. The reference-rotor energies :math:`E_L` and
+:math:`E_{L-2}` entering the collision basis must belong to the same molecular
+energy model. These collision energies remain distinct from the spectroscopic
+energies determining the optical populations.
 
 This sequential prescription cannot generally enforce every column: the final
 column has no remaining entries to adjust, and zero or nearly cancelling sums
 can prevent a stable correction.  Truncating a band or a connected symmetry
-block can also leave a nonzero residual.  The implementation retains a sum-rule
-residual diagnostic; closure and nonnegative absorption must be checked for the
-band and conditions of interest.  The rescaling alone is not a proof of either
-property.
+block can also leave a nonzero residual. Sum-rule closure and nonnegative
+absorption must be checked for the band and conditions of interest. The
+rescaling alone is not a proof of either property.
 
 .. _lbl-ecs-multispecies:
 
 Multiple Broadening Species
 ===========================
 
-When multiple broadening species are present, the ARTS implementation offers two
-modes:
-
-In the **single-W mode** (used by default when calling ``calculate``), the per-species
-collision contributions are first volume-mixing-ratio weighted and summed into a
-single effective :math:`\mathbf{W}`.  With
+For a gas mixture, the collision contributions of the individual partners are
+volume-mixing-ratio weighted and summed into a single effective
+:math:`\mathbf{W}` before diagonalisation.  With
 :math:`\mathbf{F}=\operatorname{diag}(\nu_{0,i})`, this is
 
 .. math::
@@ -847,49 +958,25 @@ single effective :math:`\mathbf{W}`.  With
 
 and a single diagonalisation is performed.
 
-When a bath partner is listed, its fraction is the remainder after the explicit
-partners' atmospheric VMRs.  Without a bath partner, the listed partners' VMRs are
-normalised to sum to one.  If all listed partners are absent, the collision
-contribution is zero and the unperturbed line frequencies remain.  For fractions
-summing to one, the expression reduces to
-:math:`\mathbf{W}_{eff}=\sum_s x_s\mathbf{W}^{(s)}`.
+For fractions summing to one, the expression reduces to
+:math:`\mathbf{W}_{eff}=\sum_s x_s\mathbf{W}^{(s)}`. With no collisions,
+only the unperturbed line frequencies remain.
 
-In the **multi-W mode** (used by ``equivalent_values`` for pre-computing equivalent
-lines at multiple temperatures), the diagonalisation is performed separately per
-species.  These pure-partner results are useful for adaptation, but summing their
-spectra is not generally equivalent to diagonalising the combined collision
-matrix.
+Each pure partner may also be diagonalised separately, for example to obtain
+its equivalent lines for a pressure-expansion fit. Summing the resulting
+pure-partner spectra is not generally equivalent to diagonalising the combined
+collision matrix. Combining the matrices preserves the distinct thermal
+dependence and collision dynamics of each partner, including their
+contributions to higher orders of line mixing.
 
-For a gas mixture, list each collision partner in the band's line-shape models,
-provide its ECS data in ``abs_ecs_data``, and set its atmospheric volume mixing
-ratio.  For example, air broadening can use separate O\ :sub:`2` and
-N\ :sub:`2` partners with their respective diagonal widths and ECS parameters.
-ARTS constructs each partner's matrix at the requested temperature and pressure,
-then performs the weighted matrix sum above before computing the spectrum.
-This preserves the distinct thermal dependence and collision dynamics of each
-partner, including their contributions to higher orders of line mixing.
-
-Some catalogues supply only an air-broadening diagonal width, so separate
-O\ :sub:`2` and N\ :sub:`2` matrices cannot be constructed from those widths.
-For this case, ``abs_ecs_dataAddMeanAir(vmrs=..., species=...)`` creates a Bath
-ECS parameter set by taking a weighted average of the requested partners'
-temperature-model coefficients.  It can be used with the catalogue's existing
-Bath diagonal widths without requiring separate partner widths.
-
-This coefficient average is an approximate bath model.  The ECS basis rates
-and adiabatic factors are nonlinear functions of the averaged parameters, so
+A catalogue may provide only a mean-air diagonal width, rather than separate
+O\ :sub:`2` and N\ :sub:`2` widths. One approximation is then to combine that
+width with a bath model obtained by averaging the collision parameters of its
+constituents. This coefficient average is an approximate bath model: the ECS
+basis rates and adiabatic factors depend nonlinearly on those parameters, so
 the resulting matrix generally differs from a weighted sum of separately
-constructed partner matrices.  The helper does not infer missing partner
-widths or missing positive-weight ECS parameter sets.
-
-The bath-composition weights must be finite and nonnegative and sum to one
-within :math:`10^{-4}`; accepted weights are normalised to unit sum.  A
-zero-weight species is skipped even if its data are absent.  Each positive-weight
-species must have ECS data for every isotopologue being processed, and each
-parameter must have matching temperature-model types and coefficient counts
-across those species.  The input species must be explicit partners rather than
-Bath itself.  These composition weights define the Bath parameter set; its
-runtime fraction follows the atmospheric VMR rule described above.
+constructed partner matrices. A mean-air width alone does not determine the
+individual partner widths.
 
 .. _lbl-ecs-rosenkranz:
 
@@ -983,7 +1070,7 @@ subspace treatment rather than these nondegenerate formulas.
 Fitting from Equivalent Lines
 ------------------------------
 
-ARTS extracts Rosenkranz coefficients numerically from equivalent lines at a
+Rosenkranz coefficients can be extracted numerically from equivalent lines at a
 chosen reference pressure.  The equivalent-line calculation includes all orders
 of coupling, but retaining only linear and quadratic pressure terms in the
 adapted model is still an approximation.  At finite reference pressure the
@@ -994,7 +1081,7 @@ Given the complex equivalent lines :math:`(\tilde{S}_{k,s}, \tilde{\nu}_{k,s})`
 (indexed by :math:`k` in eigenvalue-decomposition order, which carries no physical
 meaning) computed by ECS for broadening species :math:`s` at pressure :math:`P_0`
 and a grid of temperatures :math:`T_1, \ldots, T_M`, the Rosenkranz coefficients are
-extracted by ``abs_bandsLineMixingAdaptation`` as follows.
+obtained by the following procedure.
 Here, :math:`i` will denote the index of the physical LBL lines (the rows/columns of
 :math:`\mathbf{K}`) and :math:`k` the index of the equivalent lines.
 
@@ -1004,7 +1091,7 @@ and the :math:`n` physical LBL lines are sorted by :math:`\nu_{0,i}`.  Equivalen
 at sorted position :math:`n` is then identified with the physical line at sorted
 position :math:`n`, giving a bijection :math:`k \leftrightarrow i` between the two
 index sets.  This is a heuristic matching: because eigenvalue decomposition does not
-guarantee any particular ordering of eigenvalues, sorting is the only way to establish a
+guarantee any particular ordering of eigenvalues, sorting defines the chosen
 correspondence.  The identification is reliable as long as the second-order frequency
 shifts and pressure shifts remain small compared with the separations between adjacent
 line centres; it can fail if either effect is comparable in magnitude to the line spacing.
@@ -1054,17 +1141,16 @@ configurable degree :math:`d`:
   G_{lm,i,s}(T)         &\approx \sum_{n=0}^{d} a_n^{(G)}\,T^n, \\
   \Delta\nu_{lm,i,s}(T) &\approx \sum_{n=0}^{d} a_n^{(DV)}\,T^n.
 
-These polynomials are stored using the ``POLY`` temperature model (see
-:ref:`lbl-line-shape-params`) for each broadening species separately and
-are then evaluated at runtime using the ordinary VMR-weighted sum of the
-:ref:`line shape parameter <lbl-line-shape-params>` framework, with the
-coefficients attached to physical line :math:`i`.
+These polynomials describe each broadening species separately. Their
+contributions to a physical line :math:`i` are combined using the
+volume-mixing-ratio weights of the :ref:`line shape parameter
+<lbl-line-shape-params>` model.
 
 .. note::
 
-  Setting ``rosenkranz_fit_order = 1`` retains only :math:`Y_{lm}` and is
-  appropriate for moderate pressures where the quadratic-in-pressure corrections
-  are negligible.  Setting it to 2 also fits :math:`G_{lm}` and
+  A first-order expansion retains only :math:`Y_{lm}` and is appropriate for
+  moderate pressures where the quadratic-in-pressure corrections are negligible.
+  A second-order expansion also retains :math:`G_{lm}` and
   :math:`\Delta\nu_{lm}` within the range where a perturbation expansion remains
   accurate; increasing the order does not make it valid for arbitrarily strong
   mixing.
@@ -1076,7 +1162,6 @@ coefficients attached to physical line :math:`i`.
   second-order adapted mixture therefore need not agree with the full ECS
   calculation that combines the matrices before diagonalisation.
 
-  The reference pressure :math:`P_0` is taken from ``atm_point.pressure``.
-  Runtime evaluation restores the indicated powers of pressure in pascals.
+  The indicated powers of pressure are restored when evaluating the expansion.
   Coefficients inferred at one finite :math:`P_0` need not reproduce the full
   ECS calculation at another pressure, even with an accurate temperature fit.
