@@ -114,7 +114,6 @@ std::pair<ArrayOfSensorObsel, ArrayOfSensorMetaInfo> Builder::operator()(std::sp
                                                                          std::span<const Time>    time,
                                                                          const Vector2&           ell) const {
   if (channels.empty()) arts::user_error("Builder requires at least one channel");
-  if (not antenna) arts::user_error("Builder requires an antenna pattern");
   if (pos.empty()) arts::user_error("Builder requires at least one sensor position");
   if (los.empty()) arts::user_error("Builder requires at least one bore LOS");
   if (pos.size() != los.size())
