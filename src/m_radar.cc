@@ -520,19 +520,19 @@ RadarResult radar_forward(const Workspace&                       ws,
 
 }  // namespace
 
-void measurement_sensorAddSimpleRadar(ArrayOfSensor&       measurement_sensor,
-                                      Matrix&              radar_range_limits,
-                                      const AscendingGrid& freq_grid,
-                                      const Vector3&       pos,
-                                      const Vector2&       los,
-                                      const Stokvec&       pol,
-                                      const AscendingGrid& range_bins,
-                                      const String&        name) try {
+void measurement_sensorsAddSimpleRadar(ArrayOfSensor&       measurement_sensors,
+                                       Matrix&              radar_range_limits,
+                                       const AscendingGrid& freq_grid,
+                                       const Vector3&       pos,
+                                       const Vector2&       los,
+                                       const Stokvec&       pol,
+                                       const AscendingGrid& range_bins,
+                                       const String&        name) try {
   ARTS_TIME_REPORT
   if (freq_grid.empty()) arts::user_error("Radar frequency grid cannot be empty");
   if (range_bins.size() < 2) arts::user_error("Radar range_bins needs at least two edges");
 
-  const Size old_n = measurement_size(measurement_sensor);
+  const Size old_n = measurement_size(measurement_sensors);
   if (radar_range_limits.nrows() != 0 and
       (radar_range_limits.ncols() != 2 or static_cast<Size>(radar_range_limits.nrows()) != old_n))
     arts::user_error(
@@ -543,7 +543,7 @@ void measurement_sensorAddSimpleRadar(ArrayOfSensor&       measurement_sensor,
   Matrix     new_limits(old_n + nnew, 2);
   if (old_n) new_limits[Range(0, old_n), joker] = radar_range_limits;
 
-  measurement_sensor.reserve(measurement_sensor.size() + freq_grid.size());
+  measurement_sensors.reserve(measurement_sensors.size() + freq_grid.size());
 
   // One sensor per frequency, with one element per range bin
   Size row = old_n;
@@ -558,7 +558,7 @@ void measurement_sensorAddSimpleRadar(ArrayOfSensor&       measurement_sensor,
     }
 
     SortedGriddedField1 meta;
-    meta.data_name     = name.empty() ? std::format("sensor-{}", measurement_sensor.size() + 1) : name;
+    meta.data_name     = name.empty() ? std::format("sensor-{}", measurement_sensors.size() + 1) : name;
     meta.gridname<0>() = "range";
     Vector centers(nbins);
     for (Size ib = 0; ib < nbins; ++ib) centers[ib] = std::midpoint(range_bins[ib], range_bins[ib + 1]);
@@ -567,7 +567,7 @@ void measurement_sensorAddSimpleRadar(ArrayOfSensor&       measurement_sensor,
     meta.data = 0.0;
 
     Sensor& sensor =
-        measurement_sensor.emplace_back(Sensor{.freq_grid = AscendingGrid{freq_grid[iv]},
+        measurement_sensors.emplace_back(Sensor{.freq_grid = AscendingGrid{freq_grid[iv]},
                                                .geometry  = SensorPosLosVector{SensorPosLos{.pos = pos, .los = los}},
                                                .elements  = std::vector<sensor::SparseStokvecMatrix>(nbins, weights),
                                                .meta      = std::move(meta)});
@@ -581,7 +581,7 @@ void measurement_vecFromRadarSingleScattering(const Workspace&                ws
                                               Vector&                         measurement_vec,
                                               Matrix&                         measurement_jac,
                                               Matrix&                         radar_aux,
-                                              const ArrayOfSensor&            measurement_sensor,
+                                              const ArrayOfSensor&            measurement_sensors,
                                               const Matrix&                   radar_range_limits,
                                               const JacobianTargets&          jac_targets,
                                               const AtmField&                 atm_field,
@@ -598,17 +598,17 @@ void measurement_vecFromRadarSingleScattering(const Workspace&                ws
                                               const Numeric&                  pext_scaling,
                                               const ArrayOfString&            aux_vars) try {
   ARTS_TIME_REPORT
-  const Size ny = measurement_size(measurement_sensor);
-  if (ny == 0) arts::user_error("measurement_sensor cannot be empty for a radar calculation");
+  const Size ny = measurement_size(measurement_sensors);
+  if (ny == 0) arts::user_error("measurement_sensors cannot be empty for a radar calculation");
   if (radar_range_limits.nrows() != static_cast<Index>(ny) or radar_range_limits.ncols() != 2)
     arts::user_error("radar_range_limits must have shape [{}, 2], got {:B,}", ny, radar_range_limits.shape());
-  for (const auto& sensor : measurement_sensor) sensor.check();
+  for (const auto& sensor : measurement_sensors) sensor.check();
   for (Size iy = 0; iy < ny; ++iy) {
     if (not(radar_range_limits[iy, 0] < radar_range_limits[iy, 1])) {
-      const auto [isensor, ie] = measurement_element(measurement_sensor, iy);
+      const auto [isensor, ie] = measurement_element(measurement_sensors, iy);
       arts::user_error(
           R"(Sensor "{}": the radar range limits of element {} (row {}) are not strictly increasing: [{}, {}])",
-          measurement_sensor[isensor].name(),
+          measurement_sensors[isensor].name(),
           ie,
           iy,
           radar_range_limits[iy, 0],
@@ -634,7 +634,7 @@ void measurement_vecFromRadarSingleScattering(const Workspace&                ws
   const RadarRangeMode            coordinate_mode = range_mode(range_mode_string, radar_range_limits);
   std::vector<PreparedSimulation> simulations;
   Size                            start = 0;
-  for (const auto& sensor : measurement_sensor) {
+  for (const auto& sensor : measurement_sensors) {
     const auto& poslos = sensor.geometry;
     for (Size iposlos = 0; iposlos < poslos.size(); ++iposlos) {
       PreparedSimulation prepared{.sensor = &sensor, .start = start, .iposlos = iposlos};
@@ -647,7 +647,7 @@ void measurement_vecFromRadarSingleScattering(const Workspace&                ws
 
   const auto calculate = [&](const AtmField& field) {
     return radar_forward(ws,
-                         measurement_sensor,
+                         measurement_sensors,
                          radar_range_limits,
                          simulations,
                          field,
@@ -681,8 +681,8 @@ ARTS_METHOD_ERROR_CATCH
 
 namespace {
 //! The name of the sensor of measurement element iy
-const String& gate_sensor_name(const ArrayOfSensor& measurement_sensor, Size iy) {
-  return measurement_sensor[measurement_element(measurement_sensor, iy).first].name();
+const String& gate_sensor_name(const ArrayOfSensor& measurement_sensors, Size iy) {
+  return measurement_sensors[measurement_element(measurement_sensors, iy).first].name();
 }
 }  // namespace
 
@@ -692,7 +692,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
                                           Matrix&                         measurement_jac,
                                           AtmField&                       atm_field,
                                           const Vector&                   measurement_vec,
-                                          const ArrayOfSensor&            measurement_sensor,
+                                          const ArrayOfSensor&            measurement_sensors,
                                           const Matrix&                   radar_range_limits,
                                           const JacobianTargets&          jac_targets,
                                           const SurfaceField&             surf_field,
@@ -714,7 +714,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
                                           const Index&                    max_iterations,
                                           const Index&                    max_sweeps) try {
   ARTS_TIME_REPORT
-  const Size ny = measurement_size(measurement_sensor);
+  const Size ny = measurement_size(measurement_sensors);
   const Size nx = jac_targets.x_size();
   if (radar_range_limits.nrows() != static_cast<Index>(ny) or radar_range_limits.ncols() != 2)
     arts::user_error("radar_range_limits must have shape [{}, 2], got {:B,}", ny, radar_range_limits.shape());
@@ -742,7 +742,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
                                              measurement_vec_fit,
                                              measurement_jac,
                                              radar_aux,
-                                             measurement_sensor,
+                                             measurement_sensors,
                                              radar_range_limits,
                                              jac_targets,
                                              atm_field,
@@ -774,7 +774,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
   const auto           distance_key    = [&](const Size iy) {
     const Numeric center = std::midpoint(radar_range_limits[iy, 0], radar_range_limits[iy, 1]);
     if (coordinate_mode != RadarRangeMode::Altitude) return center;
-    const auto& sensor = measurement_sensor[measurement_element(measurement_sensor, iy).first];
+    const auto& sensor = measurement_sensors[measurement_element(measurement_sensors, iy).first];
     const auto& poslos = sensor.geometry;
     if (poslos.empty())
       arts::user_error(R"(Sensor "{}": radar observation {} has no position/LOS geometry)", sensor.name(), iy);
@@ -813,7 +813,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
       if (not std::isfinite(derivative) or derivative == 0.0)
         arts::user_error(
             R"(Sensor "{}": radar onion peeling encountered a zero/non-finite derivative for gate {} and state {})",
-            gate_sensor_name(measurement_sensor, iy),
+            gate_sensor_name(measurement_sensors, iy),
             iy,
             ix_best);
       Numeric step             = residual / derivative;
@@ -829,7 +829,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
     if (not converged)
       arts::user_error(
           R"(Sensor "{}": radar onion peeling did not converge for gate {} (observed {}, fitted {}) after {} iterations)",
-          gate_sensor_name(measurement_sensor, iy),
+          gate_sensor_name(measurement_sensors, iy),
           iy,
           measurement_vec[iy],
           measurement_vec_fit[iy],
@@ -859,7 +859,7 @@ void model_state_vecFromRadarOnionPeeling(const Workspace&                ws,
         if (not std::isfinite(derivative) or derivative == 0.0)
           arts::user_error(
               R"(Sensor "{}": radar onion peeling encountered a zero/non-finite derivative for gate {} and state {})",
-              gate_sensor_name(measurement_sensor, iy),
+              gate_sensor_name(measurement_sensors, iy),
               iy,
               ix);
         Numeric step        = std::clamp(residual / derivative, -max_step, max_step);

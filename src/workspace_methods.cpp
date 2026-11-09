@@ -3041,7 +3041,7 @@ building of an actual Jacobian matrix.
 )--",
       .author = {"Richard Larsson"},
       .out    = {"jac_targets"},
-      .in     = {"jac_targets", "atm_field", "surf_field", "subsurf_field", "abs_bands", "measurement_sensor"},
+      .in     = {"jac_targets", "atm_field", "surf_field", "subsurf_field", "abs_bands", "measurement_sensors"},
   };
 
   const auto jac2oem = [&wsm_data](const std::string& name) {
@@ -3093,16 +3093,16 @@ Order 1 means linear:   :math:`y = y_0 + a + b t`
 and so on.  The derivatives that are added to the *model_state_vec* are
 those with regards to a, b, etc..
 
-The GIN ``sensor_elem`` is the index of the sensor in *measurement_sensor*.
+The GIN ``sensor_elem`` is the index of the sensor in *measurement_sensors*.
 )--",
       .author    = {"Richard Larsson"},
       .out       = {"jac_targets"},
-      .in        = {"jac_targets", "measurement_sensor"},
+      .in        = {"jac_targets", "measurement_sensors"},
       .gin       = {"t", "sensor_elem", "polyorder"},
       .gin_type  = {"Vector", "Index", "Index"},
       .gin_value = {std::nullopt, std::nullopt, Index{0}},
       .gin_desc  = {"The grid of :math:`y`.  As :math:`t` above.",
-                    "The index of the sensor in *measurement_sensor*",
+                    "The index of the sensor in *measurement_sensors*",
                     "The order of the polynomial fit.  Maximum :math:`n` above."},
   };
   wsm_data["oemAddErrorPolyFit"] = jac2oem("jac_targetsAddErrorPolyFit");
@@ -3121,16 +3121,16 @@ the grid and :math:`a \pm b` at its edges.  The derivatives that are added
 to the *model_state_vec* are those with regards to a, b, etc..
 *measurement_jacAddSensorJacobianPerturbations* computes them.
 
-The GIN ``sensor_elem`` is the index of the sensor in *measurement_sensor*.
+The GIN ``sensor_elem`` is the index of the sensor in *measurement_sensors*.
 )--",
       .author    = {"Richard Larsson"},
       .out       = {"jac_targets"},
-      .in        = {"jac_targets", "measurement_sensor"},
+      .in        = {"jac_targets", "measurement_sensors"},
       .gin       = {"d", "sensor_elem", "polyorder"},
       .gin_type  = {"Numeric", "Index", "Index"},
       .gin_value = {Numeric{0.1}, std::nullopt, Index{0}},
       .gin_desc  = {"The perturbation used in methods that cannot compute derivatives analytically",
-                    "The index of the sensor in *measurement_sensor*",
+                    "The index of the sensor in *measurement_sensors*",
                     "The order of the polynomial fit"},
   };
   wsm_data["oemAddSensorFrequencyPolyOffset"] = jac2oem("jac_targetsAddSensorFrequencyPolyOffset");
@@ -4568,7 +4568,7 @@ The core calculations happens inside the *spectral_rad_operator*.
 )--",
       .author         = {"Richard Larsson"},
       .out            = {"measurement_vec"},
-      .in             = {"measurement_sensor", "spectral_rad_operator", "ray_path_observer_agenda"},
+      .in             = {"measurement_sensors", "spectral_rad_operator", "ray_path_observer_agenda"},
       .pass_workspace = true,
   };
 
@@ -4591,7 +4591,7 @@ left as zero, see *measurement_jacAddSensorJacobianPerturbations*.
 )--",
       .author    = {"Richard Larsson"},
       .out       = {"measurement_vec", "measurement_jac"},
-      .in        = {"measurement_sensor",
+      .in        = {"measurement_sensors",
                     "jac_targets",
                     "atm_field",
                     "surf_field",
@@ -4610,20 +4610,20 @@ left as zero, see *measurement_jacAddSensorJacobianPerturbations*.
           R"--(Adds the derivatives with regards to the sensor targets of *jac_targets* to *measurement_jac*.
 
 Each sensor target changes the frequency grid or the geometries of one sensor
-in *measurement_sensor* by a polynomial offset.  For each coefficient of the
+in *measurement_sensors* by a polynomial offset.  For each coefficient of the
 polynomial, that sensor is perturbed by the target's perturbation times the
 term of the coefficient and simulated again by *measurement_vecFromSensor*,
 without Jacobian targets.  Its change from *measurement_vec*, divided by the
 perturbation, is the derivative.
 
 *measurement_vec* must be the result of *measurement_vecFromSensor* for the
-same *measurement_sensor*, so call this method directly after it.
+same *measurement_sensors*, so call this method directly after it.
 )--",
       .author    = {"Richard Larsson"},
       .out       = {"measurement_jac"},
       .in        = {"measurement_jac",
                     "measurement_vec",
-                    "measurement_sensor",
+                    "measurement_sensors",
                     "jac_targets",
                     "atm_field",
                     "surf_field",
@@ -4673,36 +4673,36 @@ same *measurement_sensor*, so call this method directly after it.
       .desc             = "Applies transformations to the measurement sensor state Jacobian\n",
       .author           = {"Richard Larsson"},
       .out              = {"measurement_jac"},
-      .in               = {"measurement_jac", "model_state_vec", "measurement_sensor", "jac_targets"},
+      .in               = {"measurement_jac", "model_state_vec", "measurement_sensors", "jac_targets"},
       .size_constraints = false,
   };
 
-  wsm_data["measurement_sensorFromModelState"] = {
+  wsm_data["measurement_sensorsFromModelState"] = {
       .desc =
-          R"--(Update *measurement_sensor* from *model_state_vec*.
+          R"--(Update *measurement_sensors* from *model_state_vec*.
 )--",
       .author = {"Richard Larsson"},
-      .out    = {"measurement_sensor"},
-      .in     = {"measurement_sensor", "model_state_vec", "model_state_targets"},
+      .out    = {"measurement_sensors"},
+      .in     = {"measurement_sensors", "model_state_vec", "model_state_targets"},
   };
 
-  wsm_data["measurement_sensorInit"] = {
+  wsm_data["measurement_sensorsInit"] = {
       .desc =
-          R"--(Initialize *measurement_sensor* to empty.
+          R"--(Initialize *measurement_sensors* to empty.
 )--",
       .author = {"Richard Larsson"},
-      .out    = {"measurement_sensor"},
+      .out    = {"measurement_sensors"},
   };
 
-  wsm_data["measurement_sensorAddSimple"] = {
+  wsm_data["measurement_sensorsAddSimple"] = {
       .desc =
           R"--(Adds a sensor with a dirac channel opening around the frequency grid.
 
 All elements share position, line-of-sight, and frequency grid.
 )--",
       .author    = {"Richard Larsson"},
-      .out       = {"measurement_sensor"},
-      .in        = {"measurement_sensor", "freq_grid"},
+      .out       = {"measurement_sensors"},
+      .in        = {"measurement_sensors", "freq_grid"},
       .gin       = {"pos", "los", "pol", "name"},
       .gin_type  = {"Vector3", "Vector2", "Stokvec", "String"},
       .gin_value = {std::nullopt, std::nullopt, rtepack::to_stokvec(PolarizationChoice::I), String{}},
@@ -4710,16 +4710,16 @@ All elements share position, line-of-sight, and frequency grid.
           {"A position [alt, lat, lon]",
            "A line of sight [zenith, azimuth]",
            "The polarization whose dot-product with the spectral radiance becomes the measurement",
-           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensor*"},
+           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensors*"},
   };
 
-  wsm_data["measurement_sensorAddGaussianZenith"] = {
+  wsm_data["measurement_sensorsAddGaussianZenith"] = {
       .desc =
-          R"--(Add a sensor to *measurement_sensor* that has a Gaussian zenith response.
+          R"--(Add a sensor to *measurement_sensors* that has a Gaussian zenith response.
 )--",
       .author    = {"Richard Larsson"},
-      .out       = {"measurement_sensor"},
-      .in        = {"measurement_sensor", "freq_grid"},
+      .out       = {"measurement_sensors"},
+      .in        = {"measurement_sensors", "freq_grid"},
       .gin       = {"pos", "los", "pol", "dzen_grid", "std_zen", "name"},
       .gin_type  = {"Vector3", "Vector2", "Stokvec", "AscendingGrid", "Numeric", "String"},
       .gin_value = {std::nullopt,
@@ -4734,10 +4734,10 @@ All elements share position, line-of-sight, and frequency grid.
            "The polarization whose dot-product with the spectral radiance becomes the measurement",
            "The delta zenith grid for the Gaussian response",
            "The standard deviation for the Gaussian response",
-           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensor*"},
+           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensors*"},
   };
 
-  wsm_data["measurement_sensorAddSimpleGaussian"] = {
+  wsm_data["measurement_sensorsAddSimpleGaussian"] = {
       .desc =
           R"--(Adds a sensor with a Gaussian channel opening around the frequency grid.
 
@@ -4749,8 +4749,8 @@ The I component's distribution is normalized to 1 or 0 by itself, while
 the Q, U, and V components' hypotenuse are normalized to 1 or 0 together.
 )--",
       .author    = {"Richard Larsson"},
-      .out       = {"measurement_sensor"},
-      .in        = {"measurement_sensor", "freq_grid"},
+      .out       = {"measurement_sensors"},
+      .in        = {"measurement_sensors", "freq_grid"},
       .gin       = {"std", "pos", "los", "pol", "name"},
       .gin_type  = {"Numeric", "Vector3", "Vector2", "Stokvec", "String"},
       .gin_value = {std::nullopt, std::nullopt, std::nullopt, rtepack::to_stokvec(PolarizationChoice::I), String{}},
@@ -4759,16 +4759,16 @@ the Q, U, and V components' hypotenuse are normalized to 1 or 0 together.
            "A position [alt, lat, lon]",
            "A line of sight [zenith, azimuth]",
            "The polarization whose dot-product with the spectral radiance becomes the measurement",
-           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensor*"},
+           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensors*"},
   };
 
   {
-    auto& this_       = wsm_data["measurement_sensorAddVectorGaussian"];
-    this_             = wsm_data.at("measurement_sensorAddSimpleGaussian");
+    auto& this_       = wsm_data["measurement_sensorsAddVectorGaussian"];
+    this_             = wsm_data.at("measurement_sensorsAddSimpleGaussian");
     this_.gin_type[0] = "Vector";
   }
 
-  wsm_data["measurement_sensorAddRawSensor"] = {
+  wsm_data["measurement_sensorsAddRawSensor"] = {
       .desc =
           R"--(Adds sensor elements from a raw perturbation of the sensor
 
@@ -4795,8 +4795,8 @@ The quoted strings must be used as the grid names of the gridded field.
     is that the order of the dimensions do not change from the one above.
 )--",
       .author    = {"Richard Larsson"},
-      .out       = {"measurement_sensor"},
-      .in        = {"measurement_sensor", "freq_grid"},
+      .out       = {"measurement_sensors"},
+      .in        = {"measurement_sensors", "freq_grid"},
       .gin       = {"pos", "los", "raw_sensor_perturbation", "normalize", "name"},
       .gin_type  = {"Vector3",
                     "Vector2",
@@ -4812,10 +4812,10 @@ The quoted strings must be used as the grid names of the gridded field.
            "A line of sight [zenith, azimuth]",
            "The sensor perturbation grid",
            "Whether or not to normalize the perturbation to 1.0 for each element",
-           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensor*"},
+           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensors*"},
   };
 
-  wsm_data["measurement_sensorAddCamera"] = {
+  wsm_data["measurement_sensorsAddCamera"] = {
       .desc =
           R"--(Adds a simple thin-lens camera model to the measurement sensor.
 
@@ -4848,8 +4848,8 @@ A Dirac weight is assigned per pixel per frequency channel, yielding
 the same frequency grid and the same PosLos grid (one entry per pixel).
 )--",
       .author    = {"Richard Larsson"},
-      .out       = {"measurement_sensor"},
-      .in        = {"measurement_sensor", "freq_grid"},
+      .out       = {"measurement_sensors"},
+      .in        = {"measurement_sensors", "freq_grid"},
       .gin       = {"pos",
                     "los",
                     "pol",
@@ -4894,7 +4894,7 @@ the same frequency grid and the same PosLos grid (one entry per pixel).
            "Focal length of the lens in meters",
            "Diameter of the lens aperture in meters",
            "Distance to the in-focus plane in meters (must be > focal_length)",
-           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensor*"},
+           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensors*"},
   };
 
   wsm_data["sun_pathFromObserverAgenda"] = {
@@ -5136,7 +5136,7 @@ Then fills it with the perturbations from the *jac_targets*.
 )--",
       .author = {"Richard Larsson"},
       .out    = {"model_state_vec"},
-      .in     = {"model_state_vec", "measurement_sensor", "jac_targets"},
+      .in     = {"model_state_vec", "measurement_sensors", "jac_targets"},
   };
 
   wsm_data["model_state_vecFromAtmosphere"] = {
@@ -5292,8 +5292,8 @@ calculation is performed. Use this before preparing the next measurement's
 retrieval from the same physical prior.
 )",
       .author = {"Richard Larsson"},
-      .out    = {"abs_bands", "surf_field", "subsurf_field", "atm_field", "measurement_sensor"},
-      .in     = {"oem", "abs_bands", "surf_field", "subsurf_field", "atm_field", "measurement_sensor", "jac_targets"},
+      .out    = {"abs_bands", "surf_field", "subsurf_field", "atm_field", "measurement_sensors"},
+      .in     = {"oem", "abs_bands", "surf_field", "subsurf_field", "atm_field", "measurement_sensors", "jac_targets"},
   };
   wsm_data["oemClearAuxiliary"] = {
       .desc = "Release recomputable products and caches in oem; retain inputs, current state, bases and diagnostics.\n",
@@ -5499,11 +5499,11 @@ system (reduced dimensions for oemCalcReduced).
 
 )",
       .author           = {"Patrick Eriksson"},
-      .out              = {"oem", "atm_field", "abs_bands", "measurement_sensor", "surf_field", "subsurf_field"},
+      .out              = {"oem", "atm_field", "abs_bands", "measurement_sensors", "surf_field", "subsurf_field"},
       .in               = {"oem",
                            "atm_field",
                            "abs_bands",
-                           "measurement_sensor",
+                           "measurement_sensors",
                            "surf_field",
                            "subsurf_field",
                            "jac_targets",
@@ -5823,7 +5823,7 @@ success discards cached inverses.  Other existing correlations are preserved.
 )",
       .author           = {"Richard Larsson"},
       .out              = {"measurement_vec_error", "measurement_jac_error"},
-      .in               = {"measurement_sensor", "model_state_targets", "jac_targets", "model_state_vec"},
+      .in               = {"measurement_sensors", "model_state_targets", "jac_targets", "model_state_vec"},
       .size_constraints = false,
   };
 
@@ -6594,7 +6594,7 @@ this step, call *jac_targetsFinalize* first. This only finalizes the mapping;
 )",
       .author = {"Richard Larsson"},
       .out    = {"oem", "jac_targets"},
-      .in     = {"oem", "jac_targets", "atm_field", "surf_field", "subsurf_field", "abs_bands", "measurement_sensor"},
+      .in     = {"oem", "jac_targets", "atm_field", "surf_field", "subsurf_field", "abs_bands", "measurement_sensors"},
       .size_constraints = false,
   };
 
@@ -6678,7 +6678,7 @@ of the sensor element at ``idx`` at the chosen ``pol`` polarization.
       .gout      = {"ray_path_observers_weights"},
       .gout_type = {"Vector"},
       .gout_desc = {"The weights for the ray path field"},
-      .in        = {"measurement_sensor"},
+      .in        = {"measurement_sensors"},
       .gin       = {"idx", "pol"},
       .gin_type  = {"Index", "Stokvec"},
       .gin_value = {Index{0}, Stokvec{1.0, 0.0, 0.0, 0.0}},
@@ -6865,7 +6865,7 @@ can be added without changing the interface.
       .pass_workspace = true,
   };
 
-  wsm_data["measurement_sensorAddSimpleRadar"] = {
+  wsm_data["measurement_sensorsAddSimpleRadar"] = {
       .desc      = R"--(Adds range-resolved pencil-beam radar observation elements.
 
 For every frequency in *freq_grid*, one observation element is appended for
@@ -6873,14 +6873,14 @@ every interval in ``range_bins``.  The ordering is frequency first and range
 bin second, matching the ARTS2 ``yRadar`` convention.  All generated elements
 share their frequency and position/LOS grids.  The matching limits are
 appended to *radar_range_limits*.  Each frequency is appended to
-*measurement_sensor* as its own sensor, with the range grid as its meta.
+*measurement_sensors* as its own sensor, with the range grid as its meta.
 
 The receiving polarization is a Stokes dot-product vector.  For example,
 ``[0.5, 0.5, 0, 0]`` is the old ARTS polarization index 5 (vertical linear).
 )--",
       .author    = {"Patrick Eriksson", "OpenAI Codex"},
-      .out       = {"measurement_sensor", "radar_range_limits"},
-      .in        = {"measurement_sensor", "radar_range_limits", "freq_grid"},
+      .out       = {"measurement_sensors", "radar_range_limits"},
+      .in        = {"measurement_sensors", "radar_range_limits", "freq_grid"},
       .gin       = {"pos", "los", "pol", "range_bins", "name"},
       .gin_type  = {"Vector3", "Vector2", "Stokvec", "AscendingGrid", "String"},
       .gin_value = {std::nullopt, std::nullopt, Stokvec{0.5, 0.5, 0.0, 0.0}, std::nullopt, String{}},
@@ -6889,7 +6889,7 @@ The receiving polarization is a Stokes dot-product vector.  For example,
            "Radar viewing direction [zenith, azimuth].",
            "Receiving-polarization Stokes weights.",
            "Common range-bin edges.",
-           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensor*"},
+           "The name of the sensor and of its meta, or empty to name it sensor-N, where N is its position in *measurement_sensors*"},
   };
 
   wsm_data["measurement_vecFromRadarSingleScattering"] = {
@@ -6898,13 +6898,13 @@ The receiving polarization is a Stokes dot-product vector.  For example,
 This is the ARTS3 counterpart of the ARTS2 ``yRadar`` and
 ``iyRadarSingleScat`` workflow.  It calculates particle backscatter and
 two-way polarized attenuation by gases and particles along the propagation
-paths of *measurement_sensor*.  Surface clutter and multiple scattering are
+paths of *measurement_sensors*.  Surface clutter and multiple scattering are
 not included.
 
-Each element of *measurement_sensor* is paired with the corresponding row of
+Each element of *measurement_sensors* is paired with the corresponding row of
 *radar_range_limits*.  This keeps *measurement_vec* and *measurement_jac* in
 the standard retrieval layout: one sensor observation element produces one
-measurement.  Use *measurement_sensorAddSimpleRadar* for the common
+measurement.  Use *measurement_sensorsAddSimpleRadar* for the common
 frequency/polarization/range-bin arrangement.
 
 ``range_mode`` may be ``"Altitude"`` [m], ``"Distance"`` [m one way],
@@ -6933,7 +6933,7 @@ requested order.
 )--",
       .author   = {"Patrick Eriksson", "OpenAI Codex"},
       .out      = {"measurement_vec", "measurement_jac", "radar_aux"},
-      .in       = {"measurement_sensor",
+      .in       = {"measurement_sensors",
                    "radar_range_limits",
                    "jac_targets",
                    "atm_field",
@@ -6992,7 +6992,7 @@ and atmospheric state chosen by the caller.
       .author         = {"Patrick Eriksson", "OpenAI Codex"},
       .out            = {"model_state_vec", "measurement_vec_fit", "measurement_jac", "atm_field"},
       .in             = {"measurement_vec",
-                         "measurement_sensor",
+                         "measurement_sensors",
                          "radar_range_limits",
                          "jac_targets",
                          "surf_field",
@@ -7114,7 +7114,7 @@ rotations.  Scattering directions use uniform solid-angle importance sampling.
 
 This is the observer-level interface used by *spectral_rad_observer_agenda* and
 therefore by *measurement_vecFromSensor*. Frequency, polarization, and antenna
-weighting are owned by *measurement_sensor*, so this method deliberately uses
+weighting are owned by *measurement_sensors*, so this method deliberately uses
 a pencil beam internally. One Monte Carlo calculation is performed for every
 frequency in *freq_grid*.
 
