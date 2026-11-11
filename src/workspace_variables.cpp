@@ -348,6 +348,17 @@ For more information, see :doc:`user.atm_field`.
       .inner_dims = {"NFREQ"},
   };
 
+  wsv_data["freq_grid_profile"] = {
+      .desc = R"--(The frequency grid of a propagation profile.
+
+It is *freq_grid* with points added beyond both ends, so that the profile
+also covers the frequencies that the wind shifts *freq_grid* to along a path.
+See *ProfileFromAltitude*.
+)--",
+      .type = "AscendingGrid",
+      .dims = {"NFREQ_PROFILE"},
+  };
+
   wsv_data["freq_wind_shift_jac"] = {
       .desc =
           R"--(The frequency wind shift Jacobian.
@@ -439,7 +450,7 @@ The units are *spectral_rad_jac* per meter.
   };
 
   wsv_data["spectral_nlte_srcvec_jac_profile"] = {
-      .desc       = R"--(Additional non-LTE derivative in a propagation profile
+      .desc       = R"--(Additional non-LTE derivative in a propagation profile, on *freq_grid_profile*
 
 .. note::
     Polarization is considered but if the profile is polarized,
@@ -447,7 +458,7 @@ The units are *spectral_rad_jac* per meter.
 )--",
       .type       = "ArrayOfStokvecMatrix",
       .dims       = {"NALT"},
-      .inner_dims = {"NTARGET", "NFREQ"},
+      .inner_dims = {"NTARGET", "NFREQ_PROFILE"},
   };
 
   wsv_data["spectral_nlte_srcvec_path"] = {
@@ -459,7 +470,7 @@ The units are *spectral_rad_jac* per meter.
   };
 
   wsv_data["spectral_nlte_srcvec_profile"] = {
-      .desc       = R"--(Additional non-LTE in a propagation profile
+      .desc       = R"--(Additional non-LTE in a propagation profile, on *freq_grid_profile*
 
 .. note::
     Polarization is considered but if the profile is polarized,
@@ -467,7 +478,7 @@ The units are *spectral_rad_jac* per meter.
 )--",
       .type       = "ArrayOfStokvecVector",
       .dims       = {"NALT"},
-      .inner_dims = {"NFREQ"},
+      .inner_dims = {"NFREQ_PROFILE"},
   };
 
   wsv_data["spectral_phamat_spectral"] = {
@@ -526,7 +537,7 @@ The units depend on what is set in *jac_targets* [1 / m / jacobian target's unit
   };
 
   wsv_data["spectral_propmat_jac_profile"] = {
-      .desc       = R"--(Propagation derivative matrices in a propagation profile
+      .desc       = R"--(Propagation derivative matrices in a propagation profile, on *freq_grid_profile*
 
 .. note::
     Polarization is considered but if the profile is polarized,
@@ -534,7 +545,7 @@ The units depend on what is set in *jac_targets* [1 / m / jacobian target's unit
 )--",
       .type       = "ArrayOfPropmatMatrix",
       .dims       = {"NALT"},
-      .inner_dims = {"NTARGET", "NFREQ"},
+      .inner_dims = {"NTARGET", "NFREQ_PROFILE"},
   };
 
   wsv_data["spectral_propmat_path"] = {
@@ -546,7 +557,7 @@ The units depend on what is set in *jac_targets* [1 / m / jacobian target's unit
   };
 
   wsv_data["spectral_propmat_profile"] = {
-      .desc       = R"--(Propagation matrices in a propagation profile
+      .desc       = R"--(Propagation matrices in a propagation profile, on *freq_grid_profile*
 
 .. note::
     Polarization is considered but if the profile is polarized,
@@ -554,7 +565,7 @@ The units depend on what is set in *jac_targets* [1 / m / jacobian target's unit
 )--",
       .type       = "ArrayOfPropmatVector",
       .dims       = {"NALT"},
-      .inner_dims = {"NFREQ"},
+      .inner_dims = {"NFREQ_PROFILE"},
   };
 
   wsv_data["spectral_propmat_scat"] = {
