@@ -90,15 +90,9 @@ OpticalProfile optical_profile(const Workspace&                   ws,
   const ArrayOfAtmPoint atm_path = forward_atm_path(ray_path, atm_field);
 
   for (Size ip = 0; ip < np; ++ip) {
-    PropmatVector gas_return;
-    StokvecVector source_return;
-    PropmatMatrix gas_return_jac;
-    StokvecMatrix source_return_jac;
+    SpectralPropmat gas_return_pm;
     spectral_propmat_agendaExecute(ws,
-                                   gas_return,
-                                   source_return,
-                                   gas_return_jac,
-                                   source_return_jac,
+                                   gas_return_pm,
                                    frequency,
                                    Vector3{0.0, 0.0, 0.0},
                                    jac_targets,
@@ -106,17 +100,13 @@ OpticalProfile optical_profile(const Workspace&                   ws,
                                    ray_path[ip],
                                    atm_path[ip],
                                    spectral_propmat_agenda);
+    const PropmatVector& gas_return = gas_return_pm.K;
+    const PropmatMatrix& gas_return_jac = gas_return_pm.dK;
     PropagationPathPoint outgoing_point = ray_path[ip];
     outgoing_point.los                  = path::mirror(outgoing_point.los);
-    PropmatVector gas_outgoing;
-    StokvecVector source_outgoing;
-    PropmatMatrix gas_outgoing_jac;
-    StokvecMatrix source_outgoing_jac;
+    SpectralPropmat gas_outgoing_pm;
     spectral_propmat_agendaExecute(ws,
-                                   gas_outgoing,
-                                   source_outgoing,
-                                   gas_outgoing_jac,
-                                   source_outgoing_jac,
+                                   gas_outgoing_pm,
                                    frequency,
                                    Vector3{0.0, 0.0, 0.0},
                                    jac_targets,
@@ -124,6 +114,8 @@ OpticalProfile optical_profile(const Workspace&                   ws,
                                    outgoing_point,
                                    atm_path[ip],
                                    spectral_propmat_agenda);
+    const PropmatVector& gas_outgoing = gas_outgoing_pm.K;
+    const PropmatMatrix& gas_outgoing_jac = gas_outgoing_pm.dK;
 
     // Propagation-path LOS is the propagation direction toward the receiver;
     // its mirror is the transmitted propagation direction.  ARO phase

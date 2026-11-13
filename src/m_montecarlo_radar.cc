@@ -36,15 +36,9 @@ OpticalPoint optical_point(const Workspace&                ws,
                            const Agenda&                   spectral_propmat_agenda) {
   const AscendingGrid freq_grid{frequency};
 
-  PropmatVector gas_return;
-  StokvecVector src_return;
-  PropmatMatrix gas_return_jac;
-  StokvecMatrix src_return_jac;
+  SpectralPropmat gas_return_pm;
   spectral_propmat_agendaExecute(ws,
-                                 gas_return,
-                                 src_return,
-                                 gas_return_jac,
-                                 src_return_jac,
+                                 gas_return_pm,
                                  freq_grid,
                                  Vector3{0.0, 0.0, 0.0},
                                  JacobianTargets{},
@@ -52,18 +46,13 @@ OpticalPoint optical_point(const Workspace&                ws,
                                  ray_point,
                                  atm_point,
                                  spectral_propmat_agenda);
+  const PropmatVector& gas_return = gas_return_pm.K;
 
   PropagationPathPoint outgoing_point = ray_point;
   outgoing_point.los                  = path::mirror(ray_point.los);
-  PropmatVector gas_outgoing;
-  StokvecVector src_outgoing;
-  PropmatMatrix gas_outgoing_jac;
-  StokvecMatrix src_outgoing_jac;
+  SpectralPropmat gas_outgoing_pm;
   spectral_propmat_agendaExecute(ws,
-                                 gas_outgoing,
-                                 src_outgoing,
-                                 gas_outgoing_jac,
-                                 src_outgoing_jac,
+                                 gas_outgoing_pm,
                                  freq_grid,
                                  Vector3{0.0, 0.0, 0.0},
                                  JacobianTargets{},
@@ -71,6 +60,7 @@ OpticalPoint optical_point(const Workspace&                ws,
                                  outgoing_point,
                                  atm_point,
                                  spectral_propmat_agenda);
+  const PropmatVector& gas_outgoing = gas_outgoing_pm.K;
 
   const Vector2 transmit_los = outgoing_point.los;
   const Vector2 receive_los  = ray_point.los;
