@@ -100,7 +100,7 @@ OpticalProfile optical_profile(const Workspace&                   ws,
                                    ray_path[ip],
                                    atm_path[ip],
                                    spectral_propmat_agenda);
-    const PropmatVector& gas_return = gas_return_pm.K;
+    const PropmatVector& gas_return     = gas_return_pm.K;
     const PropmatMatrix& gas_return_jac = gas_return_pm.dK;
     PropagationPathPoint outgoing_point = ray_path[ip];
     outgoing_point.los                  = path::mirror(outgoing_point.los);
@@ -114,7 +114,7 @@ OpticalProfile optical_profile(const Workspace&                   ws,
                                    outgoing_point,
                                    atm_path[ip],
                                    spectral_propmat_agenda);
-    const PropmatVector& gas_outgoing = gas_outgoing_pm.K;
+    const PropmatVector& gas_outgoing     = gas_outgoing_pm.K;
     const PropmatMatrix& gas_outgoing_jac = gas_outgoing_pm.dK;
 
     // Propagation-path LOS is the propagation direction toward the receiver;
@@ -560,9 +560,9 @@ void measurement_sensorsAddSimpleRadar(ArrayOfSensor&       measurement_sensors,
 
     Sensor& sensor =
         measurement_sensors.emplace_back(Sensor{.freq_grid = AscendingGrid{freq_grid[iv]},
-                                               .geometry  = SensorPosLosVector{SensorPosLos{.pos = pos, .los = los}},
-                                               .elements  = std::vector<sensor::SparseStokvecMatrix>(nbins, weights),
-                                               .meta      = std::move(meta)});
+                                                .geometry  = SensorPosLosVector{SensorPosLos{.pos = pos, .los = los}},
+                                                .elements  = std::vector<sensor::SparseStokvecMatrix>(nbins, weights),
+                                                .meta      = std::move(meta)});
     sensor.check();
   }
   radar_range_limits = std::move(new_limits);
